@@ -1,0 +1,111 @@
+{
+  "universe": "aurora",
+  "generator": "tools/generate_brds.py",
+  "brds": [
+    {
+      "file": "BRD-AUR-26-01-taksitlendirme.docx",
+      "title": "Kampanya Bazlı Cihaz Taksitlendirme",
+      "maturity": "clean-templated",
+      "requirement_count": 8,
+      "tables": 2,
+      "planted_anchors": [
+        {
+          "type": "budget",
+          "snippet": "azami 90 adam-gün"
+        },
+        {
+          "type": "deadline",
+          "snippet": "30 Eylül 2026"
+        }
+      ],
+      "planted_ambiguities": [
+        {
+          "ref": "G-04",
+          "issue": "undefined-segment-terms",
+          "note": "'Kurumsal müşteriler için farklı koşullar' — segment ve koşullar tanımsız"
+        },
+        {
+          "ref": "G-07",
+          "issue": "missing-acceptance-criteria",
+          "note": "İade senaryosunda tahsil edilmiş taksitlerin akıbeti belirsiz"
+        }
+      ],
+      "expected_modules": [
+        "campaign-engine",
+        "billing-core",
+        "dealer-portal",
+        "invoice-render",
+        "integration-hub"
+      ]
+    },
+    {
+      "file": "BRD-AUR-26-02-konsolide-fatura.docx",
+      "title": "Konsolide Fatura",
+      "maturity": "clean-templated",
+      "requirement_count": 6,
+      "tables": 2,
+      "planted_anchors": [],
+      "planted_ambiguities": [],
+      "expected_modules": [
+        "billing-core",
+        "invoice-render",
+        "crm-suite",
+        "selfcare-web"
+      ]
+    },
+    {
+      "file": "BRD-AUR-26-03-bayi-siparis-entegrasyonu.docx",
+      "title": "Bayi Sipariş Entegrasyonu",
+      "maturity": "messy-unstructured",
+      "requirement_count": null,
+      "tables": 0,
+      "planted_anchors": [
+        {
+          "type": "analogy",
+          "snippet": "geçen yıl başka bir tedarikçiyle 40 günde"
+        }
+      ],
+      "planted_ambiguities": [
+        {
+          "ref": null,
+          "issue": "no-structure",
+          "note": "Numarasız, e-posta üslubu; gereksinimler paragraf içinde"
+        },
+        {
+          "ref": null,
+          "issue": "missing-volumetrics",
+          "note": "Sipariş hacmi, bayi sistemi/protokol, SLA tanımsız"
+        },
+        {
+          "ref": null,
+          "issue": "undefined-approval-flow",
+          "note": "'Onay adımı gerekiyorsa' — koşul ve onaylayan tanımsız"
+        }
+      ],
+      "expected_modules": [
+        "dealer-portal",
+        "integration-hub",
+        "product-catalog"
+      ]
+    },
+    {
+      "file": "BRD-AUR-26-04-bakiye-tasima.docx",
+      "title": "Ön Ödemeliden Faturalıya Geçişte Bakiye Taşıma",
+      "maturity": "micro-cr",
+      "requirement_count": 1,
+      "tables": 1,
+      "planted_anchors": [],
+      "planted_ambiguities": [
+        {
+          "ref": null,
+          "issue": "unresolved-edge-case",
+          "note": "Bakiye > ilk fatura durumu bilinçli olarak açık bırakılmış"
+        }
+      ],
+      "expected_modules": [
+        "billing-core",
+        "crm-suite"
+      ]
+    }
+  ]
+}

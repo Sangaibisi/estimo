@@ -9,6 +9,17 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- Design system artifacts under [docs/design/](docs/design/) (hi-fi screens, wireframes,
+  tokens — Aurora Telecom installment scenario, light+dark, IBM Plex).
+- S0 data foundation: Aurora fixture universe standard
+  ([fixtures/README.md](fixtures/README.md)), estimate ledger schema v0 + seed-set import
+  contract ([docs/LEDGER-SCHEMA.md](docs/LEDGER-SCHEMA.md)), in-house seed-set inventory
+  template ([docs/SEED-SET-INVENTORY.md](docs/SEED-SET-INVENTORY.md)), golden-set &
+  metrics design ([evals/README.md](evals/README.md)), synthetic Turkish BRD fixtures
+  with planted-feature manifest ([fixtures/brd/](fixtures/brd/)).
+- ARCHITECTURE: explicit **ordered indexing pipelines** section (wiki / code / ledger
+  lanes + query path); git-hosting connectors named explicitly with **Bitbucket
+  first-class** (roadmap S9-2, Admin → Connections).
 - ADR-0005: OSS-first composition — adopt proven, license-safe components behind internal
   interfaces; from-scratch code reserved for the differentiation core. Linked from
   AGENTS.md golden rules and ARCHITECTURE.md.
