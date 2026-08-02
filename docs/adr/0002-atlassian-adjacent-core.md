@@ -16,11 +16,11 @@ and an erosion clock.
 
 ## Decision
 
-Lodestar's core (ingest, knowledge layer, pipeline, calibration, review UI) runs on its own
+Estimo's core (ingest, knowledge layer, pipeline, calibration, review UI) runs on its own
 infrastructure. Atlassian integration is split by purpose: **bulk sync via first-party REST
 connectors** (checkpointed, incremental, ACL- and version-aware); **interactive enrichment
 via Atlassian/Teamwork-Graph MCP** (no hard dependency while in beta); **distribution via a
-thin Forge Rovo Agent** front-door calling our API; and Lodestar ships **its own MCP server**
+thin Forge Rovo Agent** front-door calling our API; and Estimo ships **its own MCP server**
 so estimates are queryable from Rovo/Copilot/Claude.
 
 ## Consequences

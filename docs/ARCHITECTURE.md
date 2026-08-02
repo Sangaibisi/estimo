@@ -75,7 +75,7 @@ code is reserved for the differentiation core — see
 | Knowledge curation | Canonical pages tier outranks raw wiki; freshness + authority scores on chunks | accepted | Stale-wiki poisoning defense |
 | Calibration | Analog few-shot selection + conformal intervals + historical error distributions | accepted | The two evidence-backed accuracy levers (RESEARCH §3.2) |
 | Evals | Golden synthetic set + Ragas/DeepEval/promptfoo offline; Langfuse online feedback | accepted | Naive-baseline reporting mandatory (PRINCIPLES #7) |
-| Review UI | Next.js/TypeScript web app, Turkish-first i18n | proposed | Design system incoming via [UI-VISION.md](UI-VISION.md) |
+| Review UI | Next.js/TypeScript web app; `en` default locale, `tr` first localization | proposed | Design system incoming via [UI-VISION.md](UI-VISION.md); [ADR-0004](adr/0004-turkish-first-pipeline.md) |
 | Connectors | First-party REST ingestors (Confluence v2 crawl w/ ACL+version metadata, Jira JQL cursor, git clone) | accepted | Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
 | Atlassian surface | Thin Forge Rovo Agent front-door + product's own MCP server | planned | Distribution without platform lock-in ([ADR-0002](adr/0002-atlassian-adjacent-core.md)) |
 | Deployment | docker-compose (dev) → Helm; ladder SaaS → VPC → BYOC → air-gap; stateless per tenant | accepted | Enterprise/telco buyer requirement |

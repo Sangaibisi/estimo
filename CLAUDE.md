@@ -5,8 +5,8 @@ there (golden rules, branch topology, Definition of Done, language policy) appli
 
 Claude-specific notes:
 
-- The maintainer converses in **Turkish** — reply in Turkish in conversation; write code,
-  commits and PRs in English per the language policy in AGENTS.md §2.8.
+- The maintainer converses in **Turkish** — reply in Turkish in conversation. Everything
+  in the repo — code, commits, PRs, and all documentation — is English per AGENTS.md §2.8.
 - Prefer **editing canonical docs** over creating new ones. This repo treats stale or
   duplicate documentation as a bug; do not generate summary/plan/notes files.
 - Before claiming an estimation-behavior change works, **run the eval harness** (once it

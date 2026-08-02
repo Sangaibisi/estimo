@@ -1,6 +1,10 @@
-# Glossary / Sözlük
+# Glossary
 
-| Term | TR | Meaning |
+Turkish equivalents are kept as a domain reference — BRDs and first-market artifacts
+arrive in Turkish (see [ADR-0004](adr/0004-turkish-first-pipeline.md)); they are data
+vocabulary, not documentation language.
+
+| Term | Turkish equivalent | Meaning |
 |---|---|---|
 | **BRD** | İş Gereksinim Dokümanı | Customer-authored business requirements document (`.docx`, high-level, Turkish-first in our context). |
 | **BoE** | Taslak Efor Dokümanı (Basis-of-Estimate) | The product's output artifact: scope basis, exclusions, decomposition, three-point ranges, assumption & risk registers, evidence provenance, signatures. |

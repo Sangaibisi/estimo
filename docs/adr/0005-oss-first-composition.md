@@ -51,7 +51,7 @@ Contributions flow back upstream when fixes are general-purpose.
 
 ## Consequences
 
-- Speed and quality: we stand on ecosystem-tested code and spend effort only where Lodestar
+- Speed and quality: we stand on ecosystem-tested code and spend effort only where Estimo
   is different; the stack stays aligned with industry-standard tooling contributors know.
 - We accept wrapper-maintenance cost and third-party risk (mitigated by pinning, interface
   isolation, and the checklist's health gate).

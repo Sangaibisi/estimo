@@ -5,9 +5,9 @@ If you are an agent picking up work here: read this file fully, then read
 [docs/ROADMAP.md](docs/ROADMAP.md) to find what to build next. When any other document
 conflicts with this one, this one wins; fix the other document in the same PR.
 
-## 1. What Lodestar is (context in 60 seconds)
+## 1. What Estimo is (context in 60 seconds)
 
-Lodestar turns a customer BRD (business requirements document, `.docx`, Turkish-first) into an
+Estimo turns a customer BRD (business requirements document, `.docx`, Turkish-first) into an
 **auditable Basis-of-Estimate (BoE) draft** for software vendors: requirement decomposition →
 ambiguity gate with clarification questions → evidence grounding (code graph, wiki retrieval,
 historical analogies) → three-point effort ranges with assumptions/risks → human review and
@@ -48,11 +48,14 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
    split, or delete a roadmap item silently — propose the change in the PR description.
 7. **Tests and evals gate merges.** Code without tests doesn't merge. Estimation-pipeline
    changes without eval evidence don't merge. Failing CI is never "flaky, ignore".
-8. **Language policy.** Code, identifiers, comments, commit messages, PRs: **English**.
-   Product UI strings and BoE outputs: **Turkish first**, i18n-ready (`tr` default, `en`
-   planned). Planning docs (`ROADMAP`, `RESEARCH`, `UI-VISION`): Turkish is fine. The
-   maintainer communicates in Turkish — mirror them in conversation; write repo artifacts
-   per this policy.
+8. **Language policy: English everywhere.** Code, identifiers, comments, commit
+   messages, PRs, and **all documentation** are English — the product targets a global
+   audience. Product UI default locale is English (`en`); Turkish (`tr`) is the first
+   localization because the first target market is Turkey. Turkish appears in the repo
+   **only as data**: synthetic BRD fixtures, retrieval benchmarks, and `tr` localization
+   templates (incoming customer BRDs are Turkish — that is an input-handling requirement,
+   not a documentation language). The maintainer converses in Turkish — mirror them in
+   conversation; repo artifacts stay English.
 9. **Security posture.** Secrets only via environment (`.env` is gitignored;
    `.env.example` documents keys). Pin dependency versions for anything touching the
    supply chain (the gateway client especially — see research §5.4). New third-party
@@ -111,7 +114,7 @@ A change is done when ALL of these hold:
 Grow into this shape (create directories when their first real content arrives, not before):
 
 ```
-lodestar/
+estimo/
 ├── apps/
 │   ├── api/            # FastAPI service: pipeline orchestration, review endpoints
 │   └── web/            # Review UI (Türkçe-first)
@@ -159,5 +162,5 @@ sequentially, link it from `docs/ARCHITECTURE.md`. Existing accepted ADRs:
 - [0001 — All model access through an OpenAI-compatible gateway (LiteLLM)](docs/adr/0001-litellm-gateway-only.md)
 - [0002 — Core runs adjacent to Atlassian; thin Forge/Rovo surface on top](docs/adr/0002-atlassian-adjacent-core.md)
 - [0003 — Apache-2.0 license](docs/adr/0003-apache-2-license.md)
-- [0004 — Turkish-first pipeline with multilingual retrieval](docs/adr/0004-turkish-first-pipeline.md)
+- [0004 — English-first product, Turkish-first input](docs/adr/0004-turkish-first-pipeline.md)
 - [0005 — OSS-first composition: adopt proven components, build only the core](docs/adr/0005-oss-first-composition.md)

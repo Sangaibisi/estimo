@@ -1,6 +1,6 @@
-# Lodestar
+# Estimo
 
-**Evidence-linked effort estimation.** Lodestar turns a customer's business requirements
+**Evidence-linked effort estimation.** Estimo turns a customer's business requirements
 document (BRD) into an auditable **Basis-of-Estimate draft** — requirement decomposition,
 clarification questions, impacted-module analysis and calibrated effort ranges — grounded
 in three things no generic AI tool has: **your codebase, your wiki know-how, and your own
@@ -10,10 +10,8 @@ estimate-vs-actual history.** Always reviewed and signed by humans.
 > The founding research dossier lives in [docs/RESEARCH.md](docs/RESEARCH.md);
 > the build plan in [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Why "Lodestar"?** A lodestar is the star navigators steer by — and in law, the
-*lodestar method* is how courts compute a defensible fee: documented hours × reasonable
-rate, adjusted with justified multipliers. An estimate you can navigate by, and defend
-line by line. That's the product.
+**Why "Estimo"?** From the Latin *aestimo* — "I estimate, I appraise." One word, one
+job: turning requirements into estimates you can defend line by line.
 
 ## Why
 
@@ -35,7 +33,8 @@ found that:
 ## How it works
 
 1. **Parse** — structural extraction of the BRD (headings, tables, requirement lists) with
-   stable requirement IDs. Turkish-first, multilingual by design.
+   stable requirement IDs. Multilingual by design — Turkish input is first-class, since
+   the first target market is Turkey.
 2. **Decompose** — ontology-guided breakdown into work items (telco: eTOM/SID-aware).
 3. **Gate** — ambiguity detection; unclear items get *clarification questions*, not numbers.
 4. **Ground** — per-item agents pull evidence: code graph traversal, hybrid wiki search,
@@ -51,7 +50,7 @@ self-host friendly, no provider SDKs anywhere in the codebase.
 
 ## Product laws
 
-Lodestar never shows a magic number. The full list is in
+Estimo never shows a magic number. The full list is in
 [docs/PRINCIPLES.md](docs/PRINCIPLES.md) — highlights:
 
 - Ranges, never point estimates. No estimate without an evidence link.
@@ -64,7 +63,7 @@ Lodestar never shows a magic number. The full list is in
 
 | Document | What it is |
 |---|---|
-| [docs/RESEARCH.md](docs/RESEARCH.md) | Founding research dossier (market, evidence, architecture, telco, OSS) — Turkish |
+| [docs/RESEARCH.md](docs/RESEARCH.md) | Founding research dossier (market, evidence, architecture, telco, OSS) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Reference architecture & tech choices |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Trackable sprint roadmap (single source of truth for plan & progress) |
 | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) | Evidence-derived product laws |

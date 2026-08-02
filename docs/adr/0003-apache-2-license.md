@@ -6,7 +6,7 @@
 
 ## Context
 
-Lodestar is developed in the open while also aiming to become a commercial product operated
+Estimo is developed in the open while also aiming to become a commercial product operated
 by its creator (internal dogfood → productization, RESEARCH.md §10 K1). License options
 considered: MIT (simple, no patent grant), Apache-2.0 (patent grant, contribution terms,
 enterprise-friendly), AGPL (protects against cloud competitors but suppresses enterprise
@@ -23,7 +23,7 @@ License the repository under **Apache-2.0**, with inbound=outbound contribution 
 
 - Maximum adoption surface for the target buyers (enterprise/telco vendors) and clean
   compatibility with the whole dependency stack.
-- A hyperscaler could offer Lodestar as a service; accepted risk at this stage — the moat is
+- A hyperscaler could offer Estimo as a service; accepted risk at this stage — the moat is
   each customer's private ledger/calibration data, which does not ship with the code.
 - Revisit triggers: significant external contribution volume (consider DCO/CLA), or a
   concrete managed-service competitor (consider open-core split for enterprise modules —

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Lodestar are documented in this file.
+All notable changes to Estimo are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/) once code ships.
@@ -14,9 +14,12 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Changed
-- Project renamed from **Eforge** to **Lodestar** (repo, docs, all references) — after the
-  navigator's star and the legal "lodestar method" (documented hours × reasonable rate =
-  a defensible, evidence-based effort figure).
+- Project renamed from **Eforge** to **Estimo** (briefly Lodestar) — from the Latin
+  *aestimo*, "I estimate, I appraise".
+- **English is now the repository's single language**: the research dossier, roadmap and
+  UI vision were translated; Turkish remains as *data only* (synthetic BRD fixtures,
+  retrieval benchmarks, `tr` localization templates). ADR-0004 revised to
+  "English-first product, Turkish-first input"; AGENTS.md language policy updated.
 - ADR-0005 gained an explicit **credibility bar**: only de-facto-standard,
   major-org-backed, or overwhelmingly adopted OSS projects qualify as dependencies.
 - README is now English-only (Turkish summary section removed).
