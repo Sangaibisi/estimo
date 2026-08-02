@@ -1,4 +1,4 @@
-# Eforge Yol Haritası
+# Lodestar Yol Haritası
 
 Planın ve ilerlemenin **tek kanonik kaynağı** bu dosyadır. Mimari gerekçeler
 [ARCHITECTURE.md](ARCHITECTURE.md) ve [RESEARCH.md](RESEARCH.md) içindedir; bu dosya
@@ -80,7 +80,7 @@ uçtan uca çalışıyor; provider-SDK guard testle kanıtlı.
 - [ ] S2-3 **Çıpa karantinası**: bütçe/tarih/efor imalarını tespit et, işaretle, tahmin bağlamından ayır (insan görür, model görmez — PRINCIPLES #5)
 - [ ] S2-4 Muğlaklık ön-skoru v0 (kural + LLM karması): eksik aktör/koşul/kabul kriteri sinyalleri
 - [ ] S2-5 Parse eval'i: fixture'lar üzerinde segmentasyon doğruluğu golden karşılaştırması; bozuk şablon dayanıklılık testleri
-- [ ] S2-6 CLI: `eforge parse <brd.docx>` → JSON gereksinim tablosu
+- [ ] S2-6 CLI: `lodestar parse <brd.docx>` → JSON gereksinim tablosu
 
 **Çıkış kapısı:** Tüm fixture BRD'ler ID-kararlı ayrışıyor; çıpa tespiti fixture'lardaki
 tüm ekilmiş çıpaları yakalıyor; parse eval CI'da.
@@ -224,13 +224,13 @@ bandda, kadro memnuniyeti anketi olumlu; karar raporu yazıldı.
 
 **Amaç:** Tek-kiracıdan ürüne: kimlik, izolasyon, paketleme, dağıtım yüzeyleri.
 
-**Mimari dilimi:** multi-tenant temel, `infra/` Helm, Forge app, Eforge MCP server.
+**Mimari dilimi:** multi-tenant temel, `infra/` Helm, Forge app, Lodestar MCP server.
 
 - [ ] S10-1 AuthN/Z: SSO (OIDC), rol modeli (tahminci / reviewer / imza yetkilisi / admin)
 - [ ] S10-2 Tenant izolasyonu: index namespace + anahtar ayrımı; stateless-per-tenant pipeline doğrulaması
 - [ ] S10-3 Helm chart + BYOC kurulum kılavuzu; hava-boşluklu kurulum notları (açık-ağırlık model profili)
-- [ ] S10-4 Forge Rovo Agent front-door: Jira/Confluence içinden "Eforge'a gönder" + durum kartı
-- [ ] S10-5 Eforge MCP server: estimate/kanıt/dekompozisyon sorgu araçları (OAuth, stateless HTTP)
+- [ ] S10-4 Forge Rovo Agent front-door: Jira/Confluence içinden "Lodestar'a gönder" + durum kartı
+- [ ] S10-5 Lodestar MCP server: estimate/kanıt/dekompozisyon sorgu araçları (OAuth, stateless HTTP)
 - [ ] S10-6 Dokümantasyon sitesi + kurulum hızlı-başlangıcı; Marketplace hazırlık değerlendirmesi
 - [ ] S10-7 FP/COSMIC opsiyonel katman tasarım notu (Nesma enhancement-FPA) — uygulama sonraki döngüye
 

@@ -1,6 +1,6 @@
-# Eforge
+# Lodestar
 
-**Evidence-linked effort estimation.** Eforge turns a customer's business requirements
+**Evidence-linked effort estimation.** Lodestar turns a customer's business requirements
 document (BRD) into an auditable **Basis-of-Estimate draft** — requirement decomposition,
 clarification questions, impacted-module analysis and calibrated effort ranges — grounded
 in three things no generic AI tool has: **your codebase, your wiki know-how, and your own
@@ -9,6 +9,11 @@ estimate-vs-actual history.** Always reviewed and signed by humans.
 > 📍 **Status: research & foundation phase (pre-code).**
 > The founding research dossier lives in [docs/RESEARCH.md](docs/RESEARCH.md);
 > the build plan in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+**Why "Lodestar"?** A lodestar is the star navigators steer by — and in law, the
+*lodestar method* is how courts compute a defensible fee: documented hours × reasonable
+rate, adjusted with justified multipliers. An estimate you can navigate by, and defend
+line by line. That's the product.
 
 ## Why
 
@@ -46,7 +51,7 @@ self-host friendly, no provider SDKs anywhere in the codebase.
 
 ## Product laws
 
-Eforge never shows a magic number. The full list is in
+Lodestar never shows a magic number. The full list is in
 [docs/PRINCIPLES.md](docs/PRINCIPLES.md) — highlights:
 
 - Ranges, never point estimates. No estimate without an evidence link.

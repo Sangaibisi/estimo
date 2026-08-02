@@ -5,9 +5,9 @@ If you are an agent picking up work here: read this file fully, then read
 [docs/ROADMAP.md](docs/ROADMAP.md) to find what to build next. When any other document
 conflicts with this one, this one wins; fix the other document in the same PR.
 
-## 1. What Eforge is (context in 60 seconds)
+## 1. What Lodestar is (context in 60 seconds)
 
-Eforge turns a customer BRD (business requirements document, `.docx`, Turkish-first) into an
+Lodestar turns a customer BRD (business requirements document, `.docx`, Turkish-first) into an
 **auditable Basis-of-Estimate (BoE) draft** for software vendors: requirement decomposition →
 ambiguity gate with clarification questions → evidence grounding (code graph, wiki retrieval,
 historical analogies) → three-point effort ranges with assumptions/risks → human review and
@@ -59,12 +59,14 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
    dependencies require a license check: MIT/Apache-2.0/BSD are fine; AGPL/SSPL/BUSL/ELv2
    need an ADR and maintainer approval. Never copy code from `ee/` or `enterprise/`
    directories of open-core projects.
-10. **OSS-first composition.** Do not hand-roll infrastructure (parsing, retrieval,
-    orchestration, evals) that an established, license-safe OSS project already solves —
-    adopt it behind an internal interface per the checklist in
-    [ADR-0005](docs/adr/0005-oss-first-composition.md). From-scratch code is reserved for
-    the differentiation core (decomposition, ambiguity gate, analog selection,
-    calibration, BoE workflow).
+10. **OSS-first composition, with a credibility bar.** Do not hand-roll infrastructure
+    (parsing, retrieval, orchestration, evals) that an established, license-safe OSS
+    project already solves — adopt it behind an internal interface per the checklist in
+    [ADR-0005](docs/adr/0005-oss-first-composition.md). Only widely recognized projects
+    qualify as dependencies: de-facto standards, major-org/foundation-backed, or
+    overwhelming-adoption repos. Obscure-but-clever projects are LEARN-FROM at most.
+    From-scratch code is reserved for the differentiation core (decomposition, ambiguity
+    gate, analog selection, calibration, BoE workflow).
 
 ## 3. Branch topology & workflow
 
@@ -109,7 +111,7 @@ A change is done when ALL of these hold:
 Grow into this shape (create directories when their first real content arrives, not before):
 
 ```
-eforge/
+lodestar/
 ├── apps/
 │   ├── api/            # FastAPI service: pipeline orchestration, review endpoints
 │   └── web/            # Review UI (Türkçe-first)

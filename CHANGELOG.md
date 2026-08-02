@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Eforge are documented in this file.
+All notable changes to Lodestar are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/) once code ships.
@@ -14,6 +14,11 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Changed
+- Project renamed from **Eforge** to **Lodestar** (repo, docs, all references) — after the
+  navigator's star and the legal "lodestar method" (documented hours × reasonable rate =
+  a defensible, evidence-based effort figure).
+- ADR-0005 gained an explicit **credibility bar**: only de-facto-standard,
+  major-org-backed, or overwhelmingly adopted OSS projects qualify as dependencies.
 - README is now English-only (Turkish summary section removed).
 
 ## [0.1.0] - 2026-08-03

@@ -1,7 +1,7 @@
-# Eforge — BRD → Kanıtlı Taslak Efor
+# Lodestar — BRD → Kanıtlı Taslak Efor
 ## Kuruluş Araştırma Dosyası v1
 
-*Tarih: 3 Ağustos 2026 · Yöntem: 5 paralel araştırma ajanı (pazar, kanıt tabanı, mimari, telco domain, open-source), tüm iddialar kaynak linkli. Doğrulanamayan/spekülatif maddeler açıkça etiketlendi. Bu dosya, Eforge'un kuruluş araştırmasının kamuya açık sürümüdür; §10'daki kararlar proje sahibinin discovery cevaplarıyla güncellenmiştir.*
+*Tarih: 3 Ağustos 2026 · Yöntem: 5 paralel araştırma ajanı (pazar, kanıt tabanı, mimari, telco domain, open-source), tüm iddialar kaynak linkli. Doğrulanamayan/spekülatif maddeler açıkça etiketlendi. Bu dosya, Lodestar'ın kuruluş araştırmasının kamuya açık sürümüdür; §10'daki kararlar proje sahibinin discovery cevaplarıyla güncellenmiştir.*
 
 ---
 
@@ -227,13 +227,13 @@ Müşterinin **LiteLLM gateway'i** (MIT çekirdek; ~55k yıldız; OpenAI-uyumlu 
 
 **Neden biz:** Kurucunun daha önceki dahili ajan-altyapısı çalışmalarında olgunlaşmış üç bilgi-katmanı deseni, bu ürünün çekirdeğiyle birebir örtüşüyor — bağımsız yürütülen mimari araştırma da aynı desenlere vardı:
 
-| Önceki çalışmadan gelen desen | Eforge'daki karşılığı |
+| Önceki çalışmadan gelen desen | Lodestar'daki karşılığı |
 |---|---|
 | Canonical pages (damıtılmış, onaylı bilgi) | Ham wiki'yi retrieval'da geçen insan-onaylı domain brief katmanı |
 | Feedback-driven retrieval | Reviewer düzeltmelerinin sıralama + kalibrasyonu beslemesi |
 | Search-first context (transcript ≠ working context) | Worker ajanların bağlamı araç çağrısıyla çekmesi; context-stuffing yok |
 
-Bilgi çekirdeğinin tasarımı hazır; Eforge bunun üstüne eforlama workflow'unu giydiriyor.
+Bilgi çekirdeğinin tasarımı hazır; Lodestar bunun üstüne eforlama workflow'unu giydiriyor.
 
 ---
 
@@ -266,7 +266,7 @@ Bilgi çekirdeğinin tasarımı hazır; Eforge bunun üstüne eforlama workflow'
 
 ## 10. Fikir Çarpıştırma Gündemi
 
-**Pozisyonum (tartışmaya açık):** Bu ürün "AI efor tahmincisi" olarak değil, **"Grounded Basis-of-Estimate platformu"** olarak kurulmalı. İlk değer vaadi efor sayısı bile değil: *aynı gün gelen kanıtlı dekompozisyon + netleştirme soruları + analoji kartları*; efor bandı beta rozetiyle başlar, ledger doldukça güvenilirleşir. Dogfood-first (kendi ekibinizde), ama mimari birinci günden multi-tenant ürün gibi. *(Ürün adı: **Eforge** — efor + forge.)*
+**Pozisyonum (tartışmaya açık):** Bu ürün "AI efor tahmincisi" olarak değil, **"Grounded Basis-of-Estimate platformu"** olarak kurulmalı. İlk değer vaadi efor sayısı bile değil: *aynı gün gelen kanıtlı dekompozisyon + netleştirme soruları + analoji kartları*; efor bandı beta rozetiyle başlar, ledger doldukça güvenilirleşir. Dogfood-first (kendi ekibinizde), ama mimari birinci günden multi-tenant ürün gibi. *(Ürün adı: **Lodestar** — hem denizcilikte yol gösteren yıldız, hem de hukuktaki "lodestar yöntemi": belgelenmiş saat × makul oran ile hesaplanan, mahkemede savunulabilir efor — kanıta dayalı, denetlenebilir tahminin ta kendisi.)*
 
 Karar kalemleri:
 

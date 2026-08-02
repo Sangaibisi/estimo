@@ -1,6 +1,6 @@
-# Contributing to Eforge
+# Contributing to Lodestar
 
-Thanks for your interest! Eforge is in its **foundation phase** — the research and plan are
+Thanks for your interest! Lodestar is in its **foundation phase** — the research and plan are
 done, the code is arriving sprint by sprint. Early contributions are most valuable on the
 items marked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -29,7 +29,7 @@ them need to change the principle first (with evidence), not sneak past it.
 
 ## Licensing of contributions
 
-Eforge is [Apache-2.0](LICENSE). By submitting a contribution you agree it is provided
+Lodestar is [Apache-2.0](LICENSE). By submitting a contribution you agree it is provided
 under Apache-2.0 (inbound = outbound), per Section 5 of the license. Do not contribute
 code you don't have the right to submit — and never code copied from `ee/`/`enterprise/`
 directories of open-core projects.

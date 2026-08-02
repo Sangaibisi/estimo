@@ -8,7 +8,7 @@ for security problems. You'll get an acknowledgement within a few days.
 
 ## The data rule (zero tolerance)
 
-Eforge's subject matter — customer BRDs, internal wikis, codebases, estimate spreadsheets —
+Lodestar's subject matter — customer BRDs, internal wikis, codebases, estimate spreadsheets —
 is exactly the kind of data that must **never** appear in an open-source repository.
 
 Forbidden in code, fixtures, tests, docs, issues, PRs and commit history:

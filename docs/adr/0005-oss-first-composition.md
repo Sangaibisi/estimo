@@ -33,6 +33,14 @@ For any technical capability, the default order is:
 
 - License is MIT/Apache-2.0/BSD (SPDX-verified); nothing pulled from `ee/`/`enterprise/`
   paths of open-core repos. Other licenses require their own ADR.
+- **Credibility bar — at least one must hold:** the project is a de-facto industry
+  standard for its niche (multiple independent production adopters, canonical in the
+  ecosystem's own docs/comparisons); OR it is governed/backed by a major organization or
+  foundation (e.g. Linux Foundation/LF AI & Data, Apache, Microsoft, IBM, Google-scale
+  vendors); OR its adoption signals are overwhelming (GitHub stars in the tens of
+  thousands with matching download/usage numbers). Clever-but-obscure repos never become
+  dependencies regardless of technical merit — they are LEARN-FROM material at most.
+  Stars alone are hype-prone; they satisfy the bar only together with real maintenance.
 - Actively maintained (recent releases/commits, responsive issues) or trivially vendorable.
 - Scope fits the need — we don't adopt a platform to use one function.
 - Integration goes behind an internal interface; no OSS type leaks into `packages/core`
@@ -43,7 +51,7 @@ Contributions flow back upstream when fixes are general-purpose.
 
 ## Consequences
 
-- Speed and quality: we stand on ecosystem-tested code and spend effort only where Eforge
+- Speed and quality: we stand on ecosystem-tested code and spend effort only where Lodestar
   is different; the stack stays aligned with industry-standard tooling contributors know.
 - We accept wrapper-maintenance cost and third-party risk (mitigated by pinning, interface
   isolation, and the checklist's health gate).

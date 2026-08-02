@@ -16,7 +16,7 @@ supply-chain incident on the LiteLLM PyPI package makes version pinning mandator
 
 ## Decision
 
-Every LLM, embedding and rerank call in Eforge goes through a single internal module
+Every LLM, embedding and rerank call in Lodestar goes through a single internal module
 (`packages/gateway/`) that speaks only the OpenAI-compatible API to a configurable base
 URL. Provider SDKs are banned repo-wide; model names live in configuration (routing
 profiles per pipeline stage), never in code. Gateway 429/budget responses are first-class

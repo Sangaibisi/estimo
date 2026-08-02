@@ -1,4 +1,4 @@
-# Eforge UI Vizyonu
+# Lodestar UI Vizyonu
 
 **Bu dosyanın amacı:** Bir tasarım sistemi çalışmasına (Claude Design) girdi olmak. Burada
 ürünün *ne hissettireceği*, ekranları, bileşen envanteri, durumları ve mikro-metin dili
@@ -147,7 +147,7 @@ aşamalar arası geçiş (`[` `]`), kalemler arası (`j/k` benzeri) — power-us
 
 ## 5. Bileşen envanteri (tasarım sisteminden beklenen)
 
-Temel kütüphane (tablo, form, dialog, toast, tab, badge…) + Eforge'a özgü olanlar:
+Temel kütüphane (tablo, form, dialog, toast, tab, badge…) + Lodestar'a özgü olanlar:
 
 1. **AralıkÇubuğu** — üç-nokta bandın kanonik görseli; boyutları: satır-içi mini,
    tablo-standart, karşılaştırma (iki bant üst üste + kesişim vurgusu). Nokta değil bant.
