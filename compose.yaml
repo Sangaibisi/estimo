@@ -1,0 +1,83 @@
+# `docker compose up` runs the product (ADR-0006). Copy .env.example to .env first.
+# Optional services live behind profiles: `docker compose --profile mock up`.
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg18-trixie
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-estimo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-estimo}
+    shm_size: 1g
+    volumes:
+      # PostgreSQL 18+ images want the mount at /var/lib/postgresql (data lives in a
+      # versioned subdirectory, enabling pg_upgrade --link across majors).
+      - estimo-pgdata:/var/lib/postgresql
+    ports:
+      # Host-side convenience mapping; 5433 to avoid colliding with a local Postgres.
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      # -h 127.0.0.1 forces TCP: the entrypoint's temporary init server only listens on
+      # the unix socket, so a socket-based pg_isready reports ready too early.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  migrate:
+    image: estimo-api:local
+    build: *api-build
+    command: ["alembic", "-c", "/app/apps/api/alembic.ini", "upgrade", "head"]
+    env_file: [.env]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: estimo-api:local
+    build: *api-build
+    env_file: [.env]
+    ports:
+      # Loopback-only by default; non-local exposure goes through an explicit reverse
+      # proxy or a compose override.
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      migrate:
+        condition: service_completed_successfully
+
+  mock-llm:
+    image: estimo-api:local
+    build: *api-build
+    profiles: ["mock"]
+    command:
+      ["uvicorn", "estimo_api.mockllm:app", "--host", "0.0.0.0", "--port", "8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).status == 200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  smoke:
+    image: estimo-api:local
+    build: *api-build
+    profiles: ["mock"]
+    command: ["python", "-m", "estimo_gateway.smoke"]
+    environment:
+      ESTIMO_GATEWAY__BASE_URL: http://mock-llm:8080/v1
+      ESTIMO_GATEWAY__API_KEY: sk-local-dev
+      ESTIMO_GATEWAY__PROFILES: '{"default": "mock-small", "smoke": "mock-small"}'
+    depends_on:
+      mock-llm:
+        condition: service_healthy
+
+volumes:
+  estimo-pgdata:

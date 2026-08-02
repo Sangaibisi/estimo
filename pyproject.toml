@@ -1,0 +1,66 @@
+[project]
+name = "estimo"
+version = "0.1.0"
+description = "Evidence-linked effort estimation — workspace root"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+
+[tool.uv]
+package = false
+required-version = ">=0.12,<0.13"
+
+[tool.uv.workspace]
+members = ["apps/*", "packages/*"]
+
+[tool.uv.sources]
+estimo-core = { workspace = true }
+estimo-gateway = { workspace = true }
+estimo-api = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff==0.16.1",
+    "mypy>=2.3,<2.4",
+    "pytest>=8,<9",
+    "pytest-asyncio>=1,<2",
+    "respx>=0.22,<1",
+    "httpx>=0.28,<0.29",
+    "asgi-lifespan>=2,<3",
+    "pre-commit>=4,<5",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["apps/api/src", "packages/core/src", "packages/gateway/src"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "PLR2004"]
+"tests/**" = ["S101", "PLR2004"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = ["apps/api/src", "packages/core/src", "packages/gateway/src", "apps/api/tests"]
+exclude = ["alembic/"]
+
+[[tool.mypy.overrides]]
+module = ["pgvector.*", "asgi_lifespan.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests", "packages", "apps"]
+markers = [
+    "db: requires PostgreSQL (set ESTIMO_TEST_DATABASE_URL); skipped otherwise",
+]

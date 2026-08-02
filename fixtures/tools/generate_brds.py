@@ -21,6 +21,7 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "brd"
 
 # ---------------------------------------------------------------- helpers
 
+
 def _style(doc: Document) -> None:
     normal = doc.styles["Normal"]
     normal.font.name = "Calibri"
@@ -52,15 +53,19 @@ def _signature_block(doc: Document, names: list[tuple[str, str]]) -> None:
 
 # ---------------------------------------------------------------- BRD 01 — clean, templated
 
+
 def brd_01(doc: Document) -> None:
     doc.add_heading("İş Gereksinim Dokümanı — Kampanya Bazlı Cihaz Taksitlendirme", level=0)
-    _meta_table(doc, [
-        ("Müşteri", "Aurora Telekom A.Ş."),
-        ("Doküman No", "AUR-BRD-2026-041"),
-        ("Tarih", "15.06.2026"),
-        ("Versiyon", "1.2"),
-        ("Hazırlayan", "S. Kaya — İş Analisti"),
-    ])
+    _meta_table(
+        doc,
+        [
+            ("Müşteri", "Aurora Telekom A.Ş."),
+            ("Doküman No", "AUR-BRD-2026-041"),
+            ("Tarih", "15.06.2026"),
+            ("Versiyon", "1.2"),
+            ("Hazırlayan", "S. Kaya — İş Analisti"),
+        ],
+    )
 
     doc.add_heading("1. Amaç", level=1)
     doc.add_paragraph(
@@ -78,20 +83,27 @@ def brd_01(doc: Document) -> None:
 
     doc.add_heading("3. İş Gereksinimleri", level=1)
     for code, text in [
-        ("G-01", "Pazarlama ekibi, kampanya yönetimi ekranından taksitli cihaz "
-                 "kampanyası tanımlayabilmelidir (cihaz listesi, taksit sayısı seçenekleri, "
-                 "kampanya dönemi)."),
+        (
+            "G-01",
+            (
+                "Pazarlama ekibi, kampanya yönetimi ekranından taksitli cihaz "
+                "kampanyası tanımlayabilmelidir (cihaz listesi, taksit sayısı seçenekleri, "
+                "kampanya dönemi)."
+            ),
+        ),
         ("G-02", "Taksit planları 3, 6, 12 ve 24 ay seçenekleriyle sunulmalıdır."),
-        ("G-03", "Taksit tutarı, abonenin aylık faturasına ayrı kalem olarak "
-                 "yansıtılmalıdır."),
+        ("G-03", "Taksit tutarı, abonenin aylık faturasına ayrı kalem olarak yansıtılmalıdır."),
         ("G-04", "Kurumsal müşteriler için farklı koşullar uygulanabilir."),
-        ("G-05", "Bayi, satış anında abonenin taksitlendirmeye uygunluğunu "
-                 "sorgulayabilmelidir."),
-        ("G-06", "Kampanya bazında komisyon oranları aşağıdaki matrise göre "
-                 "uygulanmalıdır (bkz. Tablo 3.2-a)."),
+        ("G-05", "Bayi, satış anında abonenin taksitlendirmeye uygunluğunu sorgulayabilmelidir."),
+        (
+            "G-06",
+            (
+                "Kampanya bazında komisyon oranları aşağıdaki matrise göre "
+                "uygulanmalıdır (bkz. Tablo 3.2-a)."
+            ),
+        ),
         ("G-07", "Cihaz iadesi durumunda taksit planı kapatılmalıdır."),
-        ("G-08", "Taksitlendirme hareketleri günlük olarak muhasebe sistemine "
-                 "raporlanmalıdır."),
+        ("G-08", "Taksitlendirme hareketleri günlük olarak muhasebe sistemine raporlanmalıdır."),
     ]:
         doc.add_paragraph(f"{code}: {text}", style="List Bullet")
 
@@ -108,9 +120,7 @@ def brd_01(doc: Document) -> None:
     )
 
     doc.add_heading("4. Varsayımlar ve Kısıtlar", level=1)
-    doc.add_paragraph(
-        "V-01: Bu iş için ayrılan bütçe azami 90 adam-gündür.", style="List Bullet"
-    )
+    doc.add_paragraph("V-01: Bu iş için ayrılan bütçe azami 90 adam-gündür.", style="List Bullet")
     doc.add_paragraph(
         "V-02: Kampanya lansmanı 30 Eylül 2026 tarihine yetişmelidir.",
         style="List Bullet",
@@ -120,23 +130,30 @@ def brd_01(doc: Document) -> None:
         style="List Bullet",
     )
 
-    _signature_block(doc, [
-        ("S. Kaya", "İş Analisti (Aurora Telekom)"),
-        ("A. Demir", "Analist (Meridyen Teknoloji)"),
-    ])
+    _signature_block(
+        doc,
+        [
+            ("S. Kaya", "İş Analisti (Aurora Telekom)"),
+            ("A. Demir", "Analist (Meridyen Teknoloji)"),
+        ],
+    )
 
 
 # ---------------------------------------------------------------- BRD 02 — clean, low ambiguity (control)
 
+
 def brd_02(doc: Document) -> None:
     doc.add_heading("İş Gereksinim Dokümanı — Konsolide Fatura", level=0)
-    _meta_table(doc, [
-        ("Müşteri", "Aurora Telekom A.Ş."),
-        ("Doküman No", "AUR-BRD-2026-052"),
-        ("Tarih", "02.07.2026"),
-        ("Versiyon", "1.0"),
-        ("Hazırlayan", "E. Şahin — Ürün Yöneticisi"),
-    ])
+    _meta_table(
+        doc,
+        [
+            ("Müşteri", "Aurora Telekom A.Ş."),
+            ("Doküman No", "AUR-BRD-2026-052"),
+            ("Tarih", "02.07.2026"),
+            ("Versiyon", "1.0"),
+            ("Hazırlayan", "E. Şahin — Ürün Yöneticisi"),
+        ],
+    )
 
     doc.add_heading("1. Amaç", level=1)
     doc.add_paragraph(
@@ -149,37 +166,53 @@ def brd_02(doc: Document) -> None:
         doc,
         ["No", "Gereksinim", "Kabul Kriteri"],
         [
-            ["G-01",
-             "Müşteri, çağrı merkezi veya online kanal üzerinden konsolide fatura "
-             "talebinde bulunabilmelidir.",
-             "Talep sonrası ilk fatura döneminde tek fatura üretilir."],
-            ["G-02",
-             "Konsolide faturada abonelik bazında alt kırılım gösterilmelidir.",
-             "Her abonelik; sabit ücret, kullanım ve vergiler kırılımıyla listelenir."],
-            ["G-03",
-             "Konsolidasyon yalnızca aynı fatura dönemine sahip abonelikler için "
-             "yapılmalıdır.",
-             "Farklı dönemli abonelik eklenmek istendiğinde sistem yönlendirme mesajı "
-             "gösterir."],
-            ["G-04",
-             "Konsolide faturadan çıkış (ayrıştırma) desteklenmelidir.",
-             "Ayrıştırma bir sonraki fatura döneminde geçerli olur."],
-            ["G-05",
-             "Ödeme, konsolide fatura toplamı üzerinden tek seferde alınmalıdır.",
-             "Kısmi ödeme mevcut kurallarla abonelik bazına dağıtılır."],
-            ["G-06",
-             "Konsolide fatura PDF'i mevcut şablon standardına uygun üretilmelidir.",
-             "PDF, kurumsal şablon v4 ile birebir uyumludur."],
+            [
+                "G-01",
+                (
+                    "Müşteri, çağrı merkezi veya online kanal üzerinden konsolide fatura "
+                    "talebinde bulunabilmelidir."
+                ),
+                "Talep sonrası ilk fatura döneminde tek fatura üretilir.",
+            ],
+            [
+                "G-02",
+                "Konsolide faturada abonelik bazında alt kırılım gösterilmelidir.",
+                "Her abonelik; sabit ücret, kullanım ve vergiler kırılımıyla listelenir.",
+            ],
+            [
+                "G-03",
+                "Konsolidasyon yalnızca aynı fatura dönemine sahip abonelikler için yapılmalıdır.",
+                "Farklı dönemli abonelik eklenmek istendiğinde sistem yönlendirme mesajı gösterir.",
+            ],
+            [
+                "G-04",
+                "Konsolide faturadan çıkış (ayrıştırma) desteklenmelidir.",
+                "Ayrıştırma bir sonraki fatura döneminde geçerli olur.",
+            ],
+            [
+                "G-05",
+                "Ödeme, konsolide fatura toplamı üzerinden tek seferde alınmalıdır.",
+                "Kısmi ödeme mevcut kurallarla abonelik bazına dağıtılır.",
+            ],
+            [
+                "G-06",
+                "Konsolide fatura PDF'i mevcut şablon standardına uygun üretilmelidir.",
+                "PDF, kurumsal şablon v4 ile birebir uyumludur.",
+            ],
         ],
     )
 
-    _signature_block(doc, [
-        ("E. Şahin", "Ürün Yöneticisi (Aurora Telekom)"),
-        ("A. Demir", "Analist (Meridyen Teknoloji)"),
-    ])
+    _signature_block(
+        doc,
+        [
+            ("E. Şahin", "Ürün Yöneticisi (Aurora Telekom)"),
+            ("A. Demir", "Analist (Meridyen Teknoloji)"),
+        ],
+    )
 
 
 # ---------------------------------------------------------------- BRD 03 — messy, unstructured, high ambiguity
+
 
 def brd_03(doc: Document) -> None:
     doc.add_heading("Bayi Sipariş Entegrasyonu hk.", level=0)
@@ -210,14 +243,18 @@ def brd_03(doc: Document) -> None:
 
 # ---------------------------------------------------------------- BRD 04 — micro-CR (small-item floor scenario)
 
+
 def brd_04(doc: Document) -> None:
     doc.add_heading("Değişiklik Talebi — Ön Ödemeliden Faturalıya Geçişte Bakiye Taşıma", level=0)
-    _meta_table(doc, [
-        ("Müşteri", "Aurora Telekom A.Ş."),
-        ("Talep No", "AUR-CR-2026-118"),
-        ("Tarih", "21.07.2026"),
-        ("Talep Sahibi", "B. Çelik — Müşteri Deneyimi"),
-    ])
+    _meta_table(
+        doc,
+        [
+            ("Müşteri", "Aurora Telekom A.Ş."),
+            ("Talep No", "AUR-CR-2026-118"),
+            ("Tarih", "21.07.2026"),
+            ("Talep Sahibi", "B. Çelik — Müşteri Deneyimi"),
+        ],
+    )
 
     doc.add_heading("Talep", level=1)
     doc.add_paragraph(
@@ -248,13 +285,24 @@ MANIFEST = {
                 {"type": "deadline", "snippet": "30 Eylül 2026"},
             ],
             "planted_ambiguities": [
-                {"ref": "G-04", "issue": "undefined-segment-terms",
-                 "note": "'Kurumsal müşteriler için farklı koşullar' — segment ve koşullar tanımsız"},
-                {"ref": "G-07", "issue": "missing-acceptance-criteria",
-                 "note": "İade senaryosunda tahsil edilmiş taksitlerin akıbeti belirsiz"},
+                {
+                    "ref": "G-04",
+                    "issue": "undefined-segment-terms",
+                    "note": "'Kurumsal müşteriler için farklı koşullar' — segment ve koşullar tanımsız",
+                },
+                {
+                    "ref": "G-07",
+                    "issue": "missing-acceptance-criteria",
+                    "note": "İade senaryosunda tahsil edilmiş taksitlerin akıbeti belirsiz",
+                },
             ],
-            "expected_modules": ["campaign-engine", "billing-core", "dealer-portal",
-                                 "invoice-render", "integration-hub"],
+            "expected_modules": [
+                "campaign-engine",
+                "billing-core",
+                "dealer-portal",
+                "invoice-render",
+                "integration-hub",
+            ],
         },
         {
             "file": "BRD-AUR-26-02-konsolide-fatura.docx",
@@ -264,8 +312,7 @@ MANIFEST = {
             "tables": 2,
             "planted_anchors": [],
             "planted_ambiguities": [],
-            "expected_modules": ["billing-core", "invoice-render", "crm-suite",
-                                 "selfcare-web"],
+            "expected_modules": ["billing-core", "invoice-render", "crm-suite", "selfcare-web"],
         },
         {
             "file": "BRD-AUR-26-03-bayi-siparis-entegrasyonu.docx",
@@ -277,12 +324,21 @@ MANIFEST = {
                 {"type": "analogy", "snippet": "geçen yıl başka bir tedarikçiyle 40 günde"},
             ],
             "planted_ambiguities": [
-                {"ref": None, "issue": "no-structure",
-                 "note": "Numarasız, e-posta üslubu; gereksinimler paragraf içinde"},
-                {"ref": None, "issue": "missing-volumetrics",
-                 "note": "Sipariş hacmi, bayi sistemi/protokol, SLA tanımsız"},
-                {"ref": None, "issue": "undefined-approval-flow",
-                 "note": "'Onay adımı gerekiyorsa' — koşul ve onaylayan tanımsız"},
+                {
+                    "ref": None,
+                    "issue": "no-structure",
+                    "note": "Numarasız, e-posta üslubu; gereksinimler paragraf içinde",
+                },
+                {
+                    "ref": None,
+                    "issue": "missing-volumetrics",
+                    "note": "Sipariş hacmi, bayi sistemi/protokol, SLA tanımsız",
+                },
+                {
+                    "ref": None,
+                    "issue": "undefined-approval-flow",
+                    "note": "'Onay adımı gerekiyorsa' — koşul ve onaylayan tanımsız",
+                },
             ],
             "expected_modules": ["dealer-portal", "integration-hub", "product-catalog"],
         },
@@ -294,8 +350,11 @@ MANIFEST = {
             "tables": 1,
             "planted_anchors": [],
             "planted_ambiguities": [
-                {"ref": None, "issue": "unresolved-edge-case",
-                 "note": "Bakiye > ilk fatura durumu bilinçli olarak açık bırakılmış"},
+                {
+                    "ref": None,
+                    "issue": "unresolved-edge-case",
+                    "note": "Bakiye > ilk fatura durumu bilinçli olarak açık bırakılmış",
+                },
             ],
             "expected_modules": ["billing-core", "crm-suite"],
         },

@@ -9,6 +9,21 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S1 skeleton (first code):** uv-workspace monorepo (Python 3.13/3.14) with
+  `packages/core` (pydantic domain models that structurally enforce the product laws —
+  three-point ranges, evidence-required estimate lines), `packages/gateway` (the single
+  OpenAI-compatible client module: stage→profile routing, Retry-After-aware retries,
+  metadata-only logging hooks), and `apps/api` (FastAPI: liveness/readiness split,
+  run records on Postgres via async SQLAlchemy + Alembic, pgvector enabled in
+  migration 0001).
+- Fully containerized dev loop per ADR-0006: multi-stage uv Dockerfile (non-root,
+  stdlib healthcheck), `compose.yaml` with healthcheck-gated migrate→api ordering and a
+  `mock` profile (OpenAI-compatible mock LLM + gateway smoke check).
+- CI/CD: lint/typecheck/test workflows (uv, matrix 3.13/3.14, pgvector service),
+  provider-SDK and open-core path guards as tested code, multi-arch GHCR publish on
+  native arm64 runners with provenance/SBOM attestations, release-please v5,
+  semantic PR-title enforcement, dependency review with an ADR-0005 license denylist,
+  Dependabot (actions/docker/uv) and CodeQL default setup.
 - Design system artifacts under [docs/design/](docs/design/) (hi-fi screens, wireframes,
   tokens — Aurora Telecom installment scenario, light+dark, IBM Plex).
 - S0 data foundation: Aurora fixture universe standard

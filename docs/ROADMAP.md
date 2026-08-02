@@ -49,21 +49,21 @@ mapping table approved; golden set design written down.
 
 ---
 
-## S1 — Skeleton · `Status: 🔵 Planned`
+## S1 — Skeleton · `Status: 🟡 In progress` (all items done; exit gate awaits first green CI run)
 
 **Goal:** A working (still brainless) end-to-end backbone: monorepo infrastructure,
 domain models and the **gateway** module.
 
 **Architecture slice:** `packages/core`, `packages/gateway`, `apps/api` skeleton, CI.
 
-- [ ] S1-1 Python tooling: uv workspace, ruff, mypy, pytest, pre-commit; `packages/` + `apps/` layout (AGENTS.md §5)
-- [ ] S1-2 `packages/core`: Pydantic domain models — `Requirement`, `WorkItem`, `EstimateLine` (three-point + evidence URI list as required fields), `AssumptionRisk`, `BoeDocument`, `LedgerEntry`
-- [ ] S1-3 `packages/gateway`: OpenAI-compatible client (configurable base URL), stage-based model routing profile, 429/budget backoff, request/response logging hook; version pinning
-- [ ] S1-4 CI (GitHub Actions): lint + type + test; **provider-SDK grep guard** (a provider import outside the gateway = build breaks); `ee/`/`enterprise/` path protection
-- [ ] S1-5 `apps/api` FastAPI skeleton: health endpoint, run records (Postgres); multi-stage Dockerfile (slim, non-root, healthcheck) + docker-compose (api + postgres+pgvector) — `docker compose up` runs the stack ([ADR-0006](adr/0006-fully-containerized.md))
-- [ ] S1-6 release-please + Conventional Commits validation
-- [ ] S1-7 `.env.example` + config loading (pydantic-settings); config via environment only — nothing baked into images
-- [ ] S1-8 Image publish workflow: CI builds multi-arch (amd64/arm64) images → `ghcr.io/sangaibisi/estimo-api`, tags = git SHA on main + semver on release; `.dockerignore` guard (no fixtures/secrets in images)
+- [x] S1-1 Python tooling: uv workspace, ruff, mypy, pytest, pre-commit; `packages/` + `apps/` layout (AGENTS.md §5)
+- [x] S1-2 `packages/core`: Pydantic domain models — `Requirement`, `WorkItem`, `EstimateLine` (three-point + evidence URI list as required fields), `AssumptionRisk`, `BoeDocument`, `LedgerEntry`
+- [x] S1-3 `packages/gateway`: OpenAI-compatible client (configurable base URL), stage-based model routing profile, 429/budget backoff, request/response logging hook; version pinning
+- [x] S1-4 CI (GitHub Actions): lint + type + test; **provider-SDK grep guard** (a provider import outside the gateway = build breaks); `ee/`/`enterprise/` path protection
+- [x] S1-5 `apps/api` FastAPI skeleton: health endpoint, run records (Postgres); multi-stage Dockerfile (slim, non-root, healthcheck) + docker-compose (api + postgres+pgvector) — `docker compose up` runs the stack ([ADR-0006](adr/0006-fully-containerized.md))
+- [x] S1-6 release-please + Conventional Commits validation
+- [x] S1-7 `.env.example` + config loading (pydantic-settings); config via environment only — nothing baked into images
+- [x] S1-8 Image publish workflow: CI builds multi-arch (amd64/arm64) images → `ghcr.io/sangaibisi/estimo-api`, tags = git SHA on main + semver on release; `.dockerignore` guard (no fixtures/secrets in images)
 
 **Exit gate:** CI green; a sample completion call through the gateway runs end to end in
 the compose environment; provider-SDK guard proven by a test.

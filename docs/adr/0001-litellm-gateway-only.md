@@ -22,6 +22,15 @@ URL. Provider SDKs are banned repo-wide; model names live in configuration (rout
 profiles per pipeline stage), never in code. Gateway 429/budget responses are first-class
 handled states (retry/backoff/degrade).
 
+**Clarification (2026-08-03, S1 implementation):** the `openai` PyPI package is permitted
+*inside `packages/gateway/` only*, strictly as the de-facto OpenAI-compatible **protocol
+client** with an explicit `base_url` — the standard way to talk to LiteLLM/vLLM-class
+endpoints, avoiding a hand-rolled reimplementation of retries, SSE streaming and typed
+responses. It is still a banned import everywhere else (enforced by
+`tests/test_repo_guards.py` and CI). Retry layering is fixed at two layers: the client's
+built-in Retry-After-aware `max_retries` at the transport, and step-level retries in the
+pipeline — never both around one call site.
+
 ## Consequences
 
 - Runs unchanged against LiteLLM, or any OpenAI-compatible endpoint (vLLM, managed clouds
