@@ -60,9 +60,10 @@ domain models and the **gateway** module.
 - [ ] S1-2 `packages/core`: Pydantic domain models — `Requirement`, `WorkItem`, `EstimateLine` (three-point + evidence URI list as required fields), `AssumptionRisk`, `BoeDocument`, `LedgerEntry`
 - [ ] S1-3 `packages/gateway`: OpenAI-compatible client (configurable base URL), stage-based model routing profile, 429/budget backoff, request/response logging hook; version pinning
 - [ ] S1-4 CI (GitHub Actions): lint + type + test; **provider-SDK grep guard** (a provider import outside the gateway = build breaks); `ee/`/`enterprise/` path protection
-- [ ] S1-5 `apps/api` FastAPI skeleton: health endpoint, run records (Postgres), docker-compose (postgres+pgvector)
+- [ ] S1-5 `apps/api` FastAPI skeleton: health endpoint, run records (Postgres); multi-stage Dockerfile (slim, non-root, healthcheck) + docker-compose (api + postgres+pgvector) — `docker compose up` runs the stack ([ADR-0006](adr/0006-fully-containerized.md))
 - [ ] S1-6 release-please + Conventional Commits validation
-- [ ] S1-7 `.env.example` + config loading (pydantic-settings)
+- [ ] S1-7 `.env.example` + config loading (pydantic-settings); config via environment only — nothing baked into images
+- [ ] S1-8 Image publish workflow: CI builds multi-arch (amd64/arm64) images → `ghcr.io/sangaibisi/estimo-api`, tags = git SHA on main + semver on release; `.dockerignore` guard (no fixtures/secrets in images)
 
 **Exit gate:** CI green; a sample completion call through the gateway runs end to end in
 the compose environment; provider-SDK guard proven by a test.
@@ -178,6 +179,7 @@ produced end to end from a fixture BRD; the eval report includes the naive basel
 - [ ] S7-6 Line sign-off + document approval flow; BoE preview/`.docx` export
 - [ ] S7-7 Edit telemetry: per-section correction distance + anchoring delta capture (events to Langfuse)
 - [ ] S7-8 i18n foundation (`en` default locale, `tr` first localization)
+- [ ] S7-9 Web app containerization: multi-stage Dockerfile + compose service + `ghcr.io/sangaibisi/estimo-web` publish (ADR-0006)
 
 **Exit gate:** A full round trip of a BRD (upload → questions → answers → draft →
 independent-first review → sign-off → export) completes through the UI.

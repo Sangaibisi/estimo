@@ -78,7 +78,7 @@ code is reserved for the differentiation core — see
 | Review UI | Next.js/TypeScript web app; `en` default locale, `tr` first localization | proposed | Design system incoming via [UI-VISION.md](UI-VISION.md); [ADR-0004](adr/0004-turkish-first-pipeline.md) |
 | Connectors | First-party ingestors: Confluence v2 crawl (ACL+version metadata), Jira JQL cursor, git hosting via provider APIs + git protocol — **Bitbucket first-class** (Atlassian shops), GitHub, GitLab; webhook-triggered re-index | accepted | Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
 | Atlassian surface | Thin Forge Rovo Agent front-door + product's own MCP server | planned | Distribution without platform lock-in ([ADR-0002](adr/0002-atlassian-adjacent-core.md)) |
-| Deployment | docker-compose (dev) → Helm; ladder SaaS → VPC → BYOC → air-gap; stateless per tenant | accepted | Enterprise/telco buyer requirement |
+| Deployment | **Fully containerized** — every component an OCI image on GHCR (multi-arch); `docker compose up` = dev & single-node deploys; Helm (same images) for k8s; ladder SaaS → VPC → BYOC → air-gap; stateless per tenant | accepted | Easy distribution; [ADR-0006](adr/0006-fully-containerized.md) |
 
 ## Indexing pipelines (ordered)
 

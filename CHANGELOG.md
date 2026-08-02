@@ -20,6 +20,9 @@ Until the first code release, entries track documentation and foundation milesto
 - ARCHITECTURE: explicit **ordered indexing pipelines** section (wiki / code / ledger
   lanes + query path); git-hosting connectors named explicitly with **Bitbucket
   first-class** (roadmap S9-2, Admin → Connections).
+- ADR-0006: **fully containerized delivery** — every component ships as a multi-arch OCI
+  image on GHCR; `docker compose up` is the canonical dev & single-node runtime, Helm
+  consumes the same images (roadmap S1-5/S1-8/S7-9 updated).
 - ADR-0005: OSS-first composition — adopt proven, license-safe components behind internal
   interfaces; from-scratch code reserved for the differentiation core. Linked from
   AGENTS.md golden rules and ARCHITECTURE.md.
