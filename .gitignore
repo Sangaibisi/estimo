@@ -1,0 +1,39 @@
+# --- Secrets & local config (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Real customer data guard (see SECURITY.md) ---
+# Only synthetic/sanitized fixtures belong in the repo.
+data/
+*.docx
+!fixtures/**/*.docx
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# --- Node ---
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# --- Tooling & OS ---
+.DS_Store
+.idea/
+.vscode/
+*.log
+.cache/
