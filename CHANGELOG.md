@@ -8,6 +8,14 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Added
+- ADR-0005: OSS-first composition — adopt proven, license-safe components behind internal
+  interfaces; from-scratch code reserved for the differentiation core. Linked from
+  AGENTS.md golden rules and ARCHITECTURE.md.
+
+### Changed
+- README is now English-only (Turkish summary section removed).
+
 ## [0.1.0] - 2026-08-03
 
 ### Added

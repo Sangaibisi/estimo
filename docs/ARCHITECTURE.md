@@ -58,6 +58,10 @@ flowchart TB
 
 ## Components & chosen stack
 
+Composition policy: established OSS is adopted behind internal interfaces; from-scratch
+code is reserved for the differentiation core — see
+[ADR-0005](adr/0005-oss-first-composition.md).
+
 | Component | Choice | Status | Rationale / ADR |
 |---|---|---|---|
 | BRD parsing | Docling (primary), python-docx (surgical + BoE output), MarkItDown (fallback) | accepted | Structural tables/headings from enterprise .docx; all MIT ([RESEARCH §5.6]) |

@@ -69,16 +69,6 @@ Eforge never shows a magic number. The full list is in
 | [AGENTS.md](AGENTS.md) | Canonical guide for AI coding agents (and humans) working in this repo |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) | How to contribute · security & data-handling policy |
 
-## 🇹🇷 Türkçe özet
-
-Eforge, müşteriden gelen BRD'yi (iş gereksinim dokümanı) — kod tabanınız, Confluence'ta
-birikmiş domain bilginiz ve geçmiş efor↔gerçekleşme tarihçenizle temellendirilmiş —
-**denetlenebilir bir taslak efor dokümanına** (Basis-of-Estimate) çevirir: dekompozisyon,
-netleştirme soruları, etkilenen modül analizi, üç-nokta efor bantları, varsayım/risk sicili
-ve satır satır insan imzası. Türkçe BRD'ler birinci sınıf vatandaştır. Proje açık kaynaklıdır
-(Apache-2.0) ve araştırma temelli ilerler: pazar boşluğu, kanıt tabanı ve mimari gerekçelerin
-tamamı [docs/RESEARCH.md](docs/RESEARCH.md) içindedir.
-
 ## License
 
 [Apache-2.0](LICENSE) © 2026 Emrullah Yıldırım

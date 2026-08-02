@@ -59,6 +59,12 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
    dependencies require a license check: MIT/Apache-2.0/BSD are fine; AGPL/SSPL/BUSL/ELv2
    need an ADR and maintainer approval. Never copy code from `ee/` or `enterprise/`
    directories of open-core projects.
+10. **OSS-first composition.** Do not hand-roll infrastructure (parsing, retrieval,
+    orchestration, evals) that an established, license-safe OSS project already solves —
+    adopt it behind an internal interface per the checklist in
+    [ADR-0005](docs/adr/0005-oss-first-composition.md). From-scratch code is reserved for
+    the differentiation core (decomposition, ambiguity gate, analog selection,
+    calibration, BoE workflow).
 
 ## 3. Branch topology & workflow
 
@@ -152,3 +158,4 @@ sequentially, link it from `docs/ARCHITECTURE.md`. Existing accepted ADRs:
 - [0002 — Core runs adjacent to Atlassian; thin Forge/Rovo surface on top](docs/adr/0002-atlassian-adjacent-core.md)
 - [0003 — Apache-2.0 license](docs/adr/0003-apache-2-license.md)
 - [0004 — Turkish-first pipeline with multilingual retrieval](docs/adr/0004-turkish-first-pipeline.md)
+- [0005 — OSS-first composition: adopt proven components, build only the core](docs/adr/0005-oss-first-composition.md)
