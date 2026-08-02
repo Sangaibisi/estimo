@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f0eee9;font-family:'Architects Daughter',system-ui,sans-serif}
+a{color:#2a78d6}a:hover{color:#1c5aa8}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+.wf{width:1300px;color:#1a1a1a;font:14px/1.35 'Architects Daughter',system-ui,sans-serif;display:flex;background:#fff}
+.rail{width:158px;flex:none;border-right:1.5px solid #222;padding:12px 10px;display:flex;flex-direction:column;gap:6px;background:#faf9f6}
+.ri{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:5px;color:#444}
+.ri.on{background:#ececec;border:1.5px solid #222;color:#111}
+.sq{width:14px;height:14px;border:1.5px solid #666;border-radius:3px;flex:none}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 16px;border-bottom:1.5px solid #222}
+.stage{display:flex}
+.st{padding:5px 13px;border:1.5px solid #222;border-right:none;background:#fff;font-size:13px;white-space:nowrap}
+.st:last-child{border-right:1.5px solid #222}
+.st.on{background:#2a78d6;color:#fff;border-color:#2a78d6}
+.st.done{background:#ededed;color:#555}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font:400 10.5px/1 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.07em;text-align:left;padding:7px 8px;border-bottom:1.5px solid #222;color:#666;white-space:nowrap}
+.tbl td{padding:8px;border-bottom:1px dashed #c9c9c9;vertical-align:middle}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-variant-numeric:tabular-nums}
+.num{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.btn{border:1.5px solid #222;padding:4px 11px;background:#fff;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;display:inline-block;font-size:13px;white-space:nowrap}
+.btn.pri{background:#1a1a1a;color:#fff}
+.chip{border:1.2px solid #666;border-radius:11px;padding:1px 8px;font-size:11.5px;background:#fff;display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.chip .d{width:7px;height:7px;border:1.2px solid #333;flex:none}
+.note{font-family:'Caveat',cursive;font-size:17px;color:#2a78d6;line-height:1.15}
+.ph{background:repeating-linear-gradient(45deg,#f4f4f4,#f4f4f4 6px,#eaeaea 6px,#eaeaea 12px);border:1.5px dashed #a5a5a5;display:flex;align-items:center;justify-content:center;color:#777;font-size:12px;text-align:center}
+.ln{height:7px;background:#e6e6e6;border-radius:4px}
+.panel{border:1.5px solid #222;background:#fff}
+.h{font:400 10.5px/1 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#666}
+.rb{position:relative;height:15px;background:#f1f1f1;border:1px solid #b0b0b0;border-radius:8px;overflow:hidden}
+.rbf{position:absolute;top:0;bottom:0;background:#d9d9d9;border-left:1px solid #666;border-right:1px solid #666}
+.rbl{position:absolute;top:-2px;bottom:-2px;width:2.5px;background:#1a1a1a}
+.sect{border-bottom:1.5px solid #222;padding:10px 16px}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Estimo — full flow, one considered layout per screen</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Workspace — estimates list (table-first, stage strip per row)</div>
+<div class="dv-card"><div class="wf">
+<div class="rail">
+<div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div>
+<div class="ri on"><span class="sq"></span>Estimates</div>
+<div class="ri"><span class="sq"></span>Ledger</div>
+<div class="ri"><span class="sq"></span>Calibration</div>
+<div class="ri"><span class="sq"></span>Knowledge</div>
+<div class="ri"><span class="sq"></span>Admin</div>
+<div style="flex:1"></div>
+<div class="ri"><span class="sq"></span>A. Demir</div>
+</div>
+<div class="main">
+<div class="top"><div style="font-size:17px">Estimates</div><div style="display:flex;gap:8px;align-items:center"><span class="chip">All owners</span><span class="chip">Stage: any</span><span class="btn pri">+ New estimate</span></div></div>
+<div class="sect" style="display:flex;gap:14px;align-items:center;background:#fbfbf9">
+<div class="ph" style="flex:1;height:58px;border-radius:6px">Drop a .docx BRD here</div>
+<div style="width:420px">
+<div style="display:flex;justify-content:space-between"><span class="h">First read — northwind-billing-brd.docx</span><span class="mono">62%</span></div>
+<div style="height:9px;border:1.5px solid #222;margin-top:6px;border-radius:5px;overflow:hidden"><div style="width:62%;height:100%;background:#2a78d6"></div></div>
+<div style="margin-top:5px;font-size:12.5px;color:#444">Extracting tables… 12 requirements found</div>
+</div></div>
+<table class="tbl">
+<thead><tr><th style="width:250px">File</th><th>Customer</th><th style="width:250px">Stage</th><th>Items</th><th>Open Q</th><th>Range</th><th>Waiting on</th><th>Age</th></tr></thead>
+<tbody>
+<tr><td>campaign-installments-brd.docx</td><td>Aurora Telecom</td><td><div class="stage" style="transform:scale(.82);transform-origin:left"><span class="st done">Read</span><span class="st done">Q</span><span class="st on">Impact</span><span class="st">Est</span><span class="st">BoE</span></div></td><td class="num">18</td><td><span class="chip"><span class="d" style="background:#e0a600"></span>6</span></td><td class="num">34–52 pd</td><td>Customer — 3 days</td><td class="num">9d</td></tr>
+<tr><td>northwind-billing-brd.docx</td><td>Northwind Utilities</td><td><div class="stage" style="transform:scale(.82);transform-origin:left"><span class="st on">Read</span><span class="st">Q</span><span class="st">Impact</span><span class="st">Est</span><span class="st">BoE</span></div></td><td class="num">12</td><td class="num">—</td><td style="color:#888">first read…</td><td>You</td><td class="num">4m</td></tr>
+<tr style="background:#fbfbf9"><td>loyalty-tier-migration.docx</td><td>Aurora Telecom</td><td><div class="stage" style="transform:scale(.82);transform-origin:left"><span class="st done">Read</span><span class="st done">Q</span><span class="st done">Impact</span><span class="st done">Est</span><span class="st on">BoE</span></div></td><td class="num">23</td><td class="num">0</td><td class="num">88–141 pd</td><td>M. Yılmaz — signature, 4h</td><td class="num">21d</td></tr>
+<tr><td>b2b-portal-sso.docx</td><td>Meridian Bank</td><td><div class="stage" style="transform:scale(.82);transform-origin:left"><span class="st done">Read</span><span class="st done">Q</span><span class="st done">Impact</span><span class="st on">Est</span><span class="st">BoE</span></div></td><td class="num">9</td><td><span class="chip"><span class="d" style="background:#e0a600"></span>2</span></td><td class="num">15–29 pd</td><td>Reviewer — 12/18 signed</td><td class="num">6d</td></tr>
+</tbody></table>
+<div style="padding:14px 16px;display:flex;gap:24px;align-items:flex-start">
+<div class="panel" style="flex:1;padding:12px 14px;background:#fbfbf9">
+<div class="h">Empty state (first use)</div>
+<div style="margin-top:7px;font-size:14px;max-width:640px">No estimates yet. Estimo reads a BRD, asks what's missing, and prepares a defensible range — you decide the number.</div>
+<div style="display:flex;gap:8px;margin-top:10px"><span class="btn">Import a seed set</span><span class="btn">Open the sample BRD</span><span class="btn">90-second tour</span></div>
+</div>
+<div style="width:260px" class="note">Age column is the SLA nudge — who is waiting, for how long, in plain words.</div>
+</div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Reading Room — BRD ↔ requirements, ambiguity heat, anchor quarantine</div>
+<div class="dv-card"><div class="wf">
+<div class="rail">
+<div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div>
+<div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div>
+</div>
+<div class="main">
+<div class="top">
+<div><div style="font-size:16px">campaign-installments-brd.docx</div><div class="h" style="margin-top:3px">Aurora Telecom · v1 draft</div></div>
+<div class="stage"><span class="st on">1 Reading</span><span class="st">2 Questions</span><span class="st">3 Impact</span><span class="st">4 Estimate</span><span class="st">5 BoE</span></div>
+<div style="display:flex;gap:8px"><span class="chip mono">[ ]  stages</span><span class="btn">Re-read</span></div>
+</div>
+<div style="display:flex;height:520px">
+<div style="width:48%;border-right:1.5px solid #222;display:flex;flex-direction:column">
+<div class="sect" style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px"><span class="h">Source document — page 4 / 21</span><span class="chip">Fit width</span></div>
+<div style="padding:16px 20px;overflow:hidden;flex:1">
+<div style="font-size:15px;margin-bottom:8px">3.2 Campaign-based installment plans</div>
+<div class="ln" style="width:96%;margin-bottom:7px"></div><div class="ln" style="width:91%;margin-bottom:7px"></div>
+<div style="background:#fff3cd;border-left:3px solid #e0a600;padding:6px 8px;margin:9px 0;font-size:13px">The subscriber may split a campaign charge into 3, 6 or 12 installments; eligibility rules are defined by the campaign owner.</div>
+<div class="ln" style="width:88%;margin-bottom:7px"></div>
+<div style="display:inline-block;border:1.5px dashed #b04a2f;background:#fbeae5;padding:4px 8px;margin:6px 0;font-size:13px;color:#7d2f1c">budget: ≈ 45 person-days · go-live Nov 2026 &nbsp; <span class="mono">🔒 quarantined</span></div>
+<div class="note" style="margin:4px 0 10px">Tooltip: "This information is hidden from the estimation engine (anchor protection)."</div>
+<div class="ln" style="width:94%;margin-bottom:7px"></div><div class="ln" style="width:80%;margin-bottom:7px"></div>
+<div class="ph" style="height:110px;margin-top:12px">Table 3.2-a — installment fee matrix</div>
+</div></div>
+<div style="width:52%;display:flex;flex-direction:column">
+<div class="sect" style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px"><span class="h">Requirements — 12 extracted</span><div style="display:flex;gap:6px"><span class="chip"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>clear 6</span><span class="chip"><span class="d" style="background:#e0a600;transform:rotate(45deg)"></span>partial 4</span><span class="chip"><span class="d" style="background:#b04a2f;border-radius:0"></span>ambiguous 2</span></div></div>
+<div style="flex:1;overflow:hidden">
+<table class="tbl">
+<thead><tr><th style="width:16px"></th><th style="width:70px">ID</th><th>Requirement</th><th style="width:120px">Source</th></tr></thead>
+<tbody>
+<tr><td style="background:#2f7d4f"></td><td class="mono">REQ-012</td><td>Installment option shown at checkout for eligible campaigns</td><td class="mono">p4 §3.2 ¶1</td></tr>
+<tr style="background:#fbfbf9;outline:1.5px solid #2a78d6"><td style="background:#e0a600"></td><td class="mono">REQ-014</td><td>Subscriber splits campaign charge into 3 / 6 / 12 installments<div style="margin-top:5px;font-size:12.5px;color:#7a5a00">Partial: eligibility rules are referenced but never defined. → sent to Question Board.</div></td><td class="mono">p4 §3.2 ¶2</td></tr>
+<tr><td style="background:#b04a2f"></td><td class="mono">REQ-015</td><td>Early settlement of an open installment plan<div style="margin-top:5px;font-size:12.5px;color:#7d2f1c">Ambiguous: no acceptance criteria, no refund treatment. This row gets a question, not a number.</div></td><td class="mono">p5 §3.2 ¶6</td></tr>
+<tr><td style="background:#2f7d4f"></td><td class="mono">REQ-016</td><td>Installment lines itemised on the monthly invoice</td><td class="mono">p5 §3.3</td></tr>
+<tr><td style="background:#e0a600"></td><td class="mono">REQ-017</td><td>Campaign owner configures fee matrix in back office</td><td class="mono">p6 Tbl 3.2-a</td></tr>
+<tr><td style="background:#2f7d4f"></td><td class="mono">REQ-018</td><td>Dunning excludes future-dated installment lines</td><td class="mono">p7 §3.5</td></tr>
+</tbody></table></div>
+<div style="border-top:1.5px solid #222;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;background:#fbfbf9"><span class="note">Click a row → its paragraph highlights, and back.</span><span class="btn pri">Send 6 to Question Board →</span></div>
+</div></div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Question Board — status flow + customer set builder</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:16px">campaign-installments-brd.docx</div><div class="stage"><span class="st done">1 Reading</span><span class="st on">2 Questions</span><span class="st">3 Impact</span><span class="st">4 Estimate</span><span class="st">5 BoE</span></div><span class="btn">Locale: EN</span></div>
+<div style="display:flex">
+<div style="flex:1;border-right:1.5px solid #222">
+<div class="sect" style="display:flex;gap:8px;align-items:center;padding:8px 14px"><span class="h" style="margin-right:6px">Columns</span><span class="chip">Open 4</span><span class="chip">Sent 3</span><span class="chip">Answered 2</span><span class="chip">Applied 1</span><div style="flex:1"></div><span class="chip">3 selected</span></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0">
+<div style="border-right:1px dashed #c9c9c9;padding:10px">
+<div class="h" style="margin-bottom:8px">Open</div>
+<div class="panel" style="padding:9px;margin-bottom:9px;outline:2px solid #2a78d6"><div style="display:flex;justify-content:space-between"><span class="mono">REQ-015</span><span class="sq" style="background:#2a78d6;border-color:#2a78d6"></span></div><div style="margin:6px 0;font-size:13px">How should an early settlement be priced — full remaining principal, or principal minus unearned fee?</div><div style="font-size:12px;color:#7d2f1c">Reason: no acceptance criteria</div></div>
+<div class="panel" style="padding:9px;margin-bottom:9px;outline:2px solid #2a78d6"><div style="display:flex;justify-content:space-between"><span class="mono">REQ-014</span><span class="sq" style="background:#2a78d6;border-color:#2a78d6"></span></div><div style="margin:6px 0;font-size:13px">Who defines installment eligibility — campaign owner, or a central risk rule?</div><div style="font-size:12px;color:#7a5a00">Reason: undefined ownership</div></div>
+<div class="panel" style="padding:9px"><div style="display:flex;justify-content:space-between"><span class="mono">REQ-017</span><span class="sq"></span></div><div style="margin:6px 0;font-size:13px">Is the fee matrix per campaign or per subscriber segment?</div><div style="font-size:12px;color:#7a5a00">Reason: two readings possible</div></div>
+</div>
+<div style="border-right:1px dashed #c9c9c9;padding:10px">
+<div class="h" style="margin-bottom:8px">Sent · 22 Jul</div>
+<div class="panel" style="padding:9px;margin-bottom:9px;background:#fbfbf9"><span class="mono">REQ-018</span><div style="margin:6px 0;font-size:13px">Which dunning engine version is in production?</div><div class="h">waiting 3 days</div></div>
+<div class="panel" style="padding:9px;background:#fbfbf9"><span class="mono">REQ-012</span><div style="margin:6px 0;font-size:13px">Is checkout the web funnel only, or also the dealer app?</div><div class="h">waiting 3 days</div></div>
+</div>
+<div style="border-right:1px dashed #c9c9c9;padding:10px">
+<div class="h" style="margin-bottom:8px">Answered</div>
+<div class="panel" style="padding:9px;background:#f2f7f3"><span class="mono">REQ-016</span><div style="margin:6px 0;font-size:13px">Invoice template — reuse the existing PDF renderer?</div><div style="font-size:12.5px;border-left:2px solid #2f7d4f;padding-left:6px">"Yes, renderer v4, no new template." — E. Kaya, 31 Jul</div><div class="btn" style="margin-top:8px">Apply to line item →</div></div>
+</div>
+<div style="padding:10px">
+<div class="h" style="margin-bottom:8px">Applied</div>
+<div class="panel" style="padding:9px;background:#f7f7f7"><span class="mono">REQ-013</span><div style="margin:6px 0;font-size:13px">Retry window for failed installment charge?</div><div style="font-size:12px;color:#555">Applied to <u>Billing — installment scheduler</u></div><div class="chip" style="margin-top:7px;border-color:#2a78d6;color:#2a78d6">re-estimation suggested</div></div>
+</div>
+</div></div>
+<div style="width:300px;flex:none;padding:12px 14px">
+<div class="h">Customer set</div>
+<div style="font-size:13px;margin:8px 0">3 questions selected. They compile into one formal message in the estimate's locale.</div>
+<div class="ph" style="height:150px;border-radius:5px">preview — formal register</div>
+<div style="display:flex;gap:8px;margin-top:10px"><span class="btn pri">Copy text</span><span class="btn">Download .docx</span></div>
+<div class="note" style="margin-top:14px">Empty board reads: "Every requirement passed the gate — a good sign."</div>
+</div>
+</div></div></div></div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Impact Map — graph/list toggle + docked evidence panel</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:16px">campaign-installments-brd.docx</div><div class="stage"><span class="st done">1 Reading</span><span class="st done">2 Questions</span><span class="st on">3 Impact</span><span class="st">4 Estimate</span><span class="st">5 BoE</span></div><div style="display:flex;gap:6px"><span class="btn pri">Graph</span><span class="btn">Heat list</span></div></div>
+<div style="display:flex;height:470px">
+<div style="flex:1;border-right:1.5px solid #222;position:relative;background:#fcfcfa">
+<div class="ph" style="position:absolute;inset:16px;border-radius:6px">module / service graph — neighbourhood intuition, not decoration</div>
+<div class="panel" style="position:absolute;left:120px;top:120px;padding:8px 12px;border-radius:6px"><div style="font-size:13.5px">billing-core</div><div class="chip" style="margin-top:5px"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>high confidence</div></div>
+<div class="panel" style="position:absolute;left:400px;top:80px;padding:8px 12px;border-radius:6px;outline:2px solid #2a78d6"><div style="font-size:13.5px">installment-scheduler</div><div class="chip" style="margin-top:5px"><span class="d" style="background:#e0a600;transform:rotate(45deg)"></span>medium</div></div>
+<div class="panel" style="position:absolute;left:330px;top:250px;padding:8px 12px;border-radius:6px;border-style:dashed"><div style="font-size:13.5px">dunning-svc</div><div style="display:flex;gap:5px;margin-top:5px"><span class="chip"><span class="d" style="background:#b04a2f"></span>low</span><span class="chip" style="border-color:#b04a2f;color:#b04a2f">discovery effort suggested</span></div></div>
+<div class="panel" style="position:absolute;left:110px;top:290px;padding:8px 12px;border-radius:6px"><div style="font-size:13.5px">checkout-web</div><div class="chip" style="margin-top:5px"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>high</div></div>
+<div class="note" style="position:absolute;right:22px;bottom:16px;width:230px;text-align:right">Low confidence is never hidden — it is priced.</div>
+</div>
+<div style="width:390px;flex:none;display:flex;flex-direction:column">
+<div class="sect" style="padding:9px 13px"><div style="font-size:15px">installment-scheduler</div><div class="h" style="margin-top:4px">Evidence · touched by REQ-013, REQ-014</div></div>
+<div class="sect" style="padding:10px 13px">
+<div class="h">Code references</div>
+<div class="panel" style="margin-top:7px;padding:7px 9px;background:#fbfbf9"><div class="mono">billing-core/src/schedule/Plan.java:184</div><div class="mono" style="color:#555;margin-top:4px">if (plan.getTermCount() &gt; MAX_TERMS) {</div></div>
+<div class="panel" style="margin-top:6px;padding:7px 9px;background:#fbfbf9"><div class="mono">billing-core/src/schedule/FeeMatrix.java:42</div></div>
+</div>
+<div class="sect" style="padding:10px 13px">
+<div class="h">Wiki</div>
+<div style="display:flex;justify-content:space-between;margin-top:7px;font-size:13px"><span>Installment plan lifecycle</span><span class="chip">updated 8 months ago</span></div>
+<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:13px"><span>Fee matrix ownership</span><span class="chip" style="border-color:#b04a2f;color:#b04a2f">stale · 2 yrs</span></div>
+</div>
+<div style="padding:10px 13px">
+<div class="h">Analog jobs</div>
+<div class="panel" style="margin-top:7px;padding:8px 9px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">Prepaid top-up scheduler (2024)</span><span class="chip">81% similar</span></div><div class="rb" style="margin-top:7px"><div class="rbf" style="left:22%;right:34%"></div><div class="rbl" style="left:47%"></div></div><div style="display:flex;justify-content:space-between;margin-top:4px" class="mono"><span>est 8–17 pd</span><span>actual 15 pd · within</span></div></div>
+</div>
+</div></div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Estimate Desk — independent-first, draft <b>closed</b> (the "you first" panel)</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:16px">campaign-installments-brd.docx</div><div class="stage"><span class="st done">1 Reading</span><span class="st done">2 Questions</span><span class="st done">3 Impact</span><span class="st on">4 Estimate</span><span class="st">5 BoE</span></div><div style="display:flex;gap:6px;align-items:center"><span class="chip">Dense</span><span class="chip">Delphi off</span><span class="btn">Reviewer: D. Aksoy</span></div></div>
+<div style="background:#eef4fb;border-bottom:1.5px solid #2a78d6;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
+<div><div style="font-size:14.5px">You first. The draft stays closed until you enter your own range.</div><div style="font-size:12.5px;color:#3a5570;margin-top:3px">Nothing is blurred behind this — you are not missing a number, we are not showing you one yet.</div></div>
+<div style="display:flex;gap:8px;align-items:center"><span class="mono">7 / 18 entered</span><span class="btn">Skip item (j / k to travel)</span></div>
+</div>
+<table class="tbl">
+<thead><tr><th style="width:22px"></th><th style="width:250px">Line item</th><th style="width:100px">REQ</th><th>Impact</th><th style="width:105px">Confidence</th><th style="width:230px">Your range (O / L / P)</th><th style="width:150px">Draft</th></tr></thead>
+<tbody>
+<tr><td class="mono" style="color:#888">✓</td><td>Installment scheduler — plan creation</td><td class="mono">014, 013</td><td style="font-size:12.5px">billing-core, installment-scheduler</td><td><span class="chip"><span class="d" style="background:#e0a600;transform:rotate(45deg)"></span>medium</span></td><td><div style="display:flex;gap:4px" class="mono"><span class="panel" style="padding:3px 7px">6</span><span class="panel" style="padding:3px 7px;border-width:2px">9</span><span class="panel" style="padding:3px 7px">16</span></div></td><td><span class="chip" style="background:#f0f0f0">closed</span></td></tr>
+<tr style="outline:2px solid #2a78d6;background:#fbfcfe"><td class="mono">▸</td><td>Fee matrix back-office screen</td><td class="mono">017</td><td style="font-size:12.5px">back-office, billing-core</td><td><span class="chip"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>high</span></td>
+<td><div style="display:flex;gap:4px;align-items:center" class="mono"><span class="panel" style="padding:3px 7px">3</span><span class="panel" style="padding:3px 7px;border-width:2px;outline:2px solid #2a78d6">5</span><span class="panel" style="padding:3px 7px;color:#999">P?</span></div><div class="note" style="margin-top:5px">or drag the bar — 5–10 s per item</div></td>
+<td><span class="btn" style="opacity:.45">Reveal draft</span></td></tr>
+<tr><td></td><td>Early settlement flow</td><td class="mono">015</td><td style="font-size:12.5px"><span class="chip" style="border-color:#b04a2f;color:#b04a2f">blocked — open question</span></td><td><span class="chip"><span class="d" style="background:#b04a2f"></span>low</span></td><td style="color:#888;font-size:12.5px">No line item without evidence.</td><td><span class="chip" style="background:#f0f0f0">closed</span></td></tr>
+<tr><td></td><td>Invoice itemisation</td><td class="mono">016</td><td style="font-size:12.5px">invoice-render (v4 reuse)</td><td><span class="chip"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>high</span></td><td><div style="display:flex;gap:4px" class="mono"><span class="panel" style="padding:3px 7px;color:#bbb">O</span><span class="panel" style="padding:3px 7px;color:#bbb">L</span><span class="panel" style="padding:3px 7px;color:#bbb">P</span></div></td><td><span class="chip" style="background:#f0f0f0">closed</span></td></tr>
+<tr><td></td><td>Dunning exclusion rules</td><td class="mono">018</td><td style="font-size:12.5px">dunning-svc <span class="chip" style="border-color:#b04a2f;color:#b04a2f">+ discovery</span></td><td><span class="chip"><span class="d" style="background:#b04a2f"></span>low</span></td><td><div style="display:flex;gap:4px" class="mono"><span class="panel" style="padding:3px 7px;color:#bbb">O</span><span class="panel" style="padding:3px 7px;color:#bbb">L</span><span class="panel" style="padding:3px 7px;color:#bbb">P</span></div></td><td><span class="chip" style="background:#f0f0f0">closed</span></td></tr>
+</tbody></table>
+<div style="border-top:1.5px solid #222;background:#f7f7f5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
+<div style="display:flex;gap:18px;align-items:center"><span class="h">Your subtotal so far</span><span class="num" style="font-size:15px">21 — 38 pd</span><span class="chip">likely 27</span></div>
+<div style="display:flex;gap:14px;align-items:center"><span class="chip" style="border-color:#b04a2f">Concept stage · ±4x</span><span class="mono">signatures 0 / 18</span><span class="btn" style="opacity:.45">Reveal all drafts</span></div>
+</div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Estimate Desk — draft <b>revealed</b>: range bars, delta, evidence, totals strip</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:16px">campaign-installments-brd.docx</div><div class="stage"><span class="st done">1 Reading</span><span class="st done">2 Questions</span><span class="st done">3 Impact</span><span class="st on">4 Estimate</span><span class="st">5 BoE</span></div><div style="display:flex;gap:6px;align-items:center"><span class="chip">Comfortable</span><span class="btn">Delphi: 3 reviewers</span><span class="btn pri">Send to BoE</span></div></div>
+<table class="tbl">
+<thead><tr><th style="width:22px"></th><th style="width:215px">Line item</th><th style="width:78px">REQ</th><th style="width:96px">Evidence</th><th style="width:230px">Range — O · L · P</th><th style="width:92px">Draft</th><th style="width:92px">Yours</th><th style="width:150px">Delta</th><th style="width:74px">A / R</th><th style="width:86px">Status</th></tr></thead>
+<tbody>
+<tr><td class="mono">▾</td><td>Installment scheduler — plan creation</td><td class="mono">014,013</td><td style="display:flex;gap:4px"><span class="chip" title="code">⟨/⟩3</span><span class="chip">wiki 2</span></td>
+<td><div class="rb"><div class="rbf" style="left:14%;right:22%"></div><div class="rbl" style="left:38%"></div></div><div class="mono" style="display:flex;justify-content:space-between;margin-top:3px;color:#555"><span>5</span><span>9</span><span>18</span></div></td>
+<td class="num">5–18</td><td class="num">6–16</td><td><span class="chip" style="border-color:#2f7d4f;color:#2f7d4f">ranges intersect</span></td><td class="num">4 / 2</td><td><span class="chip">reviewed</span></td></tr>
+<tr style="background:#fbfbf9"><td colspan="10" style="padding:10px 14px 12px 34px;border-bottom:1px dashed #c9c9c9">
+<div style="display:flex;gap:26px">
+<div style="flex:1"><div class="h">Assumptions (4)</div><div style="font-size:13px;margin-top:5px">· Scheduler reuses the existing retry framework<br>· Max 12 terms; no partial-term proration<br>· No migration of in-flight prepaid plans</div></div>
+<div style="flex:1"><div class="h">Risks (2)</div><div style="font-size:13px;margin-top:5px">· Fee matrix ownership still unconfirmed (REQ-017)<br>· Wiki page for plan lifecycle is 8 months old</div></div>
+<div style="width:250px"><div class="h">Rationale (yours)</div><div class="panel" style="margin-top:5px;padding:7px;font-size:13px;background:#fff">"Scheduler is well covered by tests; the fee matrix is the unknown, so P stays wide."</div></div>
+</div></td></tr>
+<tr><td class="mono">▸</td><td>Fee matrix back-office screen</td><td class="mono">017</td><td style="display:flex;gap:4px"><span class="chip">⟨/⟩1</span><span class="chip">analog</span></td>
+<td><div class="rb"><div class="rbf" style="left:20%;right:46%"></div><div class="rbl" style="left:34%"></div><div class="rbf" style="left:44%;right:12%;background:transparent;border-top:2px dashed #2a78d6;border-bottom:2px dashed #2a78d6;border-left-color:#2a78d6;border-right-color:#2a78d6"></div></div><div class="mono" style="margin-top:3px;color:#2a78d6">yours 8–14 · draft 3–9</div></td>
+<td class="num">3–9</td><td class="num">8–14</td><td><span class="chip" style="border-color:#b04a2f;color:#b04a2f">disjoint — discuss</span></td><td class="num">2 / 1</td><td><span class="chip">draft</span></td></tr>
+<tr><td></td><td>Early settlement flow</td><td class="mono">015</td><td><span class="chip" style="border-color:#e0a600">answer pending</span></td><td style="color:#888;font-size:12.5px">Held — evidence is missing. A question is open.</td><td class="num">—</td><td class="num">—</td><td></td><td class="num">0 / 1</td><td><span class="chip" style="border-color:#b04a2f;color:#b04a2f">blocked</span></td></tr>
+<tr><td></td><td>Invoice itemisation</td><td class="mono">016</td><td style="display:flex;gap:4px"><span class="chip">Q ans.</span><span class="chip">⟨/⟩2</span></td>
+<td><div class="rb"><div class="rbf" style="left:30%;right:52%"></div><div class="rbl" style="left:38%"></div></div><div class="mono" style="display:flex;justify-content:space-between;margin-top:3px;color:#555"><span>2</span><span>3</span><span>6</span></div></td>
+<td class="num">2–6</td><td class="num">2–5</td><td><span class="chip" style="border-color:#2f7d4f;color:#2f7d4f">intersect</span></td><td class="num">3 / 0</td><td><span class="chip" style="background:#1a1a1a;color:#fff">signed</span></td></tr>
+<tr><td></td><td>Dunning exclusion rules <span class="chip" style="border-color:#b04a2f;color:#b04a2f">+ discovery 2 pd</span></td><td class="mono">018</td><td><span class="chip" style="border-color:#b04a2f;color:#b04a2f">weak</span></td>
+<td><div class="rb"><div class="rbf" style="left:12%;right:8%"></div><div class="rbl" style="left:32%"></div></div><div class="mono" style="display:flex;justify-content:space-between;margin-top:3px;color:#555"><span>3</span><span>7</span><span>21</span></div><div style="font-size:12px;color:#7d2f1c;margin-top:3px">Evidence is weak here — we added discovery effort to the range.</div></td>
+<td class="num">3–21</td><td class="num">—</td><td><span class="chip">awaiting you</span></td><td class="num">1 / 3</td><td><span class="chip">draft</span></td></tr>
+<tr style="background:#fbfbf9"><td colspan="10" style="padding:12px 14px 12px 34px">
+<div style="display:flex;gap:20px;align-items:center"><div class="h" style="width:90px">Delphi<br>overlay</div>
+<div style="flex:1;position:relative;height:60px;border:1.5px dashed #a5a5a5;border-radius:6px;background:#fff">
+<div style="position:absolute;left:14%;right:30%;top:12px;height:3px;background:#555"></div>
+<div style="position:absolute;left:26%;right:18%;top:28px;height:3px;background:#555"></div>
+<div style="position:absolute;left:10%;right:46%;top:44px;height:3px;background:#555"></div>
+<div style="position:absolute;left:0;right:0;bottom:-1px;height:0"></div>
+<div style="position:absolute;left:26%;right:30%;top:0;bottom:0;background:rgba(42,120,214,.10);border-left:1px solid #2a78d6;border-right:1px solid #2a78d6"></div>
+</div>
+<div style="width:250px"><div class="note">Three anonymous reviewers. The width of the disagreement is the point; names only when the moderator reveals them.</div></div></div></td></tr>
+</tbody></table>
+<div style="border-top:1.5px solid #222;background:#f7f7f5;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;bottom:0">
+<div style="display:flex;gap:22px;align-items:baseline"><span class="h">Total across 18 items</span><span class="num" style="font-size:18px">34 — 52 pd</span><span class="chip">likely 41 pd</span></div>
+<div style="display:flex;gap:12px;align-items:center"><span class="chip" style="border-color:#b04a2f">Concept stage · ±4x</span><span class="mono">signatures 12 / 18</span><div style="width:130px;height:9px;border:1.5px solid #222;border-radius:5px;overflow:hidden"><div style="width:66%;height:100%;background:#1a1a1a"></div></div><span class="btn pri">Continue to BoE →</span></div>
+</div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>BoE Preview &amp; Signature — document + row-scoped signing</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri on"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:16px">Basis of Estimate — v3 draft</div><div class="stage"><span class="st done">1 Reading</span><span class="st done">2 Questions</span><span class="st done">3 Impact</span><span class="st done">4 Estimate</span><span class="st on">5 BoE</span></div><div style="display:flex;gap:6px"><span class="btn">Version history</span><span class="btn">Export .docx</span><span class="btn">Archival PDF</span></div></div>
+<div style="display:flex;height:530px">
+<div style="width:200px;flex:none;border-right:1.5px solid #222;padding:12px 10px;background:#fbfbf9">
+<div class="h">Contents</div>
+<div style="font-size:13px;line-height:2.1;margin-top:6px">Scope<br><b>Exclusions</b><br>Line items<br>Assumption register<br>Risk register + contingency<br>Cone stage<br>Provenance appendix<br>Signature page</div>
+<div class="chip" style="margin-top:14px;border-color:#b04a2f">Concept · ±4x</div>
+</div>
+<div style="flex:1;border-right:1.5px solid #222;background:#f0eee9;padding:18px;overflow:hidden">
+<div style="background:#fff;border:1.5px solid #222;padding:26px 30px;font-family:Georgia,serif">
+<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid #222;padding-bottom:8px"><span style="font-size:17px">Basis of Estimate</span><span class="mono">Aurora Telecom · v3 · Aug 3, 2026</span></div>
+<div style="display:flex;gap:26px;margin-top:14px">
+<div style="flex:1">
+<div class="h">2. Line items</div>
+<table class="tbl" style="font-family:Georgia,serif;margin-top:6px"><thead><tr><th>Item</th><th>O</th><th>L</th><th>P</th></tr></thead><tbody>
+<tr><td>Installment scheduler</td><td class="num">5</td><td class="num">9</td><td class="num">18</td></tr>
+<tr><td>Fee matrix back office</td><td class="num">3</td><td class="num">6</td><td class="num">14</td></tr>
+<tr><td>Invoice itemisation</td><td class="num">2</td><td class="num">3</td><td class="num">6</td></tr>
+<tr><td>Dunning exclusions (incl. discovery)</td><td class="num">3</td><td class="num">7</td><td class="num">21</td></tr>
+<tr><td style="font-weight:700">Total (18 items)</td><td class="num">34</td><td class="num">41</td><td class="num">52</td></tr>
+</tbody></table>
+<div style="font-size:12.5px;margin-top:8px;color:#444">Reported as a range. The likely figure is emphasised; both ends travel with it, always.</div>
+</div>
+<div style="width:230px">
+<div class="h">3. Assumption register</div><div style="font-size:12.5px;margin-top:5px;line-height:1.5">A-01 Renderer v4 reused<br>A-02 Max 12 terms<br>A-03 No prepaid migration<br><span style="color:#888">+ 9 more</span></div>
+<div class="h" style="margin-top:12px">4. Risks &amp; contingency</div><div style="font-size:12.5px;margin-top:5px;line-height:1.5">R-01 Fee matrix ownership<br>R-02 Stale dunning docs<br>Contingency: +6 pd (in P)</div>
+</div></div>
+<div style="border-top:1px dashed #999;margin-top:16px;padding-top:10px;display:flex;gap:30px">
+<div><div class="h">Signature — Reviewer</div><div style="font-size:13px;margin-top:5px">D. Aksoy · Aug 2, 2026<br><span class="mono">rows 1–12, 15</span></div></div>
+<div><div class="h">Signature — Signing authority</div><div style="font-size:13px;margin-top:5px;color:#999">pending — M. Yılmaz</div></div>
+</div>
+</div></div>
+<div style="width:320px;flex:none;display:flex;flex-direction:column">
+<div class="sect" style="padding:10px 13px"><div class="h">Signature flow</div><div style="font-size:13px;margin-top:6px">Reviewer → Signing authority. Each signature names the rows it covers.</div></div>
+<div class="sect" style="padding:10px 13px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13.5px">Rows you are approving</span><span class="mono">12 / 18</span></div>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;font-size:13px">
+<div style="display:flex;gap:7px;align-items:center"><span class="sq" style="background:#1a1a1a;border-color:#1a1a1a"></span>Installment scheduler</div>
+<div style="display:flex;gap:7px;align-items:center"><span class="sq" style="background:#1a1a1a;border-color:#1a1a1a"></span>Invoice itemisation</div>
+<div style="display:flex;gap:7px;align-items:center"><span class="sq"></span>Fee matrix back office <span class="chip" style="border-color:#b04a2f;color:#b04a2f">delta disjoint</span></div>
+<div style="display:flex;gap:7px;align-items:center"><span class="sq"></span>Early settlement <span class="chip">blocked</span></div>
+</div>
+<div class="btn pri" style="margin-top:11px">Sign 12 rows</div>
+</div>
+<div class="sect" style="padding:10px 13px"><div class="h">After signing</div><div style="font-size:13px;margin-top:6px">Any change creates v4 with a diff view. No confetti — just: "BoE v3 signed — ready to export."</div></div>
+<div style="padding:10px 13px"><div class="h">Version history</div><div style="font-size:13px;margin-top:6px;line-height:1.7"><b>v3</b> · 12 rows signed · today<br>v2 · range widened after REQ-013 answer<br>v1 · first draft · Jul 24</div><div class="btn" style="margin-top:9px">Diff v2 → v3</div></div>
+</div>
+</div></div></div></div></div>
+
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Ledger &amp; Analog Search — past jobs, deviation, seed import</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri"><span class="sq"></span>Estimates</div><div class="ri on"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:17px">Ledger</div><div class="panel" style="flex:1;max-width:520px;padding:6px 10px;color:#444;font-size:13.5px">campaign-based installment plans</div><div style="display:flex;gap:6px"><span class="chip">Team: Billing</span><span class="chip">Domain: Charging</span><span class="btn">Import seed set</span></div></div>
+<div style="display:flex">
+<div style="flex:1;border-right:1.5px solid #222">
+<div class="sect" style="padding:8px 14px"><span class="h">Analog matches — 4 of 212 jobs</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 14px">
+<div class="panel" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px">Prepaid top-up scheduler</span><span class="chip">81%</span></div><div class="rb" style="margin-top:8px"><div class="rbf" style="left:20%;right:36%"></div><div class="rbl" style="left:46%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px" class="mono"><span>8–17 pd est</span><span>15 pd actual</span></div><div class="chip" style="margin-top:7px;border-color:#2f7d4f;color:#2f7d4f">within range</div></div>
+<div class="panel" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px">Device instalment billing</span><span class="chip">74%</span></div><div class="rb" style="margin-top:8px"><div class="rbf" style="left:14%;right:52%"></div><div class="rbl" style="left:28%"></div><div class="rbl" style="left:82%;background:#b04a2f"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px" class="mono"><span>10–22 pd est</span><span>31 pd actual</span></div><div class="chip" style="margin-top:7px;border-color:#b04a2f;color:#b04a2f">above range</div></div>
+<div class="panel" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px">Campaign fee matrix v2</span><span class="chip">69%</span></div><div class="rb" style="margin-top:8px"><div class="rbf" style="left:26%;right:30%"></div><div class="rbl" style="left:40%"></div><div class="rbl" style="left:18%;background:#2f7d4f"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px" class="mono"><span>6–14 pd est</span><span>4 pd actual</span></div><div class="chip" style="margin-top:7px;border-color:#2f7d4f;color:#2f7d4f">below range</div></div>
+<div class="panel" style="padding:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px">Dunning rules refactor</span><span class="chip">61%</span></div><div class="rb" style="margin-top:8px"><div class="rbf" style="left:22%;right:28%"></div><div class="rbl" style="left:52%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px" class="mono"><span>9–19 pd est</span><span>17 pd actual</span></div><div class="chip" style="margin-top:7px;border-color:#2f7d4f;color:#2f7d4f">within range</div></div>
+</div>
+<table class="tbl"><thead><tr><th>Job</th><th>Delivered</th><th>Range that day</th><th>Actual</th><th>Deviation</th><th>Team</th><th>BoE row</th></tr></thead><tbody>
+<tr><td>Prepaid top-up scheduler</td><td class="mono">Mar 2024</td><td class="num">8–17 pd</td><td class="num">15 pd</td><td><span class="chip" style="border-color:#2f7d4f;color:#2f7d4f">within</span></td><td>Billing</td><td><span class="mono">open ↗</span></td></tr>
+<tr><td>Device instalment billing</td><td class="mono">Oct 2024</td><td class="num">10–22 pd</td><td class="num">31 pd</td><td><span class="chip" style="border-color:#b04a2f;color:#b04a2f">above +41%</span></td><td>Billing</td><td><span class="mono">open ↗</span></td></tr>
+<tr><td>Campaign fee matrix v2</td><td class="mono">Feb 2025</td><td class="num">6–14 pd</td><td class="num">4 pd</td><td><span class="chip" style="border-color:#2f7d4f;color:#2f7d4f">below</span></td><td>Charging</td><td><span class="mono">open ↗</span></td></tr>
+</tbody></table>
+</div>
+<div style="width:300px;flex:none;padding:12px 14px">
+<div class="h">Seed set import</div>
+<div style="font-size:13px;margin:7px 0 10px">Step 2 of 4 — map columns</div>
+<div class="panel" style="padding:9px">
+<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0"><span class="mono">Column C</span><span>→ estimate_low</span></div>
+<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-top:1px dashed #ccc"><span class="mono">Column D</span><span>→ estimate_high</span></div>
+<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-top:1px dashed #ccc"><span class="mono">Column G</span><span style="color:#b04a2f">→ unmapped</span></div>
+</div>
+<div class="panel" style="padding:9px;margin-top:10px;border-color:#b04a2f"><div style="font-size:13px">14 rows failed — missing actuals. They wait in a queue; nothing partial enters the ledger.</div><div class="btn" style="margin-top:8px">Review failed rows</div></div>
+<div class="panel" style="padding:9px;margin-top:10px"><div class="h">Before anything enters</div><div style="font-size:13px;margin-top:6px;display:flex;flex-direction:column;gap:5px"><span><span class="sq" style="background:#1a1a1a;border-color:#1a1a1a;display:inline-block;vertical-align:-2px"></span> No personal data in free-text</span><span><span class="sq" style="display:inline-block;vertical-align:-2px"></span> Customer names anonymised</span></div></div>
+</div>
+</div></div></div></div></div>
+
+<div class="dv-opt" id="1i"><div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Calibration Dashboard — the honesty showcase</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri on"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div><div style="font-size:17px">Calibration</div><div class="h" style="margin-top:3px">Last 24 months · 212 closed jobs</div></div><div style="display:flex;gap:6px"><span class="chip">All teams</span><span class="chip">All domains</span><span class="btn">Export figures</span></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+<div style="border-right:1.5px solid #222;border-bottom:1.5px solid #222;padding:14px 16px">
+<div style="font-size:14.5px">Our P10–P90 range captured actuals <b>78%</b> of the time <span style="color:#666">(target 80%)</span></div>
+<div style="position:relative;height:150px;margin-top:14px;border-left:1.5px solid #222;border-bottom:1.5px solid #222">
+<div style="position:absolute;left:0;right:0;top:26px;border-top:2px dashed #b04a2f"></div>
+<div class="mono" style="position:absolute;right:2px;top:8px;color:#b04a2f">nominal 80%</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:124px;display:flex;align-items:flex-end;gap:16px;padding:0 18px">
+<div style="flex:1;height:74%;background:#d9d9d9;border:1.5px solid #222"></div>
+<div style="flex:1;height:81%;background:#d9d9d9;border:1.5px solid #222"></div>
+<div style="flex:1;height:66%;background:#d9d9d9;border:1.5px solid #222"></div>
+<div style="flex:1;height:88%;background:#d9d9d9;border:1.5px solid #222"></div>
+<div style="flex:1;height:78%;background:#d9d9d9;border:1.5px solid #222"></div>
+</div></div>
+<div class="mono" style="display:flex;justify-content:space-between;margin-top:5px;color:#666;padding:0 18px"><span>Billing</span><span>Charging</span><span>CRM</span><span>Portal</span><span>All</span></div>
+<div class="note" style="margin-top:8px">Under target is stated plainly, in the same calm voice as over target.</div>
+</div>
+<div style="border-bottom:1.5px solid #222;padding:14px 16px">
+<div style="font-size:14.5px">Pipeline vs. naive analog median</div>
+<div class="ph" style="height:150px;margin-top:14px;border-radius:5px">two overlaid distributions + nominal line</div>
+<div style="font-size:13px;margin-top:8px">MAPE 22% vs. 24%. On this dataset the difference is not meaningful — we say so.</div>
+</div>
+<div style="border-right:1.5px solid #222;padding:14px 16px">
+<div style="font-size:14.5px">Anchoring telemetry</div>
+<div style="display:flex;gap:14px;margin-top:12px;align-items:center">
+<div style="flex:1">
+<div class="h">Independent-first entries</div><div class="rb" style="margin-top:6px;height:20px"><div class="rbf" style="left:12%;right:16%"></div><div class="rbl" style="left:44%"></div></div>
+<div class="h" style="margin-top:12px">Entered after reveal</div><div class="rb" style="margin-top:6px;height:20px"><div class="rbf" style="left:30%;right:26%"></div><div class="rbl" style="left:47%"></div></div>
+</div></div>
+<div style="font-size:13px;margin-top:10px">Post-reveal ranges are 34% narrower and cluster on the draft — the reason the desk opens closed.</div>
+</div>
+<div style="padding:14px 16px">
+<div style="font-size:14.5px">Question impact</div>
+<div style="display:flex;gap:22px;margin-top:14px">
+<div><div class="num" style="font-size:26px;text-align:left">61%</div><div style="font-size:13px;max-width:180px">of answered questions changed a line item's range</div></div>
+<div><div class="num" style="font-size:26px;text-align:left">−28%</div><div style="font-size:13px;max-width:180px">median range width after an answer lands</div></div>
+</div>
+<div class="ph" style="height:74px;margin-top:14px;border-radius:5px">revision rate by question reason</div>
+</div>
+</div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1j"><div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Knowledge Curation — candidate review, side by side</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri on"><span class="sq"></span>Knowledge</div><div class="ri"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:17px">Knowledge — canonical pages</div><div style="display:flex;gap:6px"><span class="chip">Queue 9</span><span class="chip" style="border-color:#e0a600">Drifted 4</span><span class="chip">Published 128</span></div></div>
+<div style="display:flex;height:470px">
+<div style="width:250px;flex:none;border-right:1.5px solid #222">
+<div class="sect" style="padding:8px 12px"><span class="h">Candidate queue</span></div>
+<div style="padding:8px 10px;display:flex;flex-direction:column;gap:7px">
+<div class="panel" style="padding:8px;outline:2px solid #2a78d6"><div style="font-size:13px">Installment plan lifecycle</div><div class="h" style="margin-top:4px">from 6 wiki pages</div></div>
+<div class="panel" style="padding:8px"><div style="font-size:13px">Dunning exclusion policy</div><div class="h" style="margin-top:4px">from 3 pages + 1 ADR</div></div>
+<div class="panel" style="padding:8px"><div style="font-size:13px">Fee matrix ownership</div><div class="chip" style="margin-top:5px;border-color:#b04a2f;color:#b04a2f">source 2 yrs old</div></div>
+</div>
+<div class="sect" style="border-top:1.5px solid #222;border-bottom:none;padding:9px 12px"><span class="h">Freshness warnings</span><div style="font-size:12.5px;margin-top:6px;color:#7a5a00">4 canonical pages may have drifted from their sources for 6+ months.</div></div>
+</div>
+<div style="flex:1;display:flex">
+<div style="flex:1;border-right:1px dashed #c9c9c9;padding:12px 14px"><div class="h">Source (6 pages, merged)</div><div style="margin-top:9px"><div class="ln" style="width:95%;margin-bottom:6px"></div><div class="ln" style="width:88%;margin-bottom:6px"></div><div class="ln" style="width:92%;margin-bottom:6px"></div><div class="ln" style="width:60%;margin-bottom:14px"></div><div class="ph" style="height:80px">wiki table — term limits</div><div class="ln" style="width:90%;margin:14px 0 6px"></div><div class="ln" style="width:84%;margin-bottom:6px"></div><div class="ln" style="width:70%"></div></div></div>
+<div style="flex:1;padding:12px 14px;background:#fbfcfe"><div style="display:flex;justify-content:space-between"><span class="h">Candidate — distilled</span><span class="chip">v3 draft</span></div>
+<div style="font-size:13.5px;margin-top:9px;line-height:1.5">A campaign installment plan splits one charge into 3, 6 or 12 terms. Terms are generated at plan creation and never re-priced. Early settlement is out of scope for v1 of this page.</div>
+<div style="margin-top:10px"><div class="ln" style="width:93%;margin-bottom:6px"></div><div class="ln" style="width:86%;margin-bottom:6px"></div><div class="ln" style="width:74%"></div></div>
+<div style="margin-top:14px;display:flex;gap:8px"><span class="btn pri">Approve &amp; publish v3</span><span class="btn">Revise</span><span class="btn">Reject</span></div>
+<div class="note" style="margin-top:12px">Publishing is versioned; every estimate cites the page version it read.</div>
+</div>
+</div>
+</div></div></div></div></div>
+
+<div class="dv-opt" id="1k"><div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>Admin — connections, model profiles, roles</div>
+<div class="dv-card"><div class="wf">
+<div class="rail"><div style="font:600 13px system-ui;padding:4px 6px 10px">Estimo</div><div class="ri"><span class="sq"></span>Estimates</div><div class="ri"><span class="sq"></span>Ledger</div><div class="ri"><span class="sq"></span>Calibration</div><div class="ri"><span class="sq"></span>Knowledge</div><div class="ri on"><span class="sq"></span>Admin</div></div>
+<div class="main">
+<div class="top"><div style="font-size:17px">Admin</div><div class="stage"><span class="st on">Connections</span><span class="st">Model profiles</span><span class="st">Roles</span><span class="st">Locales</span></div><span class="btn">+ Add connection</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:14px 16px">
+<div class="panel" style="padding:11px"><div style="display:flex;justify-content:space-between"><span style="font-size:14px">Confluence</span><span class="chip"><span class="d" style="background:#2f7d4f;border-radius:50%"></span>connected</span></div><div class="h" style="margin-top:7px">Last sync 12 min ago · 4,210 pages</div><div class="btn" style="margin-top:9px">Sync now</div></div>
+<div class="panel" style="padding:11px;border-color:#b04a2f"><div style="display:flex;justify-content:space-between"><span style="font-size:14px">Git — billing-core</span><span class="chip" style="border-color:#b04a2f;color:#b04a2f"><span class="d" style="background:#b04a2f"></span>error</span></div><div style="font-size:13px;margin-top:7px;color:#7d2f1c">We couldn't reach Confluence (401). Renew the connection key in Admin → Connections.</div><div class="btn" style="margin-top:9px">Renew key</div></div>
+<div class="panel" style="padding:11px"><div style="display:flex;justify-content:space-between"><span style="font-size:14px">LLM gateway</span><span class="chip"><span class="d" style="background:#e0a600;transform:rotate(45deg)"></span>first sync</span></div><div style="height:9px;border:1.5px solid #222;margin-top:9px;border-radius:5px;overflow:hidden"><div style="width:38%;height:100%;background:#2a78d6"></div></div><div style="font-size:12.5px;margin-top:6px">Indexing repositories — a large wiki can take days. You can keep working.</div></div>
+</div>
+<div style="display:flex;gap:0;border-top:1.5px solid #222">
+<div style="flex:1;border-right:1.5px solid #222;padding:13px 16px">
+<div class="h">Model profiles — stage → profile</div>
+<table class="tbl" style="margin-top:8px"><thead><tr><th>Stage</th><th>Profile</th><th>Tokens / run</th><th>Cost / run</th></tr></thead><tbody>
+<tr><td>Reading (extraction)</td><td><span class="chip">Precise-Long</span></td><td class="num">180k</td><td class="num">$0.94</td></tr>
+<tr><td>Questions</td><td><span class="chip">Balanced</span></td><td class="num">42k</td><td class="num">$0.21</td></tr>
+<tr><td>Impact</td><td><span class="chip">Precise-Long</span></td><td class="num">260k</td><td class="num">$1.36</td></tr>
+<tr><td>Draft estimate</td><td><span class="chip">Deliberate</span></td><td class="num">95k</td><td class="num">$0.72</td></tr>
+</tbody></table>
+<div class="note" style="margin-top:9px">Named profiles only. No model-name bragging in the UI.</div>
+</div>
+<div style="width:400px;flex:none;padding:13px 16px">
+<div class="h">Roles &amp; signing authorities</div>
+<table class="tbl" style="margin-top:8px"><thead><tr><th>Person</th><th>Role</th><th>May sign</th></tr></thead><tbody>
+<tr><td>A. Demir</td><td>Analyst</td><td>—</td></tr>
+<tr><td>D. Aksoy</td><td>Reviewer</td><td>line items</td></tr>
+<tr><td>M. Yılmaz</td><td>Delivery Manager</td><td>full BoE</td></tr>
+</tbody></table>
+<div class="panel" style="margin-top:12px;padding:10px;background:#fbfbf9"><div class="h">Cost meter — this month</div><div class="num" style="font-size:20px;text-align:left;margin-top:5px">$418.60</div><div style="font-size:12.5px">across 23 estimates · $18.20 median per estimate</div></div>
+</div>
+</div>
+</div></div></div></div>
+
+</div>
+<p class="dv-next">Try next: "go deeper on <a class="dv-oid" href="#1f">1f</a> — three variants of the range bar and delta" · "show <a class="dv-oid" href="#1e">1e</a> as a per-item modal instead" · "dark theme pass on <a class="dv-oid" href="#1f">1f</a> and <a class="dv-oid" href="#1i">1i</a>" · "wireframe the Turkish locale version of <a class="dv-oid" href="#1b">1b</a>"</p>
+</section>
+</x-dc>
+</body>
+</html>

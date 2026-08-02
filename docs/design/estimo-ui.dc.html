@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{
+--bg:#F4F4F1;--surf:#FFFFFF;--surf2:#FAFAF7;--surf3:#EFEFEA;
+--ink:#15181C;--ink2:#3D434B;--mut:#6B717A;--line:#E2E2DC;--line2:#CFCFC7;
+--acc:#1F4B8E;--acc-ink:#FFFFFF;--acc-bg:#EAF0F9;--acc-line:#B9CCE6;
+--ok:#2C6A4B;--ok-bg:#E9F2EC;--warn:#93651A;--warn-bg:#F8F1E2;--crit:#9C3A26;--crit-bg:#F8EBE7;
+--ev-code:#463F8F;--ev-wiki:#1A6570;--ev-analog:#7A4076;--ev-ans:#3A6428;
+--sh:0 1px 2px rgba(20,24,28,.06),0 1px 1px rgba(20,24,28,.04);
+--sh2:0 8px 24px rgba(20,24,28,.10);--r:6px;--r2:10px;
+}
+[data-theme="dark"]{
+--bg:#0E1013;--surf:#16191E;--surf2:#1B1F25;--surf3:#232830;
+--ink:#E9EAEC;--ink2:#C2C7CE;--mut:#8D949D;--line:#272C34;--line2:#39404A;
+--acc:#7BA5E8;--acc-ink:#0E1013;--acc-bg:#17253A;--acc-line:#31435F;
+--ok:#63B189;--ok-bg:#14251D;--warn:#D2A557;--warn-bg:#2A2214;--crit:#DE8069;--crit-bg:#2C1A15;
+--ev-code:#9E97E8;--ev-wiki:#5CB6C2;--ev-analog:#C48ABF;--ev-ans:#8FBF72;
+--sh:0 1px 2px rgba(0,0,0,.5);--sh2:0 10px 28px rgba(0,0,0,.55);
+}
+[data-density="dense"]{--rp:7px 10px;--rh:34px}
+[data-density="comfortable"]{--rp:12px 12px;--rh:46px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.dt{width:100%;border-collapse:collapse;font-size:13px}
+.dt th{font-size:10.5px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;background:var(--surf2)}
+.dt td{padding:var(--rp);border-bottom:1px solid var(--line);vertical-align:middle;height:var(--rh);box-sizing:border-box}
+.dt tbody tr:hover{background:var(--surf2)}
+.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:12.5px;text-align:right;white-space:nowrap}
+.mn{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:11.5px}
+.lbl{font-size:10.5px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh)}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);border-radius:4px;padding:2px 7px;font-size:11.5px;color:var(--ink2);background:var(--surf);white-space:nowrap;line-height:1.5}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:5px;padding:6px 11px;font-size:12.5px;font-weight:500;color:var(--ink);background:var(--surf);cursor:pointer;white-space:nowrap;font-family:inherit}
+.btn:hover{background:var(--surf3)}
+.btn:focus-visible,.stg:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btn.p{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.btn.p:hover{filter:brightness(1.08)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.rail-i{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:5px;font-size:13px;color:var(--ink2);cursor:pointer;border:1px solid transparent}
+.rail-i:hover{background:var(--surf3)}
+.rail-i.on{background:var(--acc-bg);border-color:var(--acc-line);color:var(--acc);font-weight:500}
+.stg{display:flex;align-items:center;gap:7px;padding:6px 13px;font-size:12.5px;color:var(--mut);background:var(--surf);border:1px solid var(--line2);border-right:none;cursor:pointer;font-family:inherit}
+.stg:first-child{border-radius:5px 0 0 5px}
+.stg:last-child{border-right:1px solid var(--line2);border-radius:0 5px 5px 0}
+.stg.done{color:var(--ink2);background:var(--surf2)}
+.stg.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:500}
+.ph{background:var(--surf2);border:1px dashed var(--line2);border-radius:var(--r);display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px;text-align:center}
+.scr{scroll-margin-top:70px}
+@media(prefers-reduced-motion:no-preference){.rv{transition:opacity .28s ease,transform .28s ease}}
+</style></helmet>
+
+<div data-theme="{{theme}}" data-density="{{density}}" style="background:var(--bg);color:var(--ink);min-height:100vh;padding-bottom:60px">
+
+<div style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:10px 22px;background:var(--surf);border-bottom:1px solid var(--line2);box-shadow:var(--sh)">
+  <div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:15px;font-weight:600;letter-spacing:-.01em">Estimo</span><span class="lbl">UI · v1</span></div>
+  <div style="display:flex;gap:2px;flex-wrap:wrap;flex:1">
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#foundations">Foundations</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#workspace">Workspace</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#reading">Reading</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#questions">Questions</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#impact">Impact</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#desk">Estimate Desk</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#boe">BoE</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#ledger">Ledger</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#calibration">Calibration</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#knowledge">Knowledge</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#admin">Admin</a>
+    <a class="btn" style="border:none;background:none;padding:5px 8px" href="#voice">Voice</a>
+  </div>
+  <button class="btn" onClick="{{ toggleDensity }}">{{ densityLabel }}</button>
+  <button class="btn" onClick="{{ toggleTheme }}">{{ themeLabel }}</button>
+</div>
+
+<div style="max-width:1560px;min-width:1280px;margin:0 auto;padding:26px 22px;display:flex;flex-direction:column;gap:34px">
+
+<section class="scr" id="foundations">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">Foundations</h2><span style="font-size:13px;color:var(--mut)">Tokens, type, and the semantics every screen below is built from.</span></div>
+  <div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:16px">
+    <div class="card" style="padding:16px">
+      <div class="lbl">Color roles</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--bg);border:1px solid var(--line2)"></span><span class="mn">--bg</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--surf);border:1px solid var(--line2)"></span><span class="mn">--surf</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--surf2);border:1px solid var(--line2)"></span><span class="mn">--surf2</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--ink)"></span><span class="mn">--ink</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--acc)"></span><span class="mn">--acc</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:4px;background:var(--line2)"></span><span class="mn">--line2</span></div>
+      </div>
+      <div class="lbl" style="margin-top:14px">Status — never mixed with type colors</div>
+      <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
+        <span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok)"></span>good</span>
+        <span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:8px;height:8px;background:var(--warn);transform:rotate(45deg)"></span>warning</span>
+        <span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:8px;height:8px;background:var(--crit)"></span>critical</span>
+      </div>
+      <div class="lbl" style="margin-top:14px">Evidence types — a third role, never status</div>
+      <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
+        <span class="chip" style="color:var(--ev-code)"><span style="width:8px;height:8px;border-radius:2px;background:var(--ev-code)"></span>code</span>
+        <span class="chip" style="color:var(--ev-wiki)"><span style="width:8px;height:8px;border-radius:2px;background:var(--ev-wiki)"></span>wiki</span>
+        <span class="chip" style="color:var(--ev-analog)"><span style="width:8px;height:8px;border-radius:2px;background:var(--ev-analog)"></span>analog</span>
+        <span class="chip" style="color:var(--ev-ans)"><span style="width:8px;height:8px;border-radius:2px;background:var(--ev-ans)"></span>answer</span>
+      </div>
+      <div style="font-size:12px;color:var(--mut);margin-top:12px;text-wrap:pretty">Shape carries state alongside color: circle = good, diamond = warning, square = critical. Color alone never decides.</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="lbl">Type — two contexts</div>
+      <div style="margin-top:10px;padding-bottom:11px;border-bottom:1px solid var(--line)">
+        <div style="font-size:22px;font-weight:600;letter-spacing:-.015em">Basis of Estimate</div>
+        <div style="font-size:15px;margin-top:4px">Interface / 15 · IBM Plex Sans</div>
+        <div style="font-size:13px;color:var(--ink2);margin-top:3px">Table body / 13 — the working size</div>
+        <div class="num" style="text-align:left;margin-top:3px">1,234.5 pd · 34–52 pd · tabular</div>
+        <div class="lbl" style="margin-top:5px">Label / 10.5 uppercase</div>
+      </div>
+      <div style="font-family:'IBM Plex Serif',Georgia,serif;font-size:14px;margin-top:11px;line-height:1.55">Document context — the BoE reads in Plex Serif, so the exported artefact and the screen agree. Turkish casing (İstanbul / ısı) is correct in this family.</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="lbl">Bespoke components</div>
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:11px">
+        <div><div class="lbl" style="text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--ink2)">RangeBar — table standard</div>
+          <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:5px;border:1px solid var(--line2)">
+            <div style="position:absolute;left:16%;right:24%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div>
+            <div style="position:absolute;left:38%;top:-3px;bottom:-3px;width:3px;background:var(--acc);border-radius:2px"></div>
+          </div>
+          <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:3px"><span>O 5</span><span style="color:var(--acc);font-weight:500">L 9</span><span>P 18</span></div></div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <span class="chip" style="color:var(--ok);border-color:var(--ok)">ranges intersect</span>
+          <span class="chip" style="color:var(--crit);border-color:var(--crit)">disjoint</span>
+          <span class="chip" style="border-color:var(--crit);color:var(--crit)">Concept · ±4x</span>
+          <span class="chip">updated 8 months ago</span>
+          <span class="chip" style="color:var(--ev-code)">Plan.java:184</span>
+        </div>
+        <div style="font-size:12px;color:var(--mut);text-wrap:pretty">14 bespoke components live across the screens below: RangeBar, EvidenceChip, AmbiguityMark, QuestionCard, AnalogCard, DeltaIndicator, ConeBadge, ConfidenceLevel, SignatureBlock, StageStrip, DeviationBadge, AnchorWarning, FreshnessTag, PipelineTimeline.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="workspace">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">1 · Workspace</h2><span style="font-size:13px;color:var(--mut)">Every estimate in flight — stage, open questions, and who is waiting.</span></div>
+  <div class="card" style="overflow:hidden;display:flex">
+    <div style="width:184px;flex:none;border-right:1px solid var(--line);background:var(--surf2);padding:12px 10px;display:flex;flex-direction:column;gap:3px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 9px 14px"><span style="width:20px;height:20px;border-radius:4px;background:var(--ink);color:var(--surf);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">E</span><span style="font-size:13.5px;font-weight:600">Estimo</span></div>
+      <div class="rail-i on"><span style="width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px"></span>Estimates</div>
+      <div class="rail-i"><span style="width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px"></span>Ledger</div>
+      <div class="rail-i"><span style="width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px"></span>Calibration</div>
+      <div class="rail-i"><span style="width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px"></span>Knowledge</div>
+      <div class="rail-i"><span style="width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px"></span>Admin</div>
+      <div style="flex:1;min-height:36px"></div>
+      <div class="rail-i"><span style="width:20px;height:20px;border-radius:50%;background:var(--surf3);border:1px solid var(--line2);font-size:9.5px;display:flex;align-items:center;justify-content:center">AD</span>A. Demir</div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line)">
+        <div><div style="font-size:16px;font-weight:600">Estimates</div><div style="font-size:12.5px;color:var(--mut);margin-top:2px">4 in flight · 2 waiting on the customer</div></div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="chip">All owners ▾</span><span class="chip">Stage: any ▾</span><button class="btn p">New estimate</button></div>
+      </div>
+      <div style="display:flex;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surf2)">
+        <div class="ph" style="flex:1;min-height:74px;flex-direction:column;gap:3px"><span style="color:var(--ink2);font-size:13px">Drop a .docx BRD here</span><span>or browse — 40 MB max</span></div>
+        <div class="card" style="width:430px;flex:none;padding:12px 14px;background:var(--surf)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:500">First read — northwind-billing-brd.docx</span><span class="mn" style="color:var(--mut)">62%</span></div>
+          <div style="height:6px;border-radius:3px;background:var(--surf3);margin-top:9px;overflow:hidden"><div style="width:62%;height:100%;background:var(--acc)"></div></div>
+          <div style="display:flex;gap:14px;margin-top:9px;font-size:11.5px;color:var(--mut)"><span style="color:var(--ok)">✓ Parsed document</span><span style="color:var(--ink);font-weight:500">Extracting tables… 12 requirements found</span><span>Ambiguity pass</span></div>
+        </div>
+      </div>
+      <table class="dt">
+        <thead><tr><th style="width:262px">File</th><th>Customer</th><th style="width:260px">Stage</th><th style="width:64px">Items</th><th style="width:82px">Open Q</th><th style="width:110px">Range</th><th>Waiting on</th><th style="width:70px">Age</th></tr></thead>
+        <tbody>
+          <tr><td><a href="#reading" style="font-weight:500;color:var(--ink)">campaign-installments-brd.docx</a></td><td style="color:var(--ink2)">Aurora Telecom</td>
+            <td><div style="display:flex;transform:scale(.86);transform-origin:left"><span class="stg done">Read</span><span class="stg done">Q</span><span class="stg on">Impact</span><span class="stg">Est</span><span class="stg">BoE</span></div></td>
+            <td class="num">18</td><td><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>6</span></td>
+            <td class="num">34–52 pd</td><td style="color:var(--ink2)">Customer — answers, 3 days</td><td class="num">9d</td></tr>
+          <tr><td style="font-weight:500">northwind-billing-brd.docx</td><td style="color:var(--ink2)">Northwind Utilities</td>
+            <td><div style="display:flex;transform:scale(.86);transform-origin:left"><span class="stg on">Read</span><span class="stg">Q</span><span class="stg">Impact</span><span class="stg">Est</span><span class="stg">BoE</span></div></td>
+            <td class="num">12</td><td class="num" style="color:var(--mut)">—</td><td style="font-size:12px;color:var(--mut)">first read…</td><td style="color:var(--ink2)">You</td><td class="num">4m</td></tr>
+          <tr><td style="font-weight:500">loyalty-tier-migration.docx</td><td style="color:var(--ink2)">Aurora Telecom</td>
+            <td><div style="display:flex;transform:scale(.86);transform-origin:left"><span class="stg done">Read</span><span class="stg done">Q</span><span class="stg done">Impact</span><span class="stg done">Est</span><span class="stg on">BoE</span></div></td>
+            <td class="num">23</td><td class="num">0</td><td class="num">88–141 pd</td><td style="color:var(--ink2)">M. Yılmaz — signature, 4h</td><td class="num">21d</td></tr>
+          <tr><td style="font-weight:500">b2b-portal-sso.docx</td><td style="color:var(--ink2)">Meridian Bank</td>
+            <td><div style="display:flex;transform:scale(.86);transform-origin:left"><span class="stg done">Read</span><span class="stg done">Q</span><span class="stg done">Impact</span><span class="stg on">Est</span><span class="stg">BoE</span></div></td>
+            <td class="num">9</td><td><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>2</span></td>
+            <td class="num">15–29 pd</td><td style="color:var(--ink2)">Reviewer — 12 / 18 signed</td><td class="num">6d</td></tr>
+        </tbody>
+      </table>
+      <div style="padding:14px 18px;display:flex;gap:18px;align-items:flex-start;background:var(--surf2);border-top:1px solid var(--line)">
+        <div style="flex:1"><div class="lbl">Empty state — first use</div>
+          <div style="font-size:14px;margin-top:6px;max-width:660px;text-wrap:pretty">No estimates yet. Estimo reads a BRD, tells you what is missing, and prepares a defensible range. You decide the number.</div>
+          <div style="display:flex;gap:8px;margin-top:11px"><button class="btn">Import a seed set</button><button class="btn">Open the sample BRD</button><button class="btn">90-second tour</button></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="reading">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">2 · Reading Room</h2><span style="font-size:13px;color:var(--mut)">The document against its structured form — ambiguity heat and anchor quarantine.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:14.5px;font-weight:600">campaign-installments-brd.docx</div><div class="lbl" style="margin-top:3px">Aurora Telecom · v1 draft · A. Demir</div></div>
+      <div style="display:flex"><span class="stg on">1 Reading</span><span class="stg">2 Questions</span><span class="stg">3 Impact</span><span class="stg">4 Estimate</span><span class="stg">5 BoE</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="chip mn">[ ]  stage</span><button class="btn">Re-read</button></div>
+    </div>
+    <div style="display:flex;height:560px">
+      <div style="width:47%;min-width:0;border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--surf2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line)"><span class="lbl">Source · page 4 of 21</span><div style="display:flex;gap:6px"><span class="chip">Fit width</span><span class="chip">Outline</span></div></div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:20px 26px">
+          <div style="background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:26px 30px;font-family:'IBM Plex Serif',Georgia,serif;font-size:13.5px;line-height:1.65;color:var(--ink2)">
+            <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:10px">3.2 Campaign-based installment plans</div>
+            <p style="margin:0 0 10px">Eligible subscribers see an installment option at the point of purchase for campaigns flagged by the campaign owner.</p>
+            <p style="margin:0 0 10px;background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn);padding:7px 10px;border-radius:0 4px 4px 0;color:var(--ink)">The subscriber may split a campaign charge into 3, 6 or 12 installments; eligibility rules are defined by the campaign owner.</p>
+            <p style="margin:0 0 10px">Installment lines appear on the monthly invoice under the campaign heading.</p>
+            <div style="display:inline-flex;align-items:center;gap:8px;border:1px dashed var(--crit);background:var(--crit-bg);color:var(--crit);padding:5px 10px;border-radius:4px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;margin:4px 0 10px">
+              <span style="width:8px;height:8px;background:var(--crit)"></span>budget ≈ 45 person-days · go-live Nov 2026<span class="mn" style="opacity:.8">quarantined</span></div>
+            <div class="card" style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:var(--ink2);padding:8px 10px;max-width:330px;box-shadow:var(--sh2);margin-bottom:12px;text-wrap:pretty">This information is hidden from the estimation engine (anchor protection).</div>
+            <p style="margin:0 0 10px">Early settlement is available from the self-service channel.</p>
+            <div class="ph" style="height:96px;font-family:'IBM Plex Sans',sans-serif">Table 3.2-a — installment fee matrix</div>
+          </div>
+        </div>
+      </div>
+      <div style="width:53%;min-width:0;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line)">
+          <span class="lbl">Requirements · 12 extracted</span>
+          <div style="display:flex;gap:6px">
+            <span class="chip" style="color:var(--ok);border-color:var(--ok)"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok)"></span>clear 6</span>
+            <span class="chip" style="color:var(--warn);border-color:var(--warn)"><span style="width:8px;height:8px;background:var(--warn);transform:rotate(45deg)"></span>partial 4</span>
+            <span class="chip" style="color:var(--crit);border-color:var(--crit)"><span style="width:8px;height:8px;background:var(--crit)"></span>ambiguous 2</span>
+          </div>
+        </div>
+        <div style="flex:1;overflow:hidden">
+          <table class="dt">
+            <thead><tr><th style="width:4px;padding:0"></th><th style="width:88px">ID</th><th>Requirement</th><th style="width:104px">Source</th></tr></thead>
+            <tbody>
+              <tr><td style="padding:0;background:var(--ok)"></td><td class="mn">REQ-012</td><td>Installment option shown at checkout for eligible campaigns</td><td class="mn" style="color:var(--mut)">p4 §3.2 ¶1</td></tr>
+              <tr style="background:var(--acc-bg);box-shadow:inset 0 0 0 1px var(--acc-line)"><td style="padding:0;background:var(--warn)"></td><td class="mn">REQ-014</td>
+                <td><div>Subscriber splits a campaign charge into 3 / 6 / 12 installments</div>
+                  <div style="display:flex;gap:7px;align-items:flex-start;margin-top:6px;font-size:12px;color:var(--warn)"><span style="width:8px;height:8px;background:var(--warn);transform:rotate(45deg);margin-top:4px;flex:none"></span><span style="color:var(--ink2);text-wrap:pretty">Partial — eligibility rules are referenced but never defined. Sent to the Question Board.</span></div></td>
+                <td class="mn" style="color:var(--mut)">p4 §3.2 ¶2</td></tr>
+              <tr><td style="padding:0;background:var(--crit)"></td><td class="mn">REQ-015</td>
+                <td><div>Early settlement of an open installment plan</div>
+                  <div style="display:flex;gap:7px;align-items:flex-start;margin-top:6px;font-size:12px"><span style="width:8px;height:8px;background:var(--crit);margin-top:4px;flex:none"></span><span style="color:var(--ink2);text-wrap:pretty">Ambiguous — no acceptance criteria and no refund treatment. This row gets a question, not a number.</span></div></td>
+                <td class="mn" style="color:var(--mut)">p5 §3.2 ¶6</td></tr>
+              <tr><td style="padding:0;background:var(--ok)"></td><td class="mn">REQ-016</td><td>Installment lines itemised on the monthly invoice</td><td class="mn" style="color:var(--mut)">p5 §3.3</td></tr>
+              <tr><td style="padding:0;background:var(--warn)"></td><td class="mn">REQ-017</td><td>Campaign owner configures the fee matrix in back office</td><td class="mn" style="color:var(--mut)">p6 Tbl 3.2-a</td></tr>
+              <tr><td style="padding:0;background:var(--ok)"></td><td class="mn">REQ-018</td><td>Dunning excludes future-dated installment lines</td><td class="mn" style="color:var(--mut)">p7 §3.5</td></tr>
+              <tr><td style="padding:0;background:var(--ok)"></td><td class="mn">REQ-019</td><td>Plan cancellation on subscriber churn</td><td class="mn" style="color:var(--mut)">p7 §3.6</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 14px;border-top:1px solid var(--line);background:var(--surf2)">
+          <span style="font-size:12.5px;color:var(--mut)">Select a row to highlight its paragraph — and back again.</span>
+          <div style="display:flex;gap:8px"><button class="btn">Mark as clear</button><button class="btn p">Send 6 to Question Board</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="questions">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">3 · Question Board</h2><span style="font-size:13px;color:var(--mut)">Open → Sent → Answered → Applied, and one button that makes the customer's letter.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div style="font-size:14.5px;font-weight:600">campaign-installments-brd.docx</div>
+      <div style="display:flex"><span class="stg done">1 Reading</span><span class="stg on">2 Questions</span><span class="stg">3 Impact</span><span class="stg">4 Estimate</span><span class="stg">5 BoE</span></div>
+      <div style="display:flex;gap:8px"><span class="chip">Locale: EN ▾</span><button class="btn">New question</button></div>
+    </div>
+    <div style="display:flex">
+      <div style="flex:1;min-width:0">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+          <div style="border-right:1px solid var(--line);padding:12px;background:var(--surf2)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="lbl">Open</span><span class="mn" style="color:var(--mut)">3</span></div>
+            <div class="card" style="padding:11px;margin-bottom:9px;box-shadow:0 0 0 1px var(--acc) inset">
+              <div style="display:flex;justify-content:space-between;align-items:center"><a href="#reading" class="mn">REQ-015</a><span style="width:15px;height:15px;border-radius:3px;background:var(--acc);color:var(--acc-ink);font-size:10px;display:flex;align-items:center;justify-content:center">✓</span></div>
+              <div style="font-size:13px;margin:7px 0;text-wrap:pretty">How should an early settlement be priced — full remaining principal, or principal minus the unearned fee?</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--crit)"><span style="width:7px;height:7px;background:var(--crit)"></span>No acceptance criteria</div>
+            </div>
+            <div class="card" style="padding:11px;margin-bottom:9px;box-shadow:0 0 0 1px var(--acc) inset">
+              <div style="display:flex;justify-content:space-between;align-items:center"><a href="#reading" class="mn">REQ-014</a><span style="width:15px;height:15px;border-radius:3px;background:var(--acc);color:var(--acc-ink);font-size:10px;display:flex;align-items:center;justify-content:center">✓</span></div>
+              <div style="font-size:13px;margin:7px 0;text-wrap:pretty">Who defines installment eligibility — the campaign owner, or a central risk rule?</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--warn)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>Undefined ownership</div>
+            </div>
+            <div class="card" style="padding:11px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><a href="#reading" class="mn">REQ-017</a><span style="width:15px;height:15px;border-radius:3px;border:1px solid var(--line2)"></span></div>
+              <div style="font-size:13px;margin:7px 0;text-wrap:pretty">Is the fee matrix defined per campaign, or per subscriber segment?</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--warn)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>Two readings possible</div>
+            </div>
+          </div>
+          <div style="border-right:1px solid var(--line);padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="lbl">Sent · 22 Jul</span><span class="mn" style="color:var(--mut)">2</span></div>
+            <div class="card" style="padding:11px;margin-bottom:9px"><span class="mn" style="color:var(--acc)">REQ-018</span><div style="font-size:13px;margin:7px 0;text-wrap:pretty">Which dunning engine version is in production today?</div><div class="lbl" style="text-transform:none;letter-spacing:0;font-size:11.5px">Waiting 3 days · E. Kaya</div></div>
+            <div class="card" style="padding:11px"><span class="mn" style="color:var(--acc)">REQ-012</span><div style="font-size:13px;margin:7px 0;text-wrap:pretty">Is checkout the web funnel only, or also the dealer app?</div><div class="lbl" style="text-transform:none;letter-spacing:0;font-size:11.5px">Waiting 3 days · E. Kaya</div></div>
+          </div>
+          <div style="border-right:1px solid var(--line);padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="lbl">Answered</span><span class="mn" style="color:var(--mut)">1</span></div>
+            <div class="card" style="padding:11px"><span class="mn" style="color:var(--acc)">REQ-016</span><div style="font-size:13px;margin:7px 0;text-wrap:pretty">Invoice template — can we reuse the existing PDF renderer?</div>
+              <div style="font-size:12.5px;background:var(--ok-bg);box-shadow:inset 3px 0 0 var(--ok);border-radius:0 4px 4px 0;padding:7px 9px;color:var(--ink);text-wrap:pretty">“Yes — renderer v4, no new template.”</div>
+              <div class="lbl" style="text-transform:none;letter-spacing:0;font-size:11.5px;margin-top:6px">E. Kaya · Jul 31, 2026</div>
+              <button class="btn" style="margin-top:9px;width:100%;justify-content:center">Apply to line item</button></div>
+          </div>
+          <div style="padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="lbl">Applied</span><span class="mn" style="color:var(--mut)">1</span></div>
+            <div class="card" style="padding:11px;background:var(--surf2)"><span class="mn" style="color:var(--mut)">REQ-013</span><div style="font-size:13px;margin:7px 0;text-wrap:pretty">Retry window for a failed installment charge?</div>
+              <div style="font-size:12px;color:var(--mut)">Applied to <a href="#desk">Installment scheduler</a></div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:9px;border:1px solid var(--acc-line);background:var(--acc-bg);color:var(--acc);border-radius:4px;padding:6px 8px;font-size:11.5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--acc)"></span>Re-estimation suggested</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="width:320px;flex:none;border-left:1px solid var(--line);padding:14px 16px;background:var(--surf2)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Customer set</span><span class="chip">2 selected</span></div>
+        <div style="font-size:12.5px;color:var(--ink2);margin:8px 0 11px;text-wrap:pretty">Selected questions compile into one message in the estimate's locale, formal register.</div>
+        <div class="card" style="padding:13px 15px;font-family:'IBM Plex Serif',Georgia,serif;font-size:12.5px;line-height:1.6;color:var(--ink2)">
+          <div style="color:var(--ink);font-weight:600;margin-bottom:7px">Clarifications — campaign installment plans</div>
+          <p style="margin:0 0 8px">Two points in section 3.2 need your decision before we can price them.</p>
+          <p style="margin:0 0 8px">1. Early settlement: should the subscriber pay the full remaining principal, or the principal minus the unearned fee?</p>
+          <p style="margin:0">2. Installment eligibility: is this owned by the campaign owner, or by a central risk rule?</p>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:11px"><button class="btn p">Copy text</button><button class="btn">Download .docx</button></div>
+        <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+          <div class="lbl">Empty state</div>
+          <div style="font-size:12.5px;color:var(--ink2);margin-top:6px;text-wrap:pretty">“Every requirement passed the gate — a good sign.”</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="impact">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">4 · Impact Map</h2><span style="font-size:13px;color:var(--mut)">Where the work touches the code — with the evidence next to it.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div style="font-size:14.5px;font-weight:600">campaign-installments-brd.docx</div>
+      <div style="display:flex"><span class="stg done">1 Reading</span><span class="stg done">2 Questions</span><span class="stg on">3 Impact</span><span class="stg">4 Estimate</span><span class="stg">5 BoE</span></div>
+      <div style="display:flex;gap:0"><span class="stg on">Graph</span><span class="stg">Heat list</span></div>
+    </div>
+    <div style="display:flex;height:500px">
+      <div style="flex:1;position:relative;border-right:1px solid var(--line);background:var(--surf2);background-image:radial-gradient(var(--line2) 1px,transparent 1px);background-size:22px 22px">
+        <svg viewBox="0 0 700 460" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
+          <line x1="180" y1="150" x2="392" y2="112" stroke="var(--line2)" stroke-width="1.5"></line>
+          <line x1="180" y1="150" x2="360" y2="290" stroke="var(--line2)" stroke-width="1.5" stroke-dasharray="5 4"></line>
+          <line x1="180" y1="150" x2="168" y2="316" stroke="var(--line2)" stroke-width="1.5"></line>
+          <line x1="392" y1="112" x2="360" y2="290" stroke="var(--line2)" stroke-width="1.5"></line>
+        </svg>
+        <div class="card" style="position:absolute;left:96px;top:126px;padding:9px 12px"><div style="font-size:13px;font-weight:500">billing-core</div><div class="chip" style="margin-top:6px;color:var(--ok);border-color:var(--ok)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>high confidence</div></div>
+        <div class="card" style="position:absolute;left:352px;top:74px;padding:9px 12px;box-shadow:0 0 0 2px var(--acc),var(--sh2)"><div style="font-size:13px;font-weight:500">installment-scheduler</div><div class="chip" style="margin-top:6px;color:var(--warn);border-color:var(--warn)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>medium</div></div>
+        <div class="card" style="position:absolute;left:300px;top:262px;padding:9px 12px;border-style:dashed;border-color:var(--crit)"><div style="font-size:13px;font-weight:500">dunning-svc</div><div style="display:flex;gap:6px;margin-top:6px"><span class="chip" style="color:var(--crit);border-color:var(--crit)"><span style="width:7px;height:7px;background:var(--crit)"></span>low</span><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)">discovery effort suggested</span></div></div>
+        <div class="card" style="position:absolute;left:96px;top:292px;padding:9px 12px"><div style="font-size:13px;font-weight:500">checkout-web</div><div class="chip" style="margin-top:6px;color:var(--ok);border-color:var(--ok)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>high</div></div>
+        <div style="position:absolute;right:16px;bottom:14px;max-width:240px;font-size:12px;color:var(--mut);text-align:right;text-wrap:pretty">Uncertainty is not hidden here — it is priced on the desk.</div>
+      </div>
+      <div style="width:400px;flex:none;display:flex;flex-direction:column">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--line)"><div style="font-size:14px;font-weight:600">installment-scheduler</div><div class="lbl" style="margin-top:4px">Evidence · REQ-013, REQ-014</div></div>
+        <div style="padding:12px 16px;border-bottom:1px solid var(--line)">
+          <div class="lbl" style="color:var(--ev-code)">Code references · 3</div>
+          <div class="card" style="margin-top:8px;padding:8px 10px;background:var(--surf2)"><div class="mn" style="color:var(--ev-code)">billing-core/src/schedule/Plan.java:184</div><div class="mn" style="color:var(--mut);margin-top:5px">if (plan.getTermCount() &gt; MAX_TERMS) {</div></div>
+          <div class="card" style="margin-top:7px;padding:8px 10px;background:var(--surf2)"><div class="mn" style="color:var(--ev-code)">billing-core/src/schedule/FeeMatrix.java:42</div></div>
+        </div>
+        <div style="padding:12px 16px;border-bottom:1px solid var(--line)">
+          <div class="lbl" style="color:var(--ev-wiki)">Wiki</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:13px"><span>Installment plan lifecycle</span><span class="chip">updated 8 months ago</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:7px;font-size:13px"><span>Fee matrix ownership</span><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)">stale · 2 years</span></div>
+        </div>
+        <div style="padding:12px 16px">
+          <div class="lbl" style="color:var(--ev-analog)">Analog jobs</div>
+          <div class="card" style="margin-top:8px;padding:10px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:500">Prepaid top-up scheduler · 2024</span><span class="chip" style="color:var(--ev-analog);border-color:var(--ev-analog)">81% similar</span></div>
+            <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:9px;border:1px solid var(--line)">
+              <div style="position:absolute;left:22%;right:34%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div>
+              <div style="position:absolute;left:47%;top:-3px;bottom:-3px;width:3px;background:var(--ok);border-radius:2px"></div>
+            </div>
+            <div class="mn" style="display:flex;justify-content:space-between;margin-top:5px;color:var(--mut)"><span>estimated 8–17 pd</span><span style="color:var(--ok)">actual 15 pd · within</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="desk">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">5 · Estimate Desk</h2><span style="font-size:13px;color:var(--mut)">The heart of the product, in its two states: draft closed, then revealed.</span></div>
+
+  <div class="card" style="overflow:hidden;margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:14.5px;font-weight:600">campaign-installments-brd.docx</div><div class="lbl" style="margin-top:3px">State A — draft closed</div></div>
+      <div style="display:flex"><span class="stg done">1 Reading</span><span class="stg done">2 Questions</span><span class="stg done">3 Impact</span><span class="stg on">4 Estimate</span><span class="stg">5 BoE</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="chip mn">j / k rows</span><span class="chip">Reviewer: D. Aksoy</span></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:var(--acc-bg);border-bottom:1px solid var(--acc-line)">
+      <div><div style="font-size:14px;font-weight:600;color:var(--acc)">You first. The draft stays closed until you enter your own range.</div>
+        <div style="font-size:12.5px;color:var(--ink2);margin-top:3px;text-wrap:pretty">Nothing is blurred behind this panel — we are not hiding a number from you, we simply have not shown you ours yet.</div></div>
+      <div style="display:flex;gap:10px;align-items:center;flex:none"><span class="mn" style="color:var(--ink2)">7 / 18 entered</span><button class="btn">Skip this item</button></div>
+    </div>
+    <table class="dt">
+      <thead><tr><th style="width:20px;padding-left:14px"></th><th style="width:250px">Line item</th><th style="width:92px">REQ</th><th>Impact</th><th style="width:118px">Confidence</th><th style="width:250px">Your range — O · L · P</th><th style="width:132px">Draft</th></tr></thead>
+      <tbody>
+        <tr><td class="mn" style="color:var(--ok);padding-left:14px">✓</td><td style="font-weight:500">Installment scheduler — plan creation</td><td class="mn" style="color:var(--acc)">014, 013</td><td style="font-size:12.5px;color:var(--ink2)">billing-core, installment-scheduler</td>
+          <td><span class="chip" style="color:var(--warn);border-color:var(--warn)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>medium</span></td>
+          <td><div style="display:flex;gap:6px"><span class="num" style="border:1px solid var(--line2);border-radius:4px;padding:4px 10px;background:var(--surf)">6</span><span class="num" style="border:1px solid var(--ink2);border-radius:4px;padding:4px 10px;background:var(--surf);font-weight:500">9</span><span class="num" style="border:1px solid var(--line2);border-radius:4px;padding:4px 10px;background:var(--surf)">16</span></div></td>
+          <td><span class="chip" style="background:var(--surf3);color:var(--mut)">closed</span></td></tr>
+        <tr style="background:var(--surf2);box-shadow:inset 2px 0 0 var(--acc)"><td class="mn" style="color:var(--acc);padding-left:14px">▸</td><td style="font-weight:500">Fee matrix back-office screen</td><td class="mn" style="color:var(--acc)">017</td><td style="font-size:12.5px;color:var(--ink2)">back-office, billing-core</td>
+          <td><span class="chip" style="color:var(--ok);border-color:var(--ok)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>high</span></td>
+          <td><div style="display:flex;gap:6px;align-items:center"><span class="num" style="border:1px solid var(--line2);border-radius:4px;padding:4px 10px;background:var(--surf)">3</span><span class="num" style="border:2px solid var(--acc);border-radius:4px;padding:3px 9px;background:var(--surf);font-weight:500">5</span><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut);background:var(--surf)">P</span></div>
+            <div style="font-size:11.5px;color:var(--mut);margin-top:5px">Type, or drag the bar. A rationale line is optional here.</div></td>
+          <td><button class="btn" disabled>Reveal draft</button></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Early settlement flow</td><td class="mn" style="color:var(--acc)">015</td>
+          <td><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>blocked — open question</span></td>
+          <td><span class="chip" style="color:var(--crit);border-color:var(--crit)"><span style="width:7px;height:7px;background:var(--crit)"></span>low</span></td>
+          <td style="font-size:12.5px;color:var(--mut)">No line item without evidence.</td><td><span class="chip" style="background:var(--surf3);color:var(--mut)">closed</span></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Invoice itemisation</td><td class="mn" style="color:var(--acc)">016</td><td style="font-size:12.5px;color:var(--ink2)">invoice-render — renderer v4 reused</td>
+          <td><span class="chip" style="color:var(--ok);border-color:var(--ok)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>high</span></td>
+          <td><div style="display:flex;gap:6px"><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">O</span><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">L</span><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">P</span></div></td>
+          <td><span class="chip" style="background:var(--surf3);color:var(--mut)">closed</span></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Dunning exclusion rules</td><td class="mn" style="color:var(--acc)">018</td>
+          <td style="font-size:12.5px;color:var(--ink2)">dunning-svc <span class="chip" style="color:var(--crit);border-color:var(--crit)">+ discovery</span></td>
+          <td><span class="chip" style="color:var(--crit);border-color:var(--crit)"><span style="width:7px;height:7px;background:var(--crit)"></span>low</span></td>
+          <td><div style="display:flex;gap:6px"><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">O</span><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">L</span><span class="num" style="border:1px dashed var(--line2);border-radius:4px;padding:4px 10px;color:var(--mut)">P</span></div></td>
+          <td><span class="chip" style="background:var(--surf3);color:var(--mut)">closed</span></td></tr>
+      </tbody>
+    </table>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-top:1px solid var(--line2);background:var(--surf2)">
+      <div style="display:flex;gap:20px;align-items:baseline"><span class="lbl">Your subtotal · 7 items</span><span class="num" style="font-size:17px;font-weight:600">21 — 38 pd</span><span class="chip">likely 27 pd</span></div>
+      <div style="display:flex;gap:12px;align-items:center"><span class="chip" style="color:var(--crit);border-color:var(--crit)">Concept stage · ±4x</span><span class="mn" style="color:var(--mut)">signatures 0 / 18</span><a class="btn p" href="#desk-revealed">Reveal all drafts</a></div>
+    </div>
+  </div>
+
+  <div class="card" style="overflow:hidden" id="desk-revealed">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:14.5px;font-weight:600">campaign-installments-brd.docx</div><div class="lbl" style="margin-top:3px">State B — draft revealed</div></div>
+      <div style="display:flex"><span class="stg done">1 Reading</span><span class="stg done">2 Questions</span><span class="stg done">3 Impact</span><span class="stg on">4 Estimate</span><span class="stg">5 BoE</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn" onClick="{{ toggleDelphi }}">{{ delphiLabel }}</button><button class="btn p">Send to BoE</button></div>
+    </div>
+    <table class="dt">
+      <thead><tr><th style="width:20px;padding-left:14px"></th><th style="width:210px">Line item</th><th style="width:76px">REQ</th><th style="width:150px">Evidence</th><th style="width:220px">Range — O · L · P</th><th style="width:86px">Draft</th><th style="width:86px">Yours</th><th style="width:150px">Delta</th><th style="width:64px">A / R</th><th style="width:96px">Status</th></tr></thead>
+      <tbody>
+        <tr><td class="mn" style="color:var(--acc);padding-left:14px">▾</td><td style="font-weight:500">Installment scheduler — plan creation</td><td class="mn" style="color:var(--acc)">014, 013</td>
+          <td><div style="display:flex;gap:5px"><span class="chip" style="color:var(--ev-code)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-code)"></span>3</span><span class="chip" style="color:var(--ev-wiki)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-wiki)"></span>2</span><span class="chip" style="color:var(--ev-analog)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-analog)"></span>1</span></div></td>
+          <td><div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;border:1px solid var(--line)"><div style="position:absolute;left:14%;right:22%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:38%;top:-3px;bottom:-3px;width:3px;background:var(--acc);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:3px"><span>5</span><span style="color:var(--acc);font-weight:500">9</span><span>18</span></div></td>
+          <td class="num">5–18</td><td class="num">6–16</td><td><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>ranges intersect</span></td><td class="num">4 / 2</td><td><span class="chip">reviewed</span></td></tr>
+        <tr style="background:var(--surf2)"><td colspan="10" style="padding:14px 18px 16px 44px">
+          <div style="display:flex;gap:26px;align-items:flex-start">
+            <div style="flex:1"><div class="lbl">Assumptions · 4</div><ul style="margin:7px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink2);line-height:1.75"><li>Scheduler reuses the existing retry framework</li><li>Maximum 12 terms; no partial-term proration</li><li>No migration of in-flight prepaid plans</li></ul></div>
+            <div style="flex:1"><div class="lbl">Risks · 2</div><ul style="margin:7px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink2);line-height:1.75"><li>Fee matrix ownership unconfirmed <a href="#questions">REQ-017</a></li><li>Plan lifecycle wiki page is 8 months old</li></ul></div>
+            <div style="width:290px"><div class="lbl">Your rationale</div><div class="card" style="padding:9px 11px;margin-top:7px;font-size:12.5px;color:var(--ink2);text-wrap:pretty">“Scheduler is well covered by tests; the fee matrix is the unknown, so P stays wide.”</div></div>
+          </div></td></tr>
+        <tr><td class="mn" style="color:var(--mut);padding-left:14px">▸</td><td style="font-weight:500">Fee matrix back-office screen</td><td class="mn" style="color:var(--acc)">017</td>
+          <td><div style="display:flex;gap:5px"><span class="chip" style="color:var(--ev-code)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-code)"></span>1</span><span class="chip" style="color:var(--ev-analog)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-analog)"></span>2</span></div></td>
+          <td><div style="position:relative;height:26px;border-radius:6px;background:var(--surf3);border:1px solid var(--line)">
+              <div style="position:absolute;left:16%;right:52%;top:3px;height:8px;background:var(--surf);border:1px solid var(--mut);border-radius:4px"></div>
+              <div style="position:absolute;left:46%;right:10%;bottom:3px;height:8px;background:var(--acc-bg);border:1px solid var(--acc);border-radius:4px"></div>
+            </div>
+            <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:3px"><span>draft 3–9</span><span style="color:var(--acc)">yours 8–14</span></div></td>
+          <td class="num">3–9</td><td class="num">8–14</td><td><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>disjoint — discuss</span></td><td class="num">2 / 1</td><td><span class="chip">draft</span></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Early settlement flow</td><td class="mn" style="color:var(--acc)">015</td>
+          <td><span class="chip" style="color:var(--warn);border-color:var(--warn)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>answer pending</span></td>
+          <td style="font-size:12.5px;color:var(--mut)">Held — the evidence is missing and a question is open.</td>
+          <td class="num" style="color:var(--mut)">—</td><td class="num" style="color:var(--mut)">—</td><td></td><td class="num">0 / 1</td><td><span class="chip" style="color:var(--crit);border-color:var(--crit)">blocked</span></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Invoice itemisation</td><td class="mn" style="color:var(--acc)">016</td>
+          <td><div style="display:flex;gap:5px"><span class="chip" style="color:var(--ev-ans)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-ans)"></span>answer</span><span class="chip" style="color:var(--ev-code)"><span style="width:7px;height:7px;border-radius:2px;background:var(--ev-code)"></span>2</span></div></td>
+          <td><div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;border:1px solid var(--line)"><div style="position:absolute;left:30%;right:52%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:38%;top:-3px;bottom:-3px;width:3px;background:var(--acc);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:3px"><span>2</span><span style="color:var(--acc);font-weight:500">3</span><span>6</span></div></td>
+          <td class="num">2–6</td><td class="num">2–5</td><td><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>ranges intersect</span></td><td class="num">3 / 0</td><td><span class="chip" style="background:var(--ink);color:var(--surf);border-color:var(--ink)">signed</span></td></tr>
+        <tr><td style="padding-left:14px"></td><td style="font-weight:500">Dunning exclusion rules<div class="chip" style="margin-top:5px;color:var(--crit);border-color:var(--crit)">+ discovery 2 pd</div></td><td class="mn" style="color:var(--acc)">018</td>
+          <td><span class="chip" style="color:var(--crit);border-color:var(--crit)"><span style="width:7px;height:7px;background:var(--crit)"></span>weak evidence</span></td>
+          <td><div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;border:1px solid var(--line)"><div style="position:absolute;left:12%;right:8%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:32%;top:-3px;bottom:-3px;width:3px;background:var(--acc);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:3px"><span>3</span><span style="color:var(--acc);font-weight:500">7</span><span>21</span></div>
+            <div style="font-size:11.5px;color:var(--crit);margin-top:4px;text-wrap:pretty">Evidence is weak on this item — we added discovery effort to the range.</div></td>
+          <td class="num">3–21</td><td class="num" style="color:var(--mut)">—</td><td><span class="chip">awaiting you</span></td><td class="num">1 / 3</td><td><span class="chip">draft</span></td></tr>
+        <sc-if value="{{ delphi }}" hint-placeholder-val="{{ true }}">
+        <tr style="background:var(--surf2)"><td colspan="10" style="padding:14px 18px 16px 44px">
+          <div style="display:flex;gap:22px;align-items:center">
+            <div style="width:120px"><div class="lbl">Delphi overlay</div><div style="font-size:11.5px;color:var(--mut);margin-top:4px">3 reviewers, anonymous</div></div>
+            <div style="flex:1;position:relative;height:74px;border:1px solid var(--line);border-radius:var(--r);background:var(--surf)">
+              <div style="position:absolute;left:26%;right:30%;top:0;bottom:0;background:var(--acc-bg);border-left:1px dashed var(--acc);border-right:1px dashed var(--acc)"></div>
+              <div style="position:absolute;left:14%;right:30%;top:16px;height:4px;border-radius:2px;background:var(--ink2)"></div>
+              <div style="position:absolute;left:26%;right:18%;top:35px;height:4px;border-radius:2px;background:var(--ink2)"></div>
+              <div style="position:absolute;left:10%;right:46%;top:54px;height:4px;border-radius:2px;background:var(--ink2)"></div>
+              <span class="mn" style="position:absolute;right:8px;top:6px;color:var(--acc)">consensus band</span>
+            </div>
+            <div style="width:280px;font-size:12.5px;color:var(--ink2);text-wrap:pretty">The width of the disagreement is the finding. Names appear only when the moderator reveals them.</div>
+          </div></td></tr>
+        </sc-if>
+      </tbody>
+    </table>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;border-top:1px solid var(--line2);background:var(--surf2);position:sticky;bottom:0">
+      <div style="display:flex;gap:22px;align-items:baseline"><span class="lbl">Total · 18 items</span><span class="num" style="font-size:19px;font-weight:600">34 — 52 pd</span><span class="chip" style="color:var(--acc);border-color:var(--acc-line);background:var(--acc-bg)">likely 41 pd</span></div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <span class="chip" style="color:var(--crit);border-color:var(--crit)">Concept stage · ±4x</span>
+        <div style="display:flex;align-items:center;gap:8px"><span class="mn" style="color:var(--mut)">signatures 12 / 18</span><div style="width:120px;height:6px;border-radius:3px;background:var(--surf3);overflow:hidden"><div style="width:66%;height:100%;background:var(--ink)"></div></div></div>
+        <a class="btn p" href="#boe">Continue to BoE</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="boe">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">6 · BoE Preview &amp; Signature</h2><span style="font-size:13px;color:var(--mut)">The document that goes to the customer, and the row-scoped approval behind it.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:14.5px;font-weight:600">Basis of Estimate — v3 draft</div><div class="lbl" style="margin-top:3px">Aurora Telecom · campaign installment plans</div></div>
+      <div style="display:flex"><span class="stg done">1 Reading</span><span class="stg done">2 Questions</span><span class="stg done">3 Impact</span><span class="stg done">4 Estimate</span><span class="stg on">5 BoE</span></div>
+      <div style="display:flex;gap:8px"><button class="btn">Version history</button><button class="btn">Export .docx</button><button class="btn">Archival PDF</button></div>
+    </div>
+    <div style="display:flex;height:600px">
+      <div style="width:210px;flex:none;border-right:1px solid var(--line);background:var(--surf2);padding:14px 12px">
+        <div class="lbl">Contents</div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:13px">
+          <div class="rail-i">1 Scope &amp; exclusions</div>
+          <div class="rail-i on">2 Line items</div>
+          <div class="rail-i">3 Assumption register</div>
+          <div class="rail-i">4 Risks &amp; contingency</div>
+          <div class="rail-i">5 Cone stage</div>
+          <div class="rail-i">6 Provenance appendix</div>
+          <div class="rail-i">7 Signature page</div>
+        </div>
+        <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px"><div class="lbl">Cone stage</div><div class="chip" style="margin-top:7px;color:var(--crit);border-color:var(--crit);background:var(--crit-bg)">Concept · ±4x</div><div style="font-size:11.5px;color:var(--mut);margin-top:7px;text-wrap:pretty">Narrows to ±1.6x once the open questions are answered.</div></div>
+      </div>
+      <div style="flex:1;min-width:0;background:var(--bg);padding:20px;overflow:hidden">
+        <div style="background:var(--surf);border:1px solid var(--line);box-shadow:var(--sh2);border-radius:3px;padding:30px 36px;font-family:'IBM Plex Serif',Georgia,serif;color:var(--ink)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid var(--ink);padding-bottom:9px"><span style="font-size:18px;font-weight:600">Basis of Estimate</span><span class="mn" style="color:var(--mut)">Aurora Telecom · v3 · Aug 3, 2026</span></div>
+          <div style="display:flex;gap:28px;margin-top:16px;align-items:flex-start">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div class="lbl" style="font-family:'IBM Plex Sans',sans-serif">2 · Line items</div>
+              <table class="dt" style="margin-top:7px;font-family:'IBM Plex Serif',Georgia,serif">
+                <thead><tr><th style="background:transparent">Item</th><th style="background:transparent;text-align:right">O</th><th style="background:transparent;text-align:right">L</th><th style="background:transparent;text-align:right">P</th></tr></thead>
+                <tbody>
+                  <tr><td>Installment scheduler — plan creation</td><td class="num">5</td><td class="num" style="font-weight:600">9</td><td class="num">18</td></tr>
+                  <tr><td>Fee matrix back-office screen</td><td class="num">3</td><td class="num" style="font-weight:600">6</td><td class="num">14</td></tr>
+                  <tr><td>Invoice itemisation</td><td class="num">2</td><td class="num" style="font-weight:600">3</td><td class="num">6</td></tr>
+                  <tr><td>Dunning exclusions — includes discovery</td><td class="num">3</td><td class="num" style="font-weight:600">7</td><td class="num">21</td></tr>
+                  <tr><td style="color:var(--mut)">+ 14 further items</td><td class="num" style="color:var(--mut)">21</td><td class="num" style="color:var(--mut)">16</td><td class="num" style="color:var(--mut)">–</td></tr>
+                  <tr><td style="font-weight:600;border-bottom:none">Total — 18 items</td><td class="num" style="font-weight:600;border-bottom:none">34</td><td class="num" style="font-weight:600;border-bottom:none">41</td><td class="num" style="font-weight:600;border-bottom:none">52</td></tr>
+                </tbody>
+              </table>
+              <div style="font-size:12.5px;color:var(--mut);margin-top:9px;font-family:'IBM Plex Sans',sans-serif;text-wrap:pretty">Reported as a range in person-days. The likely figure is emphasised; both ends of the range always travel with it.</div>
+            </div>
+            <div style="width:250px;flex:none">
+              <div class="lbl" style="font-family:'IBM Plex Sans',sans-serif">3 · Assumption register</div>
+              <div style="font-size:12.5px;line-height:1.7;margin-top:7px;color:var(--ink2)">A-01 Invoice renderer v4 reused<br>A-02 Maximum 12 terms<br>A-03 No prepaid plan migration<br><span style="color:var(--mut)">+ 9 more</span></div>
+              <div class="lbl" style="font-family:'IBM Plex Sans',sans-serif;margin-top:14px">4 · Risks &amp; contingency</div>
+              <div style="font-size:12.5px;line-height:1.7;margin-top:7px;color:var(--ink2)">R-01 Fee matrix ownership unconfirmed<br>R-02 Dunning documentation is stale<br>Contingency +6 pd, carried inside P</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--line2);margin-top:18px;padding-top:13px;display:flex;gap:34px;font-family:'IBM Plex Sans',sans-serif">
+            <div><div class="lbl">Signature — Reviewer</div><div style="font-size:13px;margin-top:5px">D. Aksoy · Aug 2, 2026</div><div class="mn" style="color:var(--mut);margin-top:3px">rows 1–12, 15</div></div>
+            <div><div class="lbl">Signature — Signing authority</div><div style="font-size:13px;margin-top:5px;color:var(--mut)">Pending — M. Yılmaz</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="width:330px;flex:none;border-left:1px solid var(--line);display:flex;flex-direction:column">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--line)"><div class="lbl">Signature flow</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12.5px"><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)">Reviewer ✓</span><span style="color:var(--mut)">→</span><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)">Signing authority</span></div></div>
+        <div style="padding:13px 16px;border-bottom:1px solid var(--line)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px;font-weight:500">Rows you are approving</span><span class="mn" style="color:var(--mut)">12 / 18</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;font-size:13px">
+            <div style="display:flex;gap:9px;align-items:center"><span style="width:15px;height:15px;border-radius:3px;background:var(--acc);color:var(--acc-ink);font-size:10px;display:flex;align-items:center;justify-content:center;flex:none">✓</span>Installment scheduler</div>
+            <div style="display:flex;gap:9px;align-items:center"><span style="width:15px;height:15px;border-radius:3px;background:var(--acc);color:var(--acc-ink);font-size:10px;display:flex;align-items:center;justify-content:center;flex:none">✓</span>Invoice itemisation</div>
+            <div style="display:flex;gap:9px;align-items:center"><span style="width:15px;height:15px;border-radius:3px;border:1px solid var(--line2);flex:none"></span>Fee matrix back office <span class="chip" style="color:var(--crit);border-color:var(--crit)">delta disjoint</span></div>
+            <div style="display:flex;gap:9px;align-items:center;color:var(--mut)"><span style="width:15px;height:15px;border-radius:3px;border:1px solid var(--line2);flex:none"></span>Early settlement <span class="chip" style="color:var(--crit);border-color:var(--crit)">blocked</span></div>
+          </div>
+          <button class="btn p" style="margin-top:13px;width:100%;justify-content:center">Sign 12 rows</button>
+          <div style="font-size:11.5px;color:var(--mut);margin-top:8px;text-wrap:pretty">Your signature names exactly the rows it covers. Anything you did not sign stays unsigned.</div>
+        </div>
+        <div style="padding:13px 16px;border-bottom:1px solid var(--line)"><div class="lbl">After signing</div><div style="font-size:12.5px;color:var(--ink2);margin-top:7px;text-wrap:pretty">Any change afterwards opens v4 with a diff. The confirmation reads: “BoE v3 signed — ready to export.”</div></div>
+        <div style="padding:13px 16px"><div class="lbl">Version history</div>
+          <div style="font-size:12.5px;line-height:1.8;margin-top:7px;color:var(--ink2)"><span style="color:var(--ink);font-weight:500">v3</span> · 12 rows signed · today<br>v2 · range widened after REQ-013<br>v1 · first draft · Jul 24, 2026</div>
+          <button class="btn" style="margin-top:10px">Diff v2 → v3</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="ledger">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">7 · Ledger &amp; Analog Search</h2><span style="font-size:13px;color:var(--mut)">What we estimated, what it actually cost, and how far off we were.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)">
+      <div style="font-size:15px;font-weight:600;flex:none">Ledger</div>
+      <div style="flex:1;max-width:560px;border:1px solid var(--line2);border-radius:5px;background:var(--surf2);padding:7px 11px;font-size:13px;color:var(--ink2)">campaign-based installment plans</div>
+      <div style="display:flex;gap:8px"><span class="chip">Team: Billing ▾</span><span class="chip">Domain: Charging ▾</span><button class="btn">Import seed set</button></div>
+    </div>
+    <div style="display:flex">
+      <div style="flex:1;min-width:0;border-right:1px solid var(--line)">
+        <div style="padding:10px 18px;border-bottom:1px solid var(--line);background:var(--surf2)"><span class="lbl">Analog matches · 4 of 212 closed jobs</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 18px">
+          <div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px;font-weight:500">Prepaid top-up scheduler</span><span class="chip" style="color:var(--ev-analog);border-color:var(--ev-analog)">81%</span></div>
+            <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:10px;border:1px solid var(--line)"><div style="position:absolute;left:20%;right:36%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:46%;top:-4px;bottom:-4px;width:3px;background:var(--ok);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;margin-top:6px;color:var(--mut)"><span>8–17 pd estimated</span><span>15 pd actual</span></div>
+            <div class="chip" style="margin-top:9px;color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>within range</div></div>
+          <div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px;font-weight:500">Device instalment billing</span><span class="chip" style="color:var(--ev-analog);border-color:var(--ev-analog)">74%</span></div>
+            <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:10px;border:1px solid var(--line)"><div style="position:absolute;left:14%;right:52%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:84%;top:-4px;bottom:-4px;width:3px;background:var(--crit);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;margin-top:6px;color:var(--mut)"><span>10–22 pd estimated</span><span>31 pd actual</span></div>
+            <div class="chip" style="margin-top:9px;color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>above range · +41%</div></div>
+          <div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px;font-weight:500">Campaign fee matrix v2</span><span class="chip" style="color:var(--ev-analog);border-color:var(--ev-analog)">69%</span></div>
+            <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:10px;border:1px solid var(--line)"><div style="position:absolute;left:26%;right:30%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:14%;top:-4px;bottom:-4px;width:3px;background:var(--warn);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;margin-top:6px;color:var(--mut)"><span>6–14 pd estimated</span><span>4 pd actual</span></div>
+            <div class="chip" style="margin-top:9px;color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>below range</div></div>
+          <div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13.5px;font-weight:500">Dunning rules refactor</span><span class="chip" style="color:var(--ev-analog);border-color:var(--ev-analog)">61%</span></div>
+            <div style="position:relative;height:16px;background:var(--surf3);border-radius:8px;margin-top:10px;border:1px solid var(--line)"><div style="position:absolute;left:22%;right:28%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc)"></div><div style="position:absolute;left:52%;top:-4px;bottom:-4px;width:3px;background:var(--ok);border-radius:2px"></div></div>
+            <div class="mn" style="display:flex;justify-content:space-between;margin-top:6px;color:var(--mut)"><span>9–19 pd estimated</span><span>17 pd actual</span></div>
+            <div class="chip" style="margin-top:9px;color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>within range</div></div>
+        </div>
+        <table class="dt">
+          <thead><tr><th>Job</th><th style="width:104px">Delivered</th><th style="width:120px">Range that day</th><th style="width:84px">Actual</th><th style="width:150px">Deviation</th><th style="width:100px">Team</th><th style="width:96px">BoE row</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:500">Prepaid top-up scheduler</td><td class="mn" style="color:var(--mut)">Mar 2024</td><td class="num">8–17 pd</td><td class="num">15 pd</td><td><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>within</span></td><td style="color:var(--ink2)">Billing</td><td><a href="#boe">open</a></td></tr>
+            <tr><td style="font-weight:500">Device instalment billing</td><td class="mn" style="color:var(--mut)">Oct 2024</td><td class="num">10–22 pd</td><td class="num">31 pd</td><td><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>above · +41%</span></td><td style="color:var(--ink2)">Billing</td><td><a href="#boe">open</a></td></tr>
+            <tr><td style="font-weight:500">Campaign fee matrix v2</td><td class="mn" style="color:var(--mut)">Feb 2025</td><td class="num">6–14 pd</td><td class="num">4 pd</td><td><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>below</span></td><td style="color:var(--ink2)">Charging</td><td><a href="#boe">open</a></td></tr>
+            <tr><td style="font-weight:500">Dunning rules refactor</td><td class="mn" style="color:var(--mut)">Jun 2025</td><td class="num">9–19 pd</td><td class="num">17 pd</td><td><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>within</span></td><td style="color:var(--ink2)">Charging</td><td><a href="#boe">open</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="width:320px;flex:none;padding:14px 16px;background:var(--surf2)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Seed set import</span><span class="mn" style="color:var(--mut)">step 2 of 4</span></div>
+        <div style="display:flex;gap:4px;margin:9px 0 12px">
+          <div style="flex:1;height:4px;border-radius:2px;background:var(--acc)"></div><div style="flex:1;height:4px;border-radius:2px;background:var(--acc)"></div><div style="flex:1;height:4px;border-radius:2px;background:var(--surf3)"></div><div style="flex:1;height:4px;border-radius:2px;background:var(--surf3)"></div>
+        </div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:8px">Map the columns</div>
+        <div class="card" style="padding:4px 12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12.5px"><span class="mn" style="color:var(--mut)">Column C</span><span>estimate_low</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12.5px;border-top:1px solid var(--line)"><span class="mn" style="color:var(--mut)">Column D</span><span>estimate_high</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12.5px;border-top:1px solid var(--line)"><span class="mn" style="color:var(--mut)">Column F</span><span>actual_effort</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12.5px;border-top:1px solid var(--line)"><span class="mn" style="color:var(--mut)">Column G</span><span style="color:var(--crit)">unmapped</span></div>
+        </div>
+        <div class="card" style="padding:11px 13px;margin-top:11px;border-color:var(--crit);background:var(--crit-bg)"><div style="font-size:12.5px;color:var(--ink);text-wrap:pretty">14 rows have no actuals. They wait in the error queue — nothing partial enters the ledger.</div><button class="btn" style="margin-top:9px">Review failed rows</button></div>
+        <div class="card" style="padding:11px 13px;margin-top:11px"><div class="lbl">Before anything enters</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:9px;font-size:12.5px">
+            <div style="display:flex;gap:9px;align-items:center"><span style="width:15px;height:15px;border-radius:3px;background:var(--acc);color:var(--acc-ink);font-size:10px;display:flex;align-items:center;justify-content:center;flex:none">✓</span>No personal data in free-text fields</div>
+            <div style="display:flex;gap:9px;align-items:center"><span style="width:15px;height:15px;border-radius:3px;border:1px solid var(--line2);flex:none"></span>Customer names anonymised</div>
+          </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="calibration">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">8 · Calibration Dashboard</h2><span style="font-size:13px;color:var(--mut)">Self-criticism, not marketing. Under target is stated as plainly as over target.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)">
+      <div><div style="font-size:15px;font-weight:600">Calibration</div><div class="lbl" style="margin-top:3px">Last 24 months · 212 closed jobs</div></div>
+      <div style="display:flex;gap:8px"><span class="chip">All teams ▾</span><span class="chip">All domains ▾</span><button class="btn">Export figures</button></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr">
+      <div style="border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 18px">
+        <div style="font-size:14px">Our P10–P90 range captured actuals <span style="font-weight:600">78%</span> of the time <span style="color:var(--mut)">· target 80%</span></div>
+        <div style="position:relative;height:170px;margin-top:16px;border-left:1px solid var(--line2);border-bottom:1px solid var(--line2)">
+          <div style="position:absolute;left:0;right:0;top:34px;border-top:1px dashed var(--crit)"></div>
+          <span class="mn" style="position:absolute;right:4px;top:16px;color:var(--crit)">nominal 80%</span>
+          <div style="position:absolute;inset:auto 0 0 0;height:170px;display:flex;align-items:flex-end;gap:20px;padding:0 22px">
+            <div style="flex:1;height:74%;background:var(--acc-bg);border:1px solid var(--acc);border-bottom:none;border-radius:3px 3px 0 0"></div>
+            <div style="flex:1;height:81%;background:var(--acc-bg);border:1px solid var(--acc);border-bottom:none;border-radius:3px 3px 0 0"></div>
+            <div style="flex:1;height:66%;background:var(--acc-bg);border:1px solid var(--acc);border-bottom:none;border-radius:3px 3px 0 0"></div>
+            <div style="flex:1;height:88%;background:var(--acc-bg);border:1px solid var(--acc);border-bottom:none;border-radius:3px 3px 0 0"></div>
+            <div style="flex:1;height:78%;background:var(--ink);border:1px solid var(--ink);border-bottom:none;border-radius:3px 3px 0 0"></div>
+          </div>
+        </div>
+        <div class="mn" style="display:flex;justify-content:space-between;color:var(--mut);margin-top:6px;padding:0 22px"><span>Billing</span><span>Charging</span><span>CRM</span><span>Portal</span><span>All</span></div>
+        <div style="font-size:12.5px;color:var(--ink2);margin-top:10px;text-wrap:pretty">CRM sits at 66% — its ranges are too narrow. We are not adjusting the target to match.</div>
+      </div>
+      <div style="border-bottom:1px solid var(--line);padding:16px 18px">
+        <div style="font-size:14px">Pipeline versus the naive analog median</div>
+        <div style="display:flex;gap:26px;margin-top:16px">
+          <div><div class="lbl">Pipeline MAPE</div><div class="num" style="text-align:left;font-size:28px;font-weight:600;margin-top:4px">22%</div></div>
+          <div><div class="lbl">Analog median MAPE</div><div class="num" style="text-align:left;font-size:28px;font-weight:600;margin-top:4px;color:var(--mut)">24%</div></div>
+        </div>
+        <div style="position:relative;height:96px;margin-top:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surf2);overflow:hidden">
+          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--crit)"></div>
+          <span class="mn" style="position:absolute;left:52%;top:6px;color:var(--crit)">perfect</span>
+          <div style="position:absolute;left:22%;right:26%;top:24px;height:22px;background:var(--acc-bg);border:1px solid var(--acc);border-radius:11px"></div>
+          <div style="position:absolute;left:16%;right:20%;bottom:16px;height:22px;background:var(--surf3);border:1px dashed var(--mut);border-radius:11px"></div>
+        </div>
+        <div style="font-size:12.5px;color:var(--ink2);margin-top:10px;text-wrap:pretty">On this dataset the difference is not meaningful. We say so rather than round it into a win.</div>
+      </div>
+      <div style="border-right:1px solid var(--line);padding:16px 18px">
+        <div style="font-size:14px">Anchoring telemetry</div>
+        <div style="margin-top:14px"><div class="lbl">Entered independent-first · 412 items</div>
+          <div style="position:relative;height:22px;background:var(--surf3);border-radius:11px;margin-top:7px;border:1px solid var(--line)"><div style="position:absolute;left:12%;right:16%;top:0;bottom:0;background:var(--acc-bg);border-left:1px solid var(--acc);border-right:1px solid var(--acc);border-radius:11px"></div><div style="position:absolute;left:44%;top:-3px;bottom:-3px;width:3px;background:var(--acc);border-radius:2px"></div></div></div>
+        <div style="margin-top:14px"><div class="lbl">Entered after the draft was revealed · 96 items</div>
+          <div style="position:relative;height:22px;background:var(--surf3);border-radius:11px;margin-top:7px;border:1px solid var(--line)"><div style="position:absolute;left:32%;right:28%;top:0;bottom:0;background:var(--warn-bg);border-left:1px solid var(--warn);border-right:1px solid var(--warn);border-radius:11px"></div><div style="position:absolute;left:47%;top:-3px;bottom:-3px;width:3px;background:var(--warn);border-radius:2px"></div></div></div>
+        <div style="font-size:12.5px;color:var(--ink2);margin-top:12px;text-wrap:pretty">Post-reveal ranges are 34% narrower and cluster on the draft. This is why the desk opens closed.</div>
+      </div>
+      <div style="padding:16px 18px">
+        <div style="font-size:14px">Question impact</div>
+        <div style="display:flex;gap:28px;margin-top:14px">
+          <div><div class="num" style="text-align:left;font-size:28px;font-weight:600">61%</div><div style="font-size:12.5px;color:var(--ink2);max-width:190px;margin-top:3px;text-wrap:pretty">of answered questions changed a line item's range</div></div>
+          <div><div class="num" style="text-align:left;font-size:28px;font-weight:600">−28%</div><div style="font-size:12.5px;color:var(--ink2);max-width:190px;margin-top:3px;text-wrap:pretty">median range width once an answer lands</div></div>
+        </div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:150px;font-size:12.5px;color:var(--ink2)">No acceptance criteria</span><div style="flex:1;height:10px;background:var(--surf3);border-radius:5px;overflow:hidden"><div style="width:78%;height:100%;background:var(--acc)"></div></div><span class="mn" style="width:34px;color:var(--mut)">78%</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:150px;font-size:12.5px;color:var(--ink2)">Undefined ownership</span><div style="flex:1;height:10px;background:var(--surf3);border-radius:5px;overflow:hidden"><div style="width:54%;height:100%;background:var(--acc)"></div></div><span class="mn" style="width:34px;color:var(--mut)">54%</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:150px;font-size:12.5px;color:var(--ink2)">Two readings possible</span><div style="flex:1;height:10px;background:var(--surf3);border-radius:5px;overflow:hidden"><div style="width:41%;height:100%;background:var(--acc)"></div></div><span class="mn" style="width:34px;color:var(--mut)">41%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="knowledge">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">9 · Knowledge Curation</h2><span style="font-size:13px;color:var(--mut)">Candidate pages reviewed against their sources, then published with a version.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)">
+      <div style="font-size:15px;font-weight:600">Knowledge — canonical pages</div>
+      <div style="display:flex;gap:8px"><span class="chip">Queue 9</span><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>Drifted 4</span><span class="chip">Published 128</span></div>
+    </div>
+    <div style="display:flex;height:500px">
+      <div style="width:266px;flex:none;border-right:1px solid var(--line);background:var(--surf2);display:flex;flex-direction:column">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--line)"><span class="lbl">Candidate queue</span></div>
+        <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+          <div class="card" style="padding:10px 12px;box-shadow:0 0 0 1px var(--acc) inset"><div style="font-size:13px;font-weight:500">Installment plan lifecycle</div><div class="lbl" style="margin-top:5px">distilled from 6 wiki pages</div></div>
+          <div class="card" style="padding:10px 12px"><div style="font-size:13px">Dunning exclusion policy</div><div class="lbl" style="margin-top:5px">3 pages + 1 ADR</div></div>
+          <div class="card" style="padding:10px 12px"><div style="font-size:13px">Fee matrix ownership</div><div class="chip" style="margin-top:6px;color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>source 2 years old</div></div>
+        </div>
+        <div style="margin-top:auto;border-top:1px solid var(--line);padding:12px 14px"><div class="lbl">Freshness warnings</div><div style="font-size:12.5px;color:var(--ink2);margin-top:6px;text-wrap:pretty">4 canonical pages may have drifted from their sources for 6 months or more.</div><button class="btn" style="margin-top:9px">Review drift</button></div>
+      </div>
+      <div style="flex:1;display:flex;min-width:0">
+        <div style="flex:1;border-right:1px solid var(--line);padding:14px 18px;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Source · 6 pages merged</span><span class="chip">Confluence</span></div>
+          <div style="font-family:'IBM Plex Serif',Georgia,serif;font-size:13px;line-height:1.7;color:var(--ink2);margin-top:12px">
+            <p style="margin:0 0 10px">Installment plans are created by the campaign engine at the moment of purchase. The term count is fixed at creation.</p>
+            <p style="margin:0 0 10px">Fees are read from the matrix in force on the purchase date; later matrix edits do not re-price open plans.</p>
+            <div class="ph" style="height:84px;font-family:'IBM Plex Sans',sans-serif;margin:12px 0">wiki table — term limits by campaign class</div>
+            <p style="margin:0">Early settlement was documented in 2023 and has not been revised since.</p>
+          </div>
+        </div>
+        <div style="flex:1;padding:14px 18px;background:var(--acc-bg);min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl" style="color:var(--acc)">Candidate · distilled</span><span class="chip">v3 draft</span></div>
+          <div style="font-size:13.5px;line-height:1.65;margin-top:12px;color:var(--ink);text-wrap:pretty">A campaign installment plan splits one charge into 3, 6 or 12 terms. Terms are generated at plan creation and never re-priced — a later change to the fee matrix does not touch an open plan.</div>
+          <div style="font-size:13.5px;line-height:1.65;margin-top:10px;color:var(--ink2);text-wrap:pretty">Early settlement is out of scope for this page: the source has not been revised since 2023 and an open question is pending with the customer.</div>
+          <div style="display:flex;gap:8px;margin-top:16px"><button class="btn p">Approve &amp; publish v3</button><button class="btn">Revise</button><button class="btn">Reject</button></div>
+          <div style="font-size:11.5px;color:var(--ink2);margin-top:12px;text-wrap:pretty">Publishing is versioned. Every estimate cites the page version it actually read.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="admin">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">10 · Admin</h2><span style="font-size:13px;color:var(--mut)">Boring but transparent: sync status, error queues, cost meters.</span></div>
+  <div class="card" style="overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)">
+      <div style="font-size:15px;font-weight:600">Admin</div>
+      <div style="display:flex"><span class="stg on">Connections</span><span class="stg">Model profiles</span><span class="stg">Roles</span><span class="stg">Locales</span></div>
+      <button class="btn">Add connection</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 18px;border-bottom:1px solid var(--line)">
+      <div class="card" style="padding:13px 15px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:500">Confluence</span><span class="chip" style="color:var(--ok);border-color:var(--ok);background:var(--ok-bg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>connected</span></div>
+        <div class="lbl" style="margin-top:9px;text-transform:none;letter-spacing:0;font-size:12px">Last sync 12 minutes ago · 4,210 pages</div><button class="btn" style="margin-top:11px">Sync now</button></div>
+      <div class="card" style="padding:13px 15px;border-color:var(--crit)"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:500">Git — billing-core</span><span class="chip" style="color:var(--crit);border-color:var(--crit);background:var(--crit-bg)"><span style="width:7px;height:7px;background:var(--crit)"></span>error</span></div>
+        <div style="font-size:12.5px;color:var(--ink2);margin-top:9px;text-wrap:pretty">We couldn't reach the repository (401). Renew the connection key in Admin → Connections.</div><button class="btn" style="margin-top:11px">Renew key</button></div>
+      <div class="card" style="padding:13px 15px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:500">LLM gateway</span><span class="chip" style="color:var(--warn);border-color:var(--warn);background:var(--warn-bg)"><span style="width:7px;height:7px;background:var(--warn);transform:rotate(45deg)"></span>first sync</span></div>
+        <div style="height:6px;border-radius:3px;background:var(--surf3);margin-top:11px;overflow:hidden"><div style="width:38%;height:100%;background:var(--acc)"></div></div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:8px;text-wrap:pretty">Indexing repositories — a large wiki can take days. You can keep working while it runs.</div></div>
+    </div>
+    <div style="display:flex">
+      <div style="flex:1;border-right:1px solid var(--line);padding:14px 18px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Model profiles · stage to profile</span><span class="chip">Named profiles only</span></div>
+        <table class="dt" style="margin-top:10px">
+          <thead><tr><th>Stage</th><th style="width:150px">Profile</th><th style="width:110px">Tokens / run</th><th style="width:100px">Cost / run</th></tr></thead>
+          <tbody>
+            <tr><td>Reading — extraction</td><td><span class="chip">Precise-Long ▾</span></td><td class="num">180k</td><td class="num">$0.94</td></tr>
+            <tr><td>Questions</td><td><span class="chip">Balanced ▾</span></td><td class="num">42k</td><td class="num">$0.21</td></tr>
+            <tr><td>Impact analysis</td><td><span class="chip">Precise-Long ▾</span></td><td class="num">260k</td><td class="num">$1.36</td></tr>
+            <tr><td>Draft estimate</td><td><span class="chip">Deliberate ▾</span></td><td class="num">95k</td><td class="num">$0.72</td></tr>
+            <tr><td>Knowledge distillation</td><td><span class="chip">Balanced ▾</span></td><td class="num">120k</td><td class="num">$0.58</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="width:420px;flex:none;padding:14px 18px">
+        <div class="lbl">Roles &amp; signing authorities</div>
+        <table class="dt" style="margin-top:10px">
+          <thead><tr><th>Person</th><th style="width:140px">Role</th><th style="width:110px">May sign</th></tr></thead>
+          <tbody>
+            <tr><td>A. Demir</td><td style="color:var(--ink2)">Analyst</td><td style="color:var(--mut)">—</td></tr>
+            <tr><td>D. Aksoy</td><td style="color:var(--ink2)">Reviewer</td><td>line items</td></tr>
+            <tr><td>M. Yılmaz</td><td style="color:var(--ink2)">Delivery Manager</td><td>full BoE</td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="margin-top:14px;padding:12px 14px;background:var(--surf2)"><div class="lbl">Cost meter · this month</div><div class="num" style="text-align:left;font-size:22px;font-weight:600;margin-top:5px">$418.60</div><div style="font-size:12.5px;color:var(--ink2);margin-top:3px">23 estimates · $18.20 median per estimate</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="voice">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">11 · Voice &amp; anti-patterns</h2><span style="font-size:13px;color:var(--mut)">The microcopy set every screen above draws from.</span></div>
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px">
+    <div class="card" style="padding:16px 18px">
+      <div class="lbl">Ten strings</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin-top:12px;font-size:12.5px;line-height:1.55;color:var(--ink2)">
+        <div><span class="lbl">Empty · questions</span><div style="color:var(--ink);margin-top:3px">Every requirement passed the gate — a good sign.</div></div>
+        <div><span class="lbl">Empty · estimates</span><div style="color:var(--ink);margin-top:3px">No estimates yet. Drop a BRD and we will read it first.</div></div>
+        <div><span class="lbl">Loading</span><div style="color:var(--ink);margin-top:3px">Extracting tables… 12 requirements found.</div></div>
+        <div><span class="lbl">Error · connection</span><div style="color:var(--ink);margin-top:3px">We couldn't reach Confluence (401). Renew the connection key in Admin → Connections.</div></div>
+        <div><span class="lbl">Uncertainty</span><div style="color:var(--ink);margin-top:3px">Evidence is weak on this item — we added discovery effort to the range.</div></div>
+        <div><span class="lbl">Anchor tooltip</span><div style="color:var(--ink);margin-top:3px">This information is hidden from the estimation engine (anchor protection).</div></div>
+        <div><span class="lbl">Independent-first</span><div style="color:var(--ink);margin-top:3px">You first. The draft stays closed until you enter your own range.</div></div>
+        <div><span class="lbl">Signature</span><div style="color:var(--ink);margin-top:3px">BoE v3 signed — ready to export.</div></div>
+        <div><span class="lbl">Calibration miss</span><div style="color:var(--ink);margin-top:3px">We captured actuals 78% of the time against a target of 80%.</div></div>
+        <div><span class="lbl">Blocked item</span><div style="color:var(--ink);margin-top:3px">Held — the evidence is missing and a question is open.</div></div>
+      </div>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <div class="lbl">Consciously excluded</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;font-size:12.5px;color:var(--ink2)">
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>One big definitive number, anywhere.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Sparkle icons, gradients, “AI magic” framing.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Confetti or celebration at signature.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Blurred content behind a paywall-style reveal — the desk shows an honest closed state instead.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Model names as a badge of quality.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Colour as the only carrier of state.</span></div>
+        <div style="display:flex;gap:9px"><span style="color:var(--crit);flex:none">✕</span><span>Mixed-language interface copy.</span></div>
+      </div>
+      <div class="lbl" style="margin-top:16px">Number &amp; date format</div>
+      <div class="mn" style="margin-top:7px;color:var(--ink2);line-height:1.9">en · 1,234.5 pd · Aug 12, 2026<br>tr · 1.234,5 a-g · 12 Ağu 2026</div>
+    </div>
+  </div>
+</section>
+
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dense&quot;,&quot;comfortable&quot;],&quot;default&quot;:&quot;dense&quot;,&quot;tsType&quot;:&quot;'dense'|'comfortable'&quot;},&quot;delphi&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Estimate Desk&quot;}}">
+class Component extends DCLogic {
+  state = {};
+  get theme(){ return this.state.theme ?? this.props.theme ?? 'light'; }
+  get density(){ return this.state.density ?? this.props.density ?? 'dense'; }
+  get delphi(){ return this.state.delphi ?? this.props.delphi ?? true; }
+  renderVals(){
+    const t = this.theme, d = this.density, dp = this.delphi;
+    return {
+      theme: t, density: d, delphi: dp,
+      delphiLabel: dp ? 'Delphi: 3 reviewers' : 'Delphi: off',
+      toggleDelphi: () => this.setState({ delphi: !dp }),
+      themeLabel: t === 'light' ? 'Dark theme' : 'Light theme',
+      densityLabel: d === 'dense' ? 'Dense' : 'Comfortable',
+      toggleTheme: () => this.setState({ theme: t === 'light' ? 'dark' : 'light' }),
+      toggleDensity: () => this.setState({ density: d === 'dense' ? 'comfortable' : 'dense' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

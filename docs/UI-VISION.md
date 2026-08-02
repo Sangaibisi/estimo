@@ -7,6 +7,11 @@ but every decision that needs making is listed here. The product's behavioral la
 ([PRINCIPLES.md](PRINCIPLES.md)) are binding in the UI as well; above all: ranges, not
 points; no line item without evidence; independent estimates first.
 
+> ✅ **Design system delivered (2026-08-03):** see [design/](design/) — hi-fi screens for
+> all 10 sections below, foundations (tokens, light+dark) and the voice set, in the
+> Aurora Telecom installment scenario. Where this brief and the delivered design
+> disagree, the design wins; fold discrepancies back here via PR.
+
 ---
 
 ## 1. Product personality

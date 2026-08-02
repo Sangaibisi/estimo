@@ -76,9 +76,38 @@ code is reserved for the differentiation core — see
 | Calibration | Analog few-shot selection + conformal intervals + historical error distributions | accepted | The two evidence-backed accuracy levers (RESEARCH §3.2) |
 | Evals | Golden synthetic set + Ragas/DeepEval/promptfoo offline; Langfuse online feedback | accepted | Naive-baseline reporting mandatory (PRINCIPLES #7) |
 | Review UI | Next.js/TypeScript web app; `en` default locale, `tr` first localization | proposed | Design system incoming via [UI-VISION.md](UI-VISION.md); [ADR-0004](adr/0004-turkish-first-pipeline.md) |
-| Connectors | First-party REST ingestors (Confluence v2 crawl w/ ACL+version metadata, Jira JQL cursor, git clone) | accepted | Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
+| Connectors | First-party ingestors: Confluence v2 crawl (ACL+version metadata), Jira JQL cursor, git hosting via provider APIs + git protocol — **Bitbucket first-class** (Atlassian shops), GitHub, GitLab; webhook-triggered re-index | accepted | Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
 | Atlassian surface | Thin Forge Rovo Agent front-door + product's own MCP server | planned | Distribution without platform lock-in ([ADR-0002](adr/0002-atlassian-adjacent-core.md)) |
 | Deployment | docker-compose (dev) → Helm; ladder SaaS → VPC → BYOC → air-gap; stateless per tenant | accepted | Enterprise/telco buyer requirement |
+
+## Indexing pipelines (ordered)
+
+Three ingestion lanes feed the knowledge layer. Each is an **ordered, checkpointed,
+resumable** pipeline — every stage idempotent, per-tenant namespaced, safe to re-run.
+
+**Wiki lane** (Confluence → wiki shelf):
+`crawl (v2 API, page+ACL+version, checkpointed)` → `normalize (HTML→markdown)` →
+`structure-aware chunking (heading/table boundaries)` → `contextual header generation
+(LLM, cached)` → `dual index write (BM25 + vector)` → `freshness/authority scoring`.
+Incremental sync diffs page versions; a permission change re-syncs ACL metadata without
+re-embedding. Canonical pages enter this lane post-approval with a rank boost.
+
+**Code lane** (git hosting → code shelf):
+`clone/fetch (Bitbucket/GitHub/GitLab APIs + git protocol)` → `tree-sitter repo map
+(symbols, ranked)` → `SCIP index (defs/refs/dependents → graph store)` → `module-wiki
+generation (nightly, LLM)` — generated module pages then flow through the wiki lane's
+chunk/index stages. Webhook push events (or polling fallback) trigger incremental
+re-index of changed paths only.
+
+**Ledger lane** (seed import / live BoE writes → estimate ledger):
+`ingest (import CLI or pipeline write)` → `validation vs schema
+([LEDGER-SCHEMA.md](LEDGER-SCHEMA.md))` → `work-item embedding (title+description)` →
+`error/review queues (unknown modules, rejected rows)`. Actuals arriving later update
+calibration aggregates as a scheduled job.
+
+**Query path** (at estimation time): `hybrid retrieve (BM25 + dense, ACL pre-filter,
+freshness-weighted)` → `rerank` → `evidence assembly with URIs`. Retrieval never sees
+content the requesting user couldn't read at the source.
 
 ## Non-negotiables encoded in code structure
 
