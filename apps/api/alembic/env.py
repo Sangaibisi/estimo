@@ -34,9 +34,20 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+# Arbitrary but fixed: every Estimo migration runner contends for this one lock id.
+_MIGRATION_LOCK_KEY = 0x_E571_E070
+
+
 def do_run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        # Every API replica runs `alembic upgrade head` on start (the bundled Postgres
+        # does not exist yet when Helm hooks fire, so migrations live in an init
+        # container). Without this, two replicas starting together race on the same
+        # DDL. The transaction-scoped advisory lock serialises them — the loser waits,
+        # then finds head already applied and no-ops. Released on commit or rollback.
+        if connection.dialect.name == "postgresql":
+            connection.exec_driver_sql(f"SELECT pg_advisory_xact_lock({_MIGRATION_LOCK_KEY})")
         context.run_migrations()
 
 

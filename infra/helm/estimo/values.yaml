@@ -5,11 +5,17 @@ image:
   registry: ghcr.io/sangaibisi
   apiRepository: estimo-api
   webRepository: estimo-web
-  tag: ""          # defaults to .Chart.appVersion
-  pullPolicy: IfNotPresent
+  # `main` is built and pushed on every merge and is what exists in GHCR today. Pin a
+  # released semver (e.g. "0.2.0") once one is tagged — CI publishes {{version}} and
+  # {{major}}.{{minor}} on every v* tag — and drop pullPolicy back to IfNotPresent.
+  tag: "main"
+  pullPolicy: Always
 
 api:
-  replicas: 2
+  # One replica by default: the git working tree below is a single ReadWriteOnce
+  # claim. Scaling out requires a ReadWriteMany class (see reposStorage.accessMode);
+  # the chart fails the install rather than leaving a pod Pending forever.
+  replicas: 1
   resources:
     requests: { cpu: "250m", memory: "512Mi" }
     limits: { cpu: "1", memory: "1Gi" }
@@ -17,6 +23,7 @@ api:
   reposStorage:
     size: 5Gi
     storageClassName: ""
+    accessMode: ReadWriteOnce   # ReadWriteMany to run api.replicas > 1
 
 web:
   replicas: 2
@@ -36,9 +43,13 @@ database:
   migrationUrl: ""
   # Owner URL for cross-tenant SYSTEM paths (startup janitor, webhook lookup). Optional.
   ownerUrl: ""
-  # Password the migration assigns to the estimo_app role (multi-tenant).
+  # Password the migration assigns to the estimo_app role (multi-tenant). Prefer
+  # appRoleExistingSecret — a value here is readable via `helm get values`.
   appRolePassword: ""
-  existingSecret: ""          # secret with key ESTIMO_DATABASE_URL (preferred)
+  appRoleExistingSecret: ""   # secret with key ESTIMO_APP_ROLE_PASSWORD (preferred)
+  # Secret with key ESTIMO_DATABASE_URL. When set it wins over database.url, and the
+  # chart stops projecting a URL into the pod env so the secret is the only source.
+  existingSecret: ""
 
 postgres:
   bundled: true               # false => BYO managed Postgres via database.url
@@ -65,13 +76,16 @@ gateway:
   existingSecret: ""          # secret with key ESTIMO_GATEWAY__API_KEY
   profiles: '{"default": "gpt-4o-mini"}'
 
+# One host fronts both apps: /api → API, / → web. Set web.apiUrl to https://<host>/api.
 ingress:
   enabled: false
   className: ""
   host: estimo.example.com
   tls: true
+  tlsSecretName: ""           # defaults to <release>-tls
   annotations: {}
 
 serviceAccount:
   create: true
   name: ""
+  annotations: {}             # e.g. IRSA / Workload Identity binding

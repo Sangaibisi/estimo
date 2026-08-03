@@ -7,8 +7,10 @@ response and the .docx export all withhold band content before full sign-off, an
 signature itself requires the signer's revealed independent band. Anchors stay
 visible here (humans see them); only model boundaries redact.
 
-Known residual (S10 authN/Z): estimator identity is a self-declared name — separating
-estimators from each other needs real authentication and lands with S10.
+Identity: with OIDC configured the estimator/signer is taken from the validated
+token (`_bound_identity`), so the anchoring telemetry and the signature trail cannot
+be forged by a client-supplied name. In single-tenant (auth-disabled) mode the caller
+names themselves, which is the historical behaviour.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from estimo_estimate import estimate_state, record_actual, render_boe_docx, revi
 from estimo_estimate.loop import origin_ref as make_origin_ref
 from estimo_knowledge import LedgerEntryRow
 from estimo_pipeline import PipelineState, resume_with_answers, run_brd
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -35,7 +37,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api import telemetry
-from estimo_api.auth import require_signing
+from estimo_api.auth import Principal, current_principal, require_signing
 from estimo_api.db import get_session
 from estimo_api.estimates_models import (
     EstimateRecord,
@@ -43,7 +45,7 @@ from estimo_api.estimates_models import (
     LineSignature,
     UiEvent,
 )
-from estimo_core import BoeDocument
+from estimo_core import BoeDocument, Signature
 
 router = APIRouter(prefix="/v1/estimates", tags=["estimates"])
 
@@ -108,6 +110,19 @@ async def _fully_signed(session: AsyncSession, record: EstimateRecord) -> bool:
     boe = BoeDocument.model_validate(record.boe)
     line_ids = {line.work_item_id for line in boe.lines}
     return bool(line_ids) and line_ids <= await _signed_item_ids(session, record)
+
+
+def _bound_identity(request: Request, principal: Principal, claimed: str) -> str:
+    """The estimator/signer identity of record.
+
+    With OIDC configured the identity comes from the validated token — a
+    client-supplied name would make the independent-first telemetry and the
+    signature trail forgeable. In single-tenant (auth-disabled) mode the caller
+    names themselves, which is the historical behaviour.
+    """
+    if getattr(request.app.state, "oidc_verifier", None) is None:
+        return claimed
+    return principal.subject
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -235,8 +250,13 @@ class IndependentIn(BaseModel):
 
 @router.post("/{estimate_id}/independent", status_code=status.HTTP_201_CREATED)
 async def record_independent(
-    estimate_id: uuid.UUID, payload: IndependentIn, session: SessionDep
+    estimate_id: uuid.UUID,
+    payload: IndependentIn,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict[str, str]:
+    estimator = _bound_identity(request, principal, payload.estimator)
     if not payload.optimistic <= payload.likely <= payload.pessimistic:
         raise HTTPException(status_code=422, detail="band must be ordered o <= l <= p")
     record = await _get_record(session, estimate_id)
@@ -250,7 +270,7 @@ async def record_independent(
         select(IndependentEstimate).where(
             IndependentEstimate.estimate_id == estimate_id,
             IndependentEstimate.work_item_id == payload.work_item_id,
-            IndependentEstimate.estimator == payload.estimator,
+            IndependentEstimate.estimator == estimator,
             IndependentEstimate.boe_version == record.boe_version,
         )
     )
@@ -262,7 +282,7 @@ async def record_independent(
         IndependentEstimate(
             estimate_id=estimate_id,
             work_item_id=payload.work_item_id,
-            estimator=payload.estimator,
+            estimator=estimator,
             boe_version=record.boe_version,
             optimistic=payload.optimistic,
             likely=payload.likely,
@@ -273,7 +293,7 @@ async def record_independent(
         UiEvent(
             estimate_id=estimate_id,
             kind="independent-recorded",
-            payload={"work_item_id": payload.work_item_id, "estimator": payload.estimator},
+            payload={"work_item_id": payload.work_item_id, "estimator": estimator},
         )
     )
     try:
@@ -295,10 +315,13 @@ async def record_independent(
 async def estimate_desk(
     estimate_id: uuid.UUID,
     session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
     estimator: Annotated[str, Query(min_length=1)],
 ) -> dict[str, Any]:
     """Independent-first desk: AI bands appear per item ONLY after the estimator's own
     band exists for that item against the CURRENT draft (server-enforced, PRINCIPLES #4)."""
+    estimator = _bound_identity(request, principal, estimator)
     record = await _get_record(session, estimate_id)
     state = PipelineState.model_validate(record.state)
     boe = BoeDocument.model_validate(record.boe) if record.boe else None
@@ -373,7 +396,14 @@ class SignIn(BaseModel):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_signing)],
 )
-async def sign_line(estimate_id: uuid.UUID, payload: SignIn, session: SessionDep) -> dict[str, str]:
+async def sign_line(
+    estimate_id: uuid.UUID,
+    payload: SignIn,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict[str, str]:
+    signer = _bound_identity(request, principal, payload.name)
     record = await _get_record(session, estimate_id)
     if record.boe is None:
         raise HTTPException(status_code=409, detail="no BoE draft to sign")
@@ -386,7 +416,7 @@ async def sign_line(estimate_id: uuid.UUID, payload: SignIn, session: SessionDep
         select(IndependentEstimate).where(
             IndependentEstimate.estimate_id == estimate_id,
             IndependentEstimate.work_item_id == payload.work_item_id,
-            IndependentEstimate.estimator == payload.name,
+            IndependentEstimate.estimator == signer,
             IndependentEstimate.boe_version == record.boe_version,
         )
     )
@@ -399,7 +429,7 @@ async def sign_line(estimate_id: uuid.UUID, payload: SignIn, session: SessionDep
             estimate_id=estimate_id,
             work_item_id=payload.work_item_id,
             boe_version=record.boe_version,
-            name=payload.name,
+            name=signer,
             role=payload.role,
         )
     )
@@ -418,6 +448,32 @@ async def download_boe(estimate_id: uuid.UUID, session: SessionDep) -> Streaming
             detail="the export contains every band — sign all lines to unlock it",
         )
     boe = BoeDocument.model_validate(record.boe)
+    # The signature trail lives in line_signatures, not in the stored BoE JSON — merge
+    # it in at export so the artefact that leaves the system names its signers
+    # (PRINCIPLES #9). Without this the document's signature table ships blank.
+    signature_rows = (
+        await session.execute(
+            select(LineSignature)
+            .where(
+                LineSignature.estimate_id == estimate_id,
+                LineSignature.boe_version == record.boe_version,
+            )
+            .order_by(LineSignature.signed_at)
+        )
+    ).scalars()
+    boe = boe.model_copy(
+        update={
+            "signatures": tuple(
+                Signature(
+                    name=row.name,
+                    role=row.role,
+                    scope=row.work_item_id,
+                    signed_at=row.signed_at,
+                )
+                for row in signature_rows
+            )
+        }
+    )
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "boe.docx"
         render_boe_docx(boe, out)

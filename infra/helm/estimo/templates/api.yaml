@@ -1,3 +1,4 @@
+{{- include "estimo.validate" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +16,7 @@ spec:
         app.kubernetes.io/name: estimo
         app.kubernetes.io/component: api
     spec:
+      serviceAccountName: {{ include "estimo.serviceAccountName" . }}
       initContainers:
         {{- if .Values.postgres.bundled }}
         - name: wait-postgres
@@ -27,9 +29,7 @@ spec:
         - name: migrate
           image: "{{ .Values.image.registry }}/{{ .Values.image.apiRepository }}:{{ include "estimo.imageTag" . }}"
           command: ["alembic", "-c", "/app/apps/api/alembic.ini", "upgrade", "head"]
-          envFrom:
-            - secretRef:
-                name: {{ .Release.Name }}-env
+          envFrom: {{- include "estimo.envFrom" . | nindent 12 }}
           env:
             {{- if .Values.postgres.bundled }}
             - name: POSTGRES_PASSWORD
@@ -38,11 +38,19 @@ spec:
                   name: {{ .Values.postgres.auth.existingSecret | default (printf "%s-postgres" .Release.Name) }}
                   key: POSTGRES_PASSWORD
             {{- end }}
+            {{- if not .Values.database.existingSecret }}
             - name: ESTIMO_DATABASE_URL
               value: {{ include "estimo.migrationDatabaseUrl" . | quote }}
-            {{- with .Values.database.appRolePassword }}
+            {{- end }}
+            {{- if .Values.database.appRoleExistingSecret }}
             - name: ESTIMO_APP_ROLE_PASSWORD
-              value: {{ . | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.appRoleExistingSecret }}
+                  key: ESTIMO_APP_ROLE_PASSWORD
+            {{- else if .Values.database.appRolePassword }}
+            - name: ESTIMO_APP_ROLE_PASSWORD
+              value: {{ .Values.database.appRolePassword | quote }}
             {{- end }}
       containers:
         - name: api
@@ -50,9 +58,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: 8000
-          envFrom:
-            - secretRef:
-                name: {{ .Release.Name }}-env
+          envFrom: {{- include "estimo.envFrom" . | nindent 12 }}
           env:
             {{- if .Values.postgres.bundled }}
             - name: POSTGRES_PASSWORD
@@ -61,8 +67,10 @@ spec:
                   name: {{ .Values.postgres.auth.existingSecret | default (printf "%s-postgres" .Release.Name) }}
                   key: POSTGRES_PASSWORD
             {{- end }}
+            {{- if not .Values.database.existingSecret }}
             - name: ESTIMO_DATABASE_URL
               value: {{ include "estimo.apiDatabaseUrl" . | quote }}
+            {{- end }}
             {{- if .Values.database.ownerUrl }}
             - name: ESTIMO_OWNER_DATABASE_URL
               value: {{ .Values.database.ownerUrl | quote }}
@@ -104,7 +112,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-repos
 spec:
-  accessModes: ["ReadWriteOnce"]
+  accessModes: [{{ .Values.api.reposStorage.accessMode | quote }}]
   {{- with .Values.api.reposStorage.storageClassName }}
   storageClassName: {{ . }}
   {{- end }}

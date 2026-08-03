@@ -171,5 +171,10 @@ def render_boe_docx(boe: BoeDocument, path: Path) -> None:
         cells[0].text = signature.name
         cells[1].text = signature.role
         cells[2].text = signature.scope
+        # The signing date belongs in the artefact: an unsigned-looking column would
+        # make the exported document unusable as the record it claims to be.
+        cells[3].text = (
+            signature.signed_at.strftime("%Y-%m-%d %H:%M") if signature.signed_at else ""
+        )
 
     doc.save(str(path))

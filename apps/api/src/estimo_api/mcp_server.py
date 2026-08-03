@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from estimo_api.auth import AuthSettings, _pluck, discover_jwks_uri, tenant_to_uuid
 from estimo_api.estimates_models import EstimateRecord
+from estimo_api.routers.estimates import _fully_signed
 from estimo_api.tenancy import DEFAULT_TENANT, bind_tenant_guc, set_current_tenant
 from estimo_core import BoeDocument
 
@@ -85,11 +86,18 @@ def build_mcp(sessionmaker: async_sessionmaker[Any], auth: AuthSettings) -> Fast
 
     @mcp.tool
     async def get_estimate_lines(estimate_id: str) -> list[dict[str, Any]]:
-        """Evidence-linked BoE lines for a signed estimate (band + evidence URIs)."""
+        """Evidence-linked BoE lines for a FULLY SIGNED estimate (band + evidence).
+
+        Independent-first (PRINCIPLES #4) is surface-wide: an unsigned draft's bands
+        are reachable only through the per-estimator desk, so this tool returns
+        nothing until every line of the current draft is signed — the same gate the
+        REST GET and the .docx export apply."""
         session = await _session()
         async with session:
             record = await session.get(EstimateRecord, uuid.UUID(estimate_id))
             if record is None or record.boe is None:
+                return []
+            if not await _fully_signed(session, record):
                 return []
             boe = BoeDocument.model_validate(record.boe)
             return [

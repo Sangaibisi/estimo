@@ -411,3 +411,33 @@ def test_independent_unique_constraint_exists_on_model() -> None:
     assert isinstance(table, Table)
     names = {constraint.name for constraint in table.constraints}
     assert "uq_independent_estimates_item_estimator_version" in names
+
+
+async def test_exported_docx_names_its_signers(client: httpx.AsyncClient) -> None:
+    """PRINCIPLES #9: the signature trail must ship INSIDE the exported artefact —
+    a blank signature table would make the document unusable as a record."""
+    import io
+    import zipfile
+
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    desk = (
+        await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "M. Yılmaz"})
+    ).json()
+    for item in desk["items"]:
+        wid = item["work_item"]["id"]
+        assert (await _record_band(client, estimate_id, wid, "M. Yılmaz")).status_code == 201
+        signed = await client.post(
+            f"/v1/estimates/{estimate_id}/sign",
+            json={"work_item_id": wid, "name": "M. Yılmaz", "role": "Delivery Manager"},
+        )
+        assert signed.status_code == 201
+
+    docx = await client.get(f"/v1/estimates/{estimate_id}/boe.docx")
+    assert docx.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(docx.content)) as archive:
+        document = archive.read("word/document.xml").decode("utf-8")
+    assert "M. Yılmaz" in document, "the signer is missing from the exported document"
+    assert "Delivery Manager" in document

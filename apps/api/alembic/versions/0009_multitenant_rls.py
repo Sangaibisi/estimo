@@ -80,14 +80,22 @@ def upgrade() -> None:
 
     # Runtime role: created idempotently, no login password baked into the migration
     # (set it out-of-band, or pass ESTIMO_APP_ROLE_PASSWORD to the migration env).
+    # CREATE ROLE takes no bind parameters, so the password is quoted by the server's
+    # own quote_literal() — a password containing an apostrophe must not be able to
+    # close the string and append DDL of its own.
+    bind = op.get_bind()
     password = os.environ.get("ESTIMO_APP_ROLE_PASSWORD", "")
-    login = f"LOGIN PASSWORD '{password}'" if password else "NOLOGIN"
-    op.execute(
-        f"DO $$ BEGIN "
-        f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{APP_ROLE}') THEN "
-        f"CREATE ROLE {APP_ROLE} {login} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE; "
-        f"END IF; END $$"
-    )
+    login = "NOLOGIN"
+    if password:
+        quoted = bind.execute(sa.text("SELECT quote_literal(:secret)"), {"secret": password})
+        login = f"LOGIN PASSWORD {quoted.scalar_one()}"
+    exists = bind.execute(
+        sa.text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": APP_ROLE}
+    ).first()
+    if exists is None:
+        op.execute(
+            f"CREATE ROLE {APP_ROLE} {login} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"
+        )
     op.execute(f"GRANT USAGE ON SCHEMA public TO {APP_ROLE}")
     op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {APP_ROLE}")
     op.execute(f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {APP_ROLE}")

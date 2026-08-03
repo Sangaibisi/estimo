@@ -12,3 +12,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    groups:
+      # One PR per week for the framework set: Next and React ship in lockstep and a
+      # split upgrade produces a peer-dependency conflict that never builds.
+      next-react:
+        patterns: ["next", "react", "react-dom", "@types/react", "@types/react-dom", "eslint-config-next"]

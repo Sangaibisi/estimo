@@ -15,6 +15,7 @@ spec:
         app.kubernetes.io/name: estimo
         app.kubernetes.io/component: web
     spec:
+      serviceAccountName: {{ include "estimo.serviceAccountName" . }}
       containers:
         - name: web
           image: "{{ .Values.image.registry }}/{{ .Values.image.webRepository }}:{{ include "estimo.imageTag" . }}"
