@@ -205,6 +205,25 @@ Until the first code release, entries track documentation and foundation milesto
   so nested env files and Node artifacts stay out of build contexts.
 
 ### Changed
+- **Doc-truth pass #2**, from scoping the S11 items against the code. The first pass fixed
+  claims that were *overstated*; this one fixes claims that were *wrong*. Retrieval is
+  **lexical in practice everywhere**: nothing in the repo writes an embedding — the only
+  `.embed()` call embeds the query, and `upsert_document` NULLs the vector columns on every
+  write — so `dense_ledger_ids` matches zero rows and RRF fuses a single ranking. There is
+  also no chunker: a Confluence page becomes one `knowledge_chunks` row, so "chunk" is
+  currently a misnomer for "document". ARCHITECTURE.md said otherwise in three places
+  (component table, wiki lane, query path) and now says this. The S11-4 blocker recorded
+  yesterday was itself wrong — `ledger_entries` has carried `team` and `domain_tags` since
+  migration 0002. Added S11-8 for the missing embedding writer, split S11-6 into the docs
+  site (decided against, with the reasoning) and the Marketplace assessment (blocked on the
+  deferred Forge surface), and recorded the sourcing escalation found under S11-7.
+- CONTRIBUTING.md told contributors "the repo is documentation-only and the only build is
+  reading docs/RESEARCH.md" — ten sprints after that stopped being true. It now carries the
+  real gates (uv sync, ruff, mypy, pytest, the separate npm build for `apps/web`). AGENTS.md
+  named a `packages/calibrate/` that has never existed, omitted `code/` and `estimate/`,
+  labelled the web app "Türkçe-first" in an English document and called the translated
+  research dossier Turkish. docs/DEPLOY.md had no inbound link from any navigable page and
+  is now in the README map.
 - **The web UI now implements the delivered design system**, not just its colour
   tokens (`docs/design/estimo-ui.dc.html`). Ported: the full token set (surfaces,
   ink tiers, two-tier borders, status and evidence roles, shadows), both density

@@ -13,8 +13,8 @@ ambiguity gate with clarification questions → evidence grounding (code graph, 
 historical analogies) → three-point effort ranges with assumptions/risks → human review and
 line-by-line sign-off → calibration loop against actuals.
 
-Everything is justified by the founding research in [docs/RESEARCH.md](docs/RESEARCH.md)
-(Turkish). The condensed reference architecture is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Everything is justified by the founding research in [docs/RESEARCH.md](docs/RESEARCH.md).
+The condensed reference architecture is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 The non-negotiable product behaviors are [docs/PRINCIPLES.md](docs/PRINCIPLES.md).
 Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
 
@@ -91,8 +91,8 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
 
 - Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `ci`, `build`.
 - Scopes (extend as modules appear): `ingest`, `parse`, `ledger`, `decompose`,
-  `questions`, `impact`, `estimate`, `calibrate`, `boe`, `review-ui`, `gateway`,
-  `connectors`, `evals`, `fixtures`, `infra`, `docs`.
+  `questions`, `impact`, `estimate`, `boe`, `web`, `auth`, `mcp`, `gateway`,
+  `connectors`, `evals`, `fixtures`, `infra`, `deps`, `docs`.
 - Example: `feat(parse): docling-based requirement segmentation with stable IDs`
 
 ## 4. Definition of Done
@@ -117,18 +117,19 @@ Grow into this shape (create directories when their first real content arrives, 
 estimo/
 ├── apps/
 │   ├── api/            # FastAPI service: pipeline orchestration, review endpoints
-│   └── web/            # Review UI (Türkçe-first)
+│   └── web/            # Review UI (Next.js; `en` default, `tr` first localization)
 ├── packages/
 │   ├── core/           # domain models: Requirement, WorkItem, EstimateLine, BoE, Ledger
 │   ├── parse/          # BRD ingestion: docling wrapper, requirement segmentation
-│   ├── knowledge/      # retrieval shelves: wiki index, code graph, canonical pages
+│   ├── knowledge/      # retrieval shelves: ledger, chunks, hybrid search, canonical pages
+│   ├── code/           # tree-sitter symbol graph, repo map, module wikis
 │   ├── pipeline/       # LangGraph graph: decompose → gate → ground → estimate → critic
-│   ├── calibrate/      # analog selection, range calibration, conformal intervals
+│   ├── estimate/       # analog selection, range calibration, conformal intervals, BoE render
 │   ├── gateway/        # THE ONLY module that talks to the LLM endpoint
-│   └── connectors/     # confluence/, git/, jira/ REST ingestors (S9)
+│   └── connectors/     # confluence, git hosting, jira ingestors + canonical curation (S9)
 ├── evals/              # golden sets (synthetic), eval harness, metric definitions
 ├── fixtures/           # synthetic BRDs & sanitized examples (Turkish)
-├── infra/              # docker-compose, helm (later)
+├── infra/              # helm chart (compose.yaml lives at the repo root)
 └── docs/               # canonical documentation (see README map)
 ```
 

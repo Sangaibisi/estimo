@@ -73,7 +73,7 @@ code is reserved for the differentiation core — see
 | Model access | OpenAI-compatible client → deployment's LiteLLM gateway | shipped `packages/gateway` | The `openai` package is the *protocol* client and is confined to this one package; CI fails the build on a provider import anywhere else ([ADR-0001](adr/0001-litellm-gateway-only.md)) |
 | API service | FastAPI, Python 3.13+ | shipped `apps/api` | Ecosystem fit with parse/pipeline packages |
 | Storage | Postgres 18 + pgvector for ledger, runs, chunks, estimates | shipped (Alembic 0001–0010) | One database until scale demands more; tenant isolation is RLS ([ADR-0007](adr/0007-multitenant-auth.md)) |
-| Wiki retrieval | Turkish FTS lexical + dense, fused with RRF (k=60), ACL pre-filter | **partial** `packages/knowledge` | Shipped without the two pieces that need more than we have: the cross-encoder rerank slot is an interface awaiting a gateway rerank route, and contextual chunk headers are unbuilt (S11-1/2). TR lexical choice measured, not assumed ([ADR-0004](adr/0004-turkish-first-pipeline.md)) |
+| Wiki retrieval | Turkish FTS lexical, ACL pre-filter; a dense leg and RRF fusion (k=60) exist in code | **partial** `packages/knowledge` | **Retrieval is lexical in practice.** Nothing in the repo writes an embedding — the only `.embed()` call embeds the *query* (`search.py`), and `upsert_document` NULLs the vector columns on every write — so the dense leg matches zero rows and RRF fuses one ranking. An indexer-side embedding writer (S11-8), the cross-encoder rerank slot (S11-1) and contextual chunk headers (S11-2) are all unbuilt. The TR lexical choice was measured, not assumed ([ADR-0004](adr/0004-turkish-first-pipeline.md)) |
 | Code intelligence | tree-sitter symbol graph (Java/TypeScript) | **partial** `packages/code` | The MVP leg is shipped; SCIP indexes and generated module wikis are not built. Impact analysis is therefore heuristic — items it cannot resolve become explicit discovery-effort lines rather than silent guesses |
 | GraphRAG | **Skipped in v1** | accepted | Free graphs already exist (code graph, page hierarchy); revisit only for multi-hop needs |
 | Knowledge curation | Canonical pages tier outranks raw wiki; freshness + authority scores on chunks | accepted | Stale-wiki poisoning defense |
@@ -91,9 +91,13 @@ resumable** pipeline — every stage idempotent, per-tenant namespaced, safe to 
 
 **Wiki lane** (Confluence → wiki shelf):
 `crawl (v2 API, page+ACL+version, checkpointed)` → `normalize (HTML→markdown)` →
-`structure-aware chunking (heading/table boundaries)` → `dual index write (FTS + vector)`
-→ `freshness/authority scoring`. A contextual-header generation stage belongs between
-chunking and indexing and is **not built** (S11-2).
+`index write (FTS)` → `freshness/authority scoring`. Two stages in the original design are
+**not built**: there is no chunker — a Confluence page becomes ONE `knowledge_chunks` row,
+so "chunk" is currently a misnomer for "document" — and nothing writes the vector column,
+so the dual index is lexical-only. Structure-aware chunking (S11-2's precondition), the
+embedding writer (S11-8) and contextual headers (S11-2) land together or not at all:
+headers over whole documents buy nothing, and chunks nobody embeds cannot be retrieved
+densely.
 Incremental sync diffs page versions; a permission change re-syncs ACL metadata without
 re-embedding. Canonical pages enter this lane post-approval with a rank boost.
 
@@ -110,9 +114,11 @@ re-index of changed paths only.
 `error/review queues (unknown modules, rejected rows)`. Actuals arriving later update
 calibration aggregates as a scheduled job.
 
-**Query path** (at estimation time): `hybrid retrieve (Turkish FTS + dense, ACL
-pre-filter, freshness-weighted)` → `RRF fusion` → `evidence assembly with URIs`. The
-rerank stage between fusion and assembly is designed but **not wired** (S11-1). Retrieval
+**Query path** (at estimation time): `retrieve (Turkish FTS, ACL pre-filter,
+freshness-weighted)` → `RRF fusion` → `evidence assembly with URIs`. Two designed stages do
+not run: the dense leg has nothing to match against until an embedding writer exists
+(S11-8), and the rerank stage between fusion and assembly is **not wired** (S11-1). RRF and
+the dense query path are correct code — they are simply fusing a single ranking today. Retrieval
 never sees content the requesting user couldn't read at the source — with the caveat that
 ACL keys are matched per connection, and `GET /v1/canonical` has no per-user filter yet
 (S11-7).

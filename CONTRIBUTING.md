@@ -36,5 +36,29 @@ directories of open-core projects.
 
 ## Setup
 
-Tooling arrives with Sprint S1 (see roadmap). Until then, the repo is documentation-only
-and the only "build" is reading [docs/RESEARCH.md](docs/RESEARCH.md).
+Containers are the only supported runtime ([ADR-0006](docs/adr/0006-fully-containerized.md)),
+so the fastest way to see the product is the quick start in the [README](README.md#quick-start):
+
+```bash
+cp .env.example .env
+docker compose --profile mock up --build
+```
+
+To work on the Python side you need [uv](https://docs.astral.sh/uv/) (the version CI pins is
+in `.github/workflows/ci.yml`):
+
+```bash
+uv sync --all-packages --all-groups
+uv run ruff format . && uv run ruff check . && uv run mypy apps packages
+uv run pytest                      # db-marked tests need ESTIMO_TEST_DATABASE_URL
+```
+
+The web app is a separate npm project under `apps/web` (it is excluded from the uv
+workspace on purpose):
+
+```bash
+cd apps/web && npm ci && npm run build
+```
+
+Those three gates — ruff, mypy, pytest, plus the web build — are exactly what CI runs. Run
+them before opening a PR; a PR that has not been run locally will simply fail slower.

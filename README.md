@@ -106,6 +106,7 @@ Estimo never shows a magic number. The full list is in
 | [docs/RESEARCH.md](docs/RESEARCH.md) | Founding research dossier (market, evidence, architecture, telco, OSS) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Reference architecture & tech choices |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Trackable sprint roadmap (single source of truth for plan & progress) |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Installing Estimo: compose, Helm/BYOC, air-gapped notes |
 | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) | Evidence-derived product laws |
 | [docs/UI-VISION.md](docs/UI-VISION.md) | UI vision brief feeding the design-system work |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | Domain vocabulary (BRD, BoE, ledger, …) |

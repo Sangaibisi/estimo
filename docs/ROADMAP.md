@@ -22,8 +22,9 @@ exported `.docx`. Two kinds of work remain, and they are different in kind.
 *Engineering, deferred rather than done* — seven items S3–S10 scoped but did not deliver,
 now collected in **[S11](#s11--carried-forward--status--not-started)** instead of hiding
 inside a ticked box: the rerank slot, contextual chunk headers, Delphi aggregation,
-team/domain curves, the OAuth repo picker, the docs site, and per-user canonical ACL
-filtering. Each names what blocks it.
+team/domain curves, the OAuth repo picker, the docs site, per-user canonical ACL filtering,
+and — found while scoping the others — the fact that **nothing writes an embedding, so
+retrieval is lexical in practice everywhere.** Each names what blocks it.
 
 *Maintainer-owned* — cannot be produced from synthetic data or without customer
 credentials: the F1 blinded evaluation's human/hybrid arms (S4), the dogfood pilot and
@@ -309,25 +310,64 @@ setup; ACL tests green.
 
 ---
 
-## S11 — Carried forward · `Status: ⚪ Not started`
+## S11 — Carried forward · `Status: 🟡 In progress`
 
 Items that S3–S10 scoped but did not deliver, collected here rather than left as ticks
 that overstate the build. Each names what blocked it.
 
-- [ ] S11-1 Cross-encoder rerank after RRF fusion (S3-3) — the slot exists in
-  `packages/knowledge/search.py`; it needs a gateway rerank route to call.
-- [ ] S11-2 Contextual chunk headers (S3-3) — prepend a document/section summary to each
-  chunk before embedding; never implemented.
+- [ ] S11-1 Cross-encoder rerank after RRF fusion (S3-3) — the "slot" is a sentence in a
+  docstring: there is no interface, no config key and no gateway method. The wiring is
+  buildable and testable today (a rerank profile that must be named explicitly, never
+  resolved through the `default` profile; fail-open with a recorded signal). Whether a real
+  cross-encoder improves Turkish ranking is NOT measurable here — same blocker as the S3-2
+  shoot-out — so the wiring may ship, but no quality claim may.
+- [ ] S11-2 Contextual chunk headers (S3-3) — **blocked on two preconditions that turned
+  up while scoping it**: there is no chunker (a Confluence page becomes ONE
+  `knowledge_chunks` row, so a "section header" has no section to describe), and nothing
+  writes chunk embeddings (S11-8), so a header added before embedding would be read by
+  nobody. Structure-aware chunking must land first; the header is a no-op without it,
+  because the Turkish tsvector already indexes `title || text` and the Confluence lane
+  already prefixes the space key onto the title.
 - [ ] S11-3 Anonymized Delphi aggregation view (S7-4) — per-estimator bands are already
-  stored and immutable, so this is a read model plus a UI, not new plumbing.
-- [ ] S11-4 Team/domain calibration curves (S8-3) — blocked on the ledger having a team
-  and domain dimension to slice on.
+  stored and immutable, so this is a read model plus a UI, not new plumbing. Needs a
+  minimum-estimator threshold: a "Delphi" panel showing one other band de-anonymizes them.
+- [ ] S11-4 Team/domain calibration curves (S8-3) — **the blocker previously recorded here
+  was wrong**: `ledger_entries` has carried `team` and `domain_tags` since migration 0002
+  and the seed importer already populates both. The real gaps are (a) grouping inside the
+  calibration transfer distribution, (b) the pipeline never sets team/domain on a
+  `WorkItem`, so every ledger row the product itself writes lands with `team = NULL`, and
+  (c) statistics: on the seed ledger the largest team slice is 6 rows and the largest
+  domain slice 7, both under the existing `MIN_SAMPLES = 8` gate, so every slice would
+  render "inherited from global". The attribution half is worth shipping now; the curve
+  itself waits for the S8-5 pilot ledger. Drawing a per-slice curve at this sample size
+  would violate PRINCIPLES #1 and #6.
+- [ ] S11-8 Indexer-side embedding writer — **nothing in the repo writes an embedding.**
+  The only `.embed()` call embeds the query; `upsert_document` NULLs the vector columns on
+  every write. So `dense_ledger_ids` matches zero rows and RRF fuses a single ranking:
+  retrieval is lexical in practice, everywhere. The dense code is correct and tested — it
+  has no data. Needs a live embedding endpoint to be worth measuring (same blocker as the
+  S3-2 embedder shoot-out), and a re-embed strategy, since Confluence re-ingests a 26-hour
+  overlap window on every sync and the conditional reset must not wipe vectors each run.
 - [ ] S11-5 OAuth workspace/repo picker for Bitbucket/GitHub/GitLab (S9-2) — needs the
   OAuth app-install flow; today Admin → Connections takes a clone URL and a JSON config.
-- [ ] S11-6 Documentation site + Marketplace readiness assessment (S10-6).
-- [ ] S11-7 Per-user ACL filtering on `GET /v1/canonical` — chunk ACL keys are stored and
-  the endpoint is reviewer-gated, but there is no user→ACL-key mapping to filter against,
-  so a reviewer sees every canonical page in their tenant.
+- [x] S11-6a Documentation site — **decided against, deliberately.** The corpus is ~20
+  navigable markdown files that GitHub already renders (including the mermaid diagrams),
+  every relative link resolves, and the live OpenAPI at `/docs` beats any static copy of
+  it. A site would add a fifth CI surface to keep green and would have rendered the actual
+  problem — stale content — more attractively without fixing it. What shipped instead: the
+  README quick start, CONTRIBUTING's real setup, a DEPLOY.md link from the docs map, and
+  the AGENTS.md layout correction. Revisit when the docs outgrow one directory or an
+  external audience needs versioned docs.
+- [ ] S11-6b Marketplace readiness assessment (S10-6) — genuinely blocked: it assesses the
+  Forge/Rovo surface, which is itself deferred (S10-4 is `[~]`).
+- [ ] S11-7 Per-user ACL filtering on canonical pages — chunk ACL keys are stored and the
+  endpoint is reviewer-gated, but there is no user→ACL-key mapping to filter against, so a
+  reviewer sees every canonical page in their tenant. Scoping it surfaced a **live
+  escalation that is more urgent than the read filter**: `POST /v1/canonical` passes the
+  request body's `acl_keys` straight into the retrieval pre-filter, so any reviewer can
+  name any ACL key, pull restricted source text into a draft body, and read it back. The
+  pre-filter must never take its permissions from the requester (SECURITY.md); the
+  sourcing clamp ships first and applies in single-tenant open mode too.
 
 ---
 
