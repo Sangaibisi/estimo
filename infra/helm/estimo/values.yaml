@@ -1,0 +1,69 @@
+# Estimo Helm values. BYOC: set postgres.bundled=false and point database.url at your
+# managed instance; set auth.* to your OIDC IdP; gateway.* to your LiteLLM endpoint.
+
+image:
+  registry: ghcr.io/sangaibisi
+  apiRepository: estimo-api
+  webRepository: estimo-web
+  tag: ""          # defaults to .Chart.appVersion
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: "250m", memory: "512Mi" }
+    limits: { cpu: "1", memory: "1Gi" }
+  # Working-tree storage for the S9 git connectors.
+  reposStorage:
+    size: 5Gi
+    storageClassName: ""
+
+web:
+  replicas: 2
+  # Browser-visible API origin — injected at runtime, never baked (see apps/web).
+  apiUrl: "https://estimo.example.com/api"
+  resources:
+    requests: { cpu: "100m", memory: "256Mi" }
+    limits: { cpu: "500m", memory: "512Mi" }
+
+# Database. Multi-tenant deployments MUST use the NOSUPERUSER estimo_app role (ADR-0007).
+database:
+  # Full asyncpg URL. Leave empty to build it from the bundled Postgres below.
+  url: ""
+  existingSecret: ""          # secret with key ESTIMO_DATABASE_URL (preferred)
+
+postgres:
+  bundled: true               # false => BYO managed Postgres via database.url
+  image: pgvector/pgvector:0.8.6-pg18-trixie
+  storage:
+    size: 20Gi
+    storageClassName: ""
+  auth:
+    database: estimo
+    username: estimo
+    # For production, prefer an existing secret over a value here.
+    existingSecret: ""
+
+# OIDC (S10-1). Empty issuer => single-tenant open mode.
+auth:
+  issuer: ""
+  audience: "estimo-api"
+  roleClaim: "realm_access.roles"
+  tenantClaim: "tenant"
+
+# LiteLLM gateway (ADR-0001). Required for real LLM calls.
+gateway:
+  baseUrl: ""                 # e.g. https://litellm.internal/v1
+  existingSecret: ""          # secret with key ESTIMO_GATEWAY__API_KEY
+  profiles: '{"default": "gpt-4o-mini"}'
+
+ingress:
+  enabled: false
+  className: ""
+  host: estimo.example.com
+  tls: true
+  annotations: {}
+
+serviceAccount:
+  create: true
+  name: ""

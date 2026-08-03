@@ -35,6 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api import telemetry
+from estimo_api.auth import require_signing
 from estimo_api.db import get_session
 from estimo_api.estimates_models import (
     EstimateRecord,
@@ -367,7 +368,11 @@ class SignIn(BaseModel):
     role: str = Field(min_length=1, max_length=80)
 
 
-@router.post("/{estimate_id}/sign", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{estimate_id}/sign",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_signing)],
+)
 async def sign_line(estimate_id: uuid.UUID, payload: SignIn, session: SessionDep) -> dict[str, str]:
     record = await _get_record(session, estimate_id)
     if record.boe is None:

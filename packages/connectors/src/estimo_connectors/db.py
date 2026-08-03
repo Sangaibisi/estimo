@@ -11,7 +11,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from estimo_knowledge.db import Base
+from estimo_knowledge.db import Base, TenantScoped
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 CONNECTION_KINDS = ("confluence", "bitbucket", "github", "gitlab", "git", "jira")
 
 
-class Connection(Base):
+class Connection(TenantScoped, Base):
     """One configured external source (Admin → Connections)."""
 
     __tablename__ = "connections"
@@ -43,7 +43,7 @@ class Connection(Base):
     )
 
 
-class SyncRun(Base):
+class SyncRun(TenantScoped, Base):
     """One (possibly checkpoint-resumed) sync execution of a connection."""
 
     __tablename__ = "sync_runs"
@@ -74,7 +74,7 @@ class SyncRun(Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
-class CanonicalPage(Base):
+class CanonicalPage(TenantScoped, Base):
     """Curated distillation (S9-4): candidate → human approval → versioned page.
 
     Approved pages enter retrieval as high-authority chunks; draft candidates

@@ -3,8 +3,8 @@
 Secrets follow the env-indirection rule: the API accepts and returns only the NAME
 of the env var holding a credential (SECURITY.md; ADR-0006 env-only config).
 
-Known residual (S10 authN/Z): this surface is admin-shaped but unauthenticated
-until OIDC lands — deployments must keep the API loopback/private until then.
+AuthZ (S10): mutations require the `admin` role and canonical curation the
+`reviewer` role; the webhook receiver is authenticated by HMAC, not a bearer token.
 """
 
 from __future__ import annotations
@@ -33,8 +33,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from estimo_api.auth import require_admin, require_reviewer
 from estimo_api.db import get_session
 from estimo_api.settings import Settings
+from estimo_api.tenancy import bind_tenant_guc, get_current_tenant, set_current_tenant
 from estimo_gateway import GatewayClient
 
 router = APIRouter(prefix="/v1", tags=["connections"])
@@ -101,7 +103,9 @@ async def list_connections(session: SessionDep) -> list[dict[str, Any]]:
     return connections
 
 
-@router.post("/connections", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/connections", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)]
+)
 async def create_connection(payload: ConnectionIn, session: SessionDep) -> dict[str, Any]:
     if payload.secret_env is not None:
         try:
@@ -123,7 +127,11 @@ async def create_connection(payload: ConnectionIn, session: SessionDep) -> dict[
     return _connection_out(connection)
 
 
-@router.delete("/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/connections/{connection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 async def delete_connection(connection_id: uuid.UUID, session: SessionDep) -> None:
     connection = await session.get(Connection, connection_id)
     if connection is None:
@@ -145,8 +153,13 @@ async def _run_sync_bg(
     sessionmaker: async_sessionmaker[AsyncSession],
     connection_id: uuid.UUID,
     settings: Settings,
+    tenant: str,
 ) -> None:
+    # A background task runs outside the request, so pin the tenant explicitly (the
+    # triggering request supplied it) before opening the tenant-scoped session.
+    set_current_tenant(tenant)
     async with sessionmaker() as session:
+        bind_tenant_guc(session)
         connection = await session.get(Connection, connection_id)
         if connection is None:
             return
@@ -163,7 +176,11 @@ async def _run_sync_bg(
             return
 
 
-@router.post("/connections/{connection_id}/sync", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/connections/{connection_id}/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_admin)],
+)
 async def trigger_sync(
     connection_id: uuid.UUID,
     session: SessionDep,
@@ -179,7 +196,11 @@ async def trigger_sync(
     if running is not None:
         raise HTTPException(status_code=409, detail="a sync is already running")
     background.add_task(
-        _run_sync_bg, request.app.state.sessionmaker, connection_id, request.app.state.settings
+        _run_sync_bg,
+        request.app.state.sessionmaker,
+        connection_id,
+        request.app.state.settings,
+        get_current_tenant(),
     )
     return {"status": "scheduled"}
 
@@ -209,30 +230,42 @@ async def list_runs(connection_id: uuid.UUID, session: SessionDep) -> list[dict[
 @router.post("/webhooks/{connection_id}", status_code=status.HTTP_202_ACCEPTED)
 async def receive_webhook(
     connection_id: uuid.UUID,
-    session: SessionDep,
     request: Request,
     background: BackgroundTasks,
 ) -> dict[str, str]:
     """Push-event receiver: verified against the RAW body, then an incremental
-    re-index is scheduled. Unverifiable deliveries are rejected — a webhook with no
-    configured secret is a misconfiguration, not a pass."""
-    connection = await session.get(Connection, connection_id)
-    if connection is None:
-        raise HTTPException(status_code=404, detail="connection not found")
-    secret_env = (connection.config or {}).get("webhook_secret_env")
-    secret = os.getenv(secret_env) if secret_env else None
-    if not secret:
-        raise HTTPException(status_code=422, detail="webhook secret is not configured")
-    body = await request.body()
-    if not verify_webhook(connection.kind, dict(request.headers), body, secret):
-        raise HTTPException(status_code=401, detail="webhook signature verification failed")
-    payload = await request.json() if body else {}
-    branches = push_event_branches(connection.kind, payload)
-    configured_branch = (connection.config or {}).get("branch")
-    if configured_branch and branches and configured_branch not in branches:
-        return {"status": "ignored"}  # push to a branch we do not index
+    re-index is scheduled. Verified by HMAC, NOT by a bearer token — the external git
+    host has no user identity — so this route does not use the auth'd session.
+
+    Multi-tenant note (S10): the connection is looked up by its opaque UUID across
+    tenants, which requires an owner/RLS-exempt DB connection. In a multi-tenant
+    deployment running as the `estimo_app` role, wire this route to an elevated
+    session (follow-up); single-tenant deployments work as-is.
+    """
+    sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
+    async with sessionmaker() as session:
+        connection = await session.get(Connection, connection_id)
+        if connection is None:
+            raise HTTPException(status_code=404, detail="connection not found")
+        secret_env = (connection.config or {}).get("webhook_secret_env")
+        secret = os.getenv(secret_env) if secret_env else None
+        if not secret:
+            raise HTTPException(status_code=422, detail="webhook secret is not configured")
+        body = await request.body()
+        if not verify_webhook(connection.kind, dict(request.headers), body, secret):
+            raise HTTPException(status_code=401, detail="webhook signature verification failed")
+        payload = await request.json() if body else {}
+        branches = push_event_branches(connection.kind, payload)
+        configured_branch = (connection.config or {}).get("branch")
+        if configured_branch and branches and configured_branch not in branches:
+            return {"status": "ignored"}  # push to a branch we do not index
+        tenant = str(connection.tenant_id)
     background.add_task(
-        _run_sync_bg, request.app.state.sessionmaker, connection_id, request.app.state.settings
+        _run_sync_bg,
+        sessionmaker,
+        connection_id,
+        request.app.state.settings,
+        tenant,
     )
     return {"status": "scheduled"}
 
@@ -287,7 +320,9 @@ async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
     ]
 
 
-@router.post("/canonical", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/canonical", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_reviewer)]
+)
 async def create_candidate(
     payload: CandidateIn, session: SessionDep, request: Request
 ) -> dict[str, str]:
@@ -301,7 +336,7 @@ async def create_candidate(
     return {"id": str(page.id), "status": page.status}
 
 
-@router.post("/canonical/{page_id}/approve")
+@router.post("/canonical/{page_id}/approve", dependencies=[Depends(require_reviewer)])
 async def approve_candidate(
     page_id: uuid.UUID, payload: ApproveIn, session: SessionDep
 ) -> dict[str, Any]:

@@ -255,19 +255,30 @@ setup; ACL tests green.
 
 ---
 
-## S10 — Productization & Atlassian Surface · `Status: 🟡 In progress`
+## S10 — Productization & Atlassian Surface · `Status: 🟢 Done (2026-08-03)` — 🧑 external onboarding pending
+
+> Engineering slice verified 2026-08-03: OIDC bearer auth + the four-role model
+> (opt-in; single-tenant open mode preserved), multi-tenant RLS proven under the
+> NOSUPERUSER estimo_app role (cross-tenant reads empty, cross-tenant writes refused),
+> the MCP server live at /mcp (3 read tools, initialize→tools/list verified), a
+> Helm-lint-clean chart, and the deploy guide. Design decisions are web-verified
+> (PyJWT over the abandoned python-jose; transaction-local tenant GUC; FastMCP 3.x).
+> Deferred by design (documented): the web SPA's OIDC login flow, the Forge Rovo Agent
+> (S10-4 — a Marketplace-hosted client of shipped endpoints), and the FP/COSMIC layer
+> (S10-7 — follows the S8 pilot data). ⚠️ **The exit gate — onboarding a second
+> external installation in < 2 weeks + a security review — needs the maintainer.**
 
 **Goal:** From single-tenant to product: identity, isolation, packaging, distribution surfaces.
 
 **Architecture slice:** multi-tenant foundation, `infra/` Helm, Forge app, Estimo MCP server.
 
-- [ ] S10-1 AuthN/Z: SSO (OIDC), role model (estimator / reviewer / signing authority / admin)
-- [ ] S10-2 Tenant isolation: index namespace + key separation; stateless-per-tenant pipeline verification
-- [ ] S10-3 Helm chart + BYOC installation guide; air-gapped installation notes (open-weight model profile)
-- [ ] S10-4 Forge Rovo Agent front-door: "send to Estimo" from inside Jira/Confluence + a status card
-- [ ] S10-5 Estimo MCP server: estimate/evidence/decomposition query tools (OAuth, stateless HTTP)
-- [ ] S10-6 Documentation site + installation quick-start; Marketplace readiness assessment
-- [ ] S10-7 FP/COSMIC optional layer design note (Nesma enhancement-FPA) — implementation deferred to the next cycle
+- [x] S10-1 AuthN/Z: SSO (OIDC), role model (estimator / reviewer / signing authority / admin)
+- [x] S10-2 Tenant isolation: index namespace + key separation; stateless-per-tenant pipeline verification
+- [x] S10-3 Helm chart + BYOC installation guide; air-gapped installation notes (open-weight model profile)
+- [~] S10-4 Forge Rovo Agent front-door: "send to Estimo" from inside Jira/Confluence + a status card
+- [x] S10-5 Estimo MCP server: estimate/evidence/decomposition query tools (OAuth, stateless HTTP)
+- [x] S10-6 Documentation site + installation quick-start; Marketplace readiness assessment
+- [~] S10-7 FP/COSMIC optional layer design note (Nesma enhancement-FPA) — implementation deferred to the next cycle
 
 **Exit gate:** Onboarding of the second (external) installation < 2 weeks; security review
 (ACL, tenant leak tests) green.

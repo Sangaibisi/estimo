@@ -28,7 +28,8 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from estimo_core.models import SQL_NAMING_CONVENTION
@@ -38,7 +39,25 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=SQL_NAMING_CONVENTION)
 
 
-class LedgerEntryRow(Base):
+# Stable UUID of the implicit tenant for single-tenant / auth-disabled deployments.
+DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
+
+_TENANT_DEFAULT = text(
+    f"coalesce(current_setting('app.current_tenant', true), '{DEFAULT_TENANT}')::uuid"
+)
+
+
+class TenantScoped:
+    """Mixin: every tenant-owned table carries a tenant_id under row-level security
+    (S10-2). The DB default resolves the current-tenant GUC, so application code never
+    has to thread the tenant through inserts."""
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), server_default=_TENANT_DEFAULT, nullable=False
+    )
+
+
+class LedgerEntryRow(TenantScoped, Base):
     """One historical work item: estimate given, actual outcome (docs/LEDGER-SCHEMA.md)."""
 
     __tablename__ = "ledger_entries"
@@ -92,7 +111,7 @@ class LedgerEntryRow(Base):
     )
 
 
-class AnalogFeedback(Base):
+class AnalogFeedback(TenantScoped, Base):
     """Outcome feedback on an analog's usefulness (S8-2, PRINCIPLES #8).
 
     Written by the calibration loop when an actual lands: the analogs that backed a
@@ -118,7 +137,7 @@ class AnalogFeedback(Base):
     )
 
 
-class CalibrationSnapshot(Base):
+class CalibrationSnapshot(TenantScoped, Base):
     """Point-in-time calibration state (S8-2/S8-3): quantiles of the transfer-error
     distribution plus rolling empirical coverage — the drift signal the dashboard
     plots against the nominal band."""
@@ -139,7 +158,7 @@ class CalibrationSnapshot(Base):
     )
 
 
-class KnowledgeChunk(Base):
+class KnowledgeChunk(TenantScoped, Base):
     """Generic retrieval unit for the wiki/code shelves (populated from S5/S9 on).
 
     ACL keys are enforced as a retrieval PRE-filter (SECURITY.md); freshness/authority

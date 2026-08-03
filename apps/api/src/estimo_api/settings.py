@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import PostgresDsn, field_validator
+from pydantic import Field, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from estimo_api.auth import AuthSettings
 from estimo_gateway import GatewayConfig
 
 
@@ -17,6 +18,8 @@ class Settings(BaseSettings):
 
     database_url: PostgresDsn
     gateway: GatewayConfig
+    # OIDC auth (ESTIMO_AUTH__ISSUER, …). Empty issuer => single-tenant open mode.
+    auth: AuthSettings = Field(default_factory=AuthSettings)
     log_level: str = "INFO"
     cors_origins: list[str] = [
         "http://localhost:3000",

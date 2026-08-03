@@ -9,6 +9,27 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S10 authN/Z** (`apps/api/auth.py`): provider-agnostic OIDC bearer-token validation
+  (PyJWT + PyJWKClient — `python-jose` banned) against the customer's own IdP, with a
+  role model (`estimator` < `reviewer` < `signing_authority` < `admin`). Opt-in: with
+  no issuer configured the API runs open in single-tenant mode. Hardening: asymmetric
+  algorithm allow-list (no alg-confusion), `iss`/`aud`/`exp`/`sub` required, last-known-
+  good JWKS fallback. Sign-off requires a signing authority; connectors/admin require
+  an admin (ADR-0007).
+- **S10 multi-tenant isolation** (migration `0009`): PostgreSQL Row-Level Security on
+  every tenant table, keyed on a transaction-local `app.current_tenant` GUC set per
+  request from the token's tenant claim; a dedicated `NOSUPERUSER NOBYPASSRLS`
+  `estimo_app` runtime role. Proven by a test that connects as that role and shows
+  cross-tenant reads return nothing and cross-tenant writes are refused. A well-known
+  DEFAULT_TENANT preserves single-tenant deployments with no data migration.
+- **S10 MCP server** (`/mcp`, FastMCP 3.x over streamable HTTP): read tools
+  `list_estimates`, `get_estimate_lines`, `get_decomposition`, sharing the API's tenant
+  isolation and OIDC auth.
+- **S10 packaging**: a Helm chart (`infra/helm/estimo`) for Kubernetes/BYOC (bundled or
+  external Postgres, migration hook, runtime-injected web API origin), a deployment
+  guide (`docs/DEPLOY.md`, incl. air-gapped notes), and design notes for the Atlassian
+  Forge Rovo Agent front-door (S10-4) and the optional FP/COSMIC functional-size layer
+  (S10-7).
 - **S9 connectors** (`packages/connectors`, migration `0007`): live knowledge from
   real sources. Confluence Cloud crawler (v2 cursor pagination, v1-only read
   restrictions mapped onto retrieval ACL keys, checkpointed CQL incremental sync,

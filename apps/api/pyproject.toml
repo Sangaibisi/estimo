@@ -24,6 +24,11 @@ dependencies = [
     "pydantic-settings>=2.14.2,<3",
     # Observability client (S8-4, MIT): a complete no-op unless LANGFUSE_* env is set.
     "langfuse>=4,<5",
+    # OIDC bearer-token validation (S10-1). PyJWT is FastAPI's recommended JWT lib and
+    # ships PyJWKClient (JWKS fetch/cache/rotation). python-jose is banned (abandoned).
+    "pyjwt[crypto]>=2.13,<3",
+    # MCP server (S10-5), mounted into the FastAPI app over streamable HTTP.
+    "fastmcp>=3.4,<4",
 ]
 
 [build-system]

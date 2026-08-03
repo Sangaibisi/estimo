@@ -6,6 +6,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
+from estimo_knowledge.db import TenantScoped
 from sqlalchemy import MetaData, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -17,7 +18,7 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=SQL_NAMING_CONVENTION)
 
 
-class Run(Base):
+class Run(TenantScoped, Base):
     """One pipeline run record (estimation, import, index refresh, …)."""
 
     __tablename__ = "runs"

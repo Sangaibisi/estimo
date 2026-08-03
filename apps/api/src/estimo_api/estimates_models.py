@@ -8,6 +8,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
+from estimo_knowledge.db import TenantScoped
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -24,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from estimo_api.models import Base
 
 
-class EstimateRecord(Base):
+class EstimateRecord(TenantScoped, Base):
     __tablename__ = "estimates"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -46,7 +47,7 @@ class EstimateRecord(Base):
     )
 
 
-class IndependentEstimate(Base):
+class IndependentEstimate(TenantScoped, Base):
     """The reviewer's own band, recorded BEFORE the AI draft is revealed (PRINCIPLES #4).
 
     The server enforces independent-first: the desk endpoint returns the AI band for an
@@ -77,7 +78,7 @@ class IndependentEstimate(Base):
     )
 
 
-class LineSignature(Base):
+class LineSignature(TenantScoped, Base):
     __tablename__ = "line_signatures"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -91,7 +92,7 @@ class LineSignature(Base):
     )
 
 
-class UiEvent(Base):
+class UiEvent(TenantScoped, Base):
     """Local telemetry capture (S7-7): correction distances, anchoring deltas.
 
     Forwarded to Langfuse when a live deployment configures it; the local table keeps

@@ -1,0 +1,79 @@
+{{- if .Values.postgres.bundled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels: {{- include "estimo.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  # A generated password; override with postgres.auth.existingSecret in production.
+  POSTGRES_PASSWORD: {{ randAlphaNum 24 | quote }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels: {{- include "estimo.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: estimo
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: estimo
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.auth.database }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.auth.username }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.auth.existingSecret | default (printf "%s-postgres" .Release.Name) }}
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            # PG18 image wants the mount at /var/lib/postgresql (data in a versioned
+            # subdir — enables pg_upgrade --link across majors).
+            - name: pgdata
+              mountPath: /var/lib/postgresql
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "{{ .Values.postgres.auth.username }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels: {{- include "estimo.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: estimo
+    app.kubernetes.io/component: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+{{- end }}

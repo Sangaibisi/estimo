@@ -1,0 +1,14 @@
+apiVersion: v2
+name: estimo
+description: >-
+  Estimo — evidence-linked effort estimation. Deploys the API, web app, and
+  (optionally) a bundled Postgres+pgvector. BYOC-friendly: point at an external
+  managed Postgres and your own OIDC IdP + LiteLLM gateway.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/Sangaibisi/estimo
+sources:
+  - https://github.com/Sangaibisi/estimo
+maintainers:
+  - name: Sangaibisi
