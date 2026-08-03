@@ -8,7 +8,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from docx import Document
+from docx import Document as create_document
+from docx.document import Document
 from estimo_parse import parse_brd, rule_score
 from estimo_parse.anchors import detect_anchors
 
@@ -16,10 +17,10 @@ from estimo_core import Requirement
 
 
 def build_docx(tmp_path: Path, name: str, build: Callable[[Document], None]) -> Path:
-    doc = Document()
+    doc = create_document()
     build(doc)
     path = tmp_path / name
-    doc.save(path)
+    doc.save(str(path))
     return path
 
 
