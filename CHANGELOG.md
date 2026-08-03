@@ -239,6 +239,16 @@ Until the first code release, entries track documentation and foundation milesto
   for edited text retrieves confidently against content that no longer says that.
 
 ### Security
+- **`GET /v1/canonical` filters by the caller's audience (S11-7 complete).** Clamping the
+  sourcing path stopped a reviewer pulling restricted text into a *new* draft; it did
+  nothing about pages an entitled curator had already published, whose bodies every
+  reviewer in the tenant could still read back. A canonical body is a distillation of its
+  sources' text and inherits their audience, so the list now derives that audience — the
+  published chunk's ACL for an approved page, the sources' common audience for a draft —
+  and omits pages the caller shares nothing with. A page whose sources were pruned has an
+  audience that cannot be computed; unknown means withheld, so the row is listed with
+  `sources_missing: true` and no body, which is also what a curator needs to see in order
+  to regenerate it.
 - **`GET /v1/estimates/{id}/desk` no longer mutates.** It flipped the caller's
   `revealed` flag, wrote a `draft-revealed` event and emitted the anchoring delta —
   from a read. A link prefetch, a crawler, or anyone passing a colleague's name in the

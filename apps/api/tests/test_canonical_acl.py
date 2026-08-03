@@ -98,3 +98,97 @@ def test_open_mode_admin_is_not_entitled_to_every_audience() -> None:
     assert local.acl_keys == frozenset({"public"})
     with pytest.raises(Exception, match="acl_keys"):
         clamp_acl_keys(local, [RESTRICTED])
+
+
+async def test_a_page_distilled_from_a_restricted_space_is_not_listed(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """The read-back half. Clamping the SOURCING path stops a reviewer pulling
+    restricted text into a NEW draft; it does nothing about a page an entitled curator
+    already published, whose body every reviewer in the tenant could still read."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(database_url)
+    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        from estimo_connectors.db import CanonicalPage
+        from estimo_knowledge import upsert_document
+
+        # An approved page published to the restricted audience only.
+        await upsert_document(
+            session,
+            source_type="canonical",
+            source_ref="canonical://marj",
+            title="Marj tablosu",
+            text=SECRET_TEXT,
+            acl_keys=[RESTRICTED],
+        )
+        session.add(
+            CanonicalPage(
+                topic="marj",
+                title="Marj tablosu",
+                body=SECRET_TEXT,
+                status="approved",
+                version=2,
+                approved_by="D. Aksoy",
+                source_refs=["confluence:wiki://restricted@1"],
+            )
+        )
+        # And a public one, to prove the filter narrows rather than empties.
+        await upsert_document(
+            session,
+            source_type="canonical",
+            source_ref="canonical://genel",
+            title="Genel",
+            text="Herkese açık özet.",
+            acl_keys=["public"],
+        )
+        session.add(
+            CanonicalPage(
+                topic="genel",
+                title="Genel",
+                body="Herkese açık özet.",
+                status="approved",
+                version=2,
+                approved_by="D. Aksoy",
+                source_refs=["confluence:wiki://public@1"],
+            )
+        )
+        await session.commit()
+    await engine.dispose()
+
+    listed = await client.get("/v1/canonical")
+    assert listed.status_code == 200
+    topics = {page["topic"] for page in listed.json()}
+    assert "genel" in topics, "a public page must still be readable"
+    assert "marj" not in topics, "a restricted page was listed to a public-only caller"
+    assert SECRET_TEXT not in listed.text
+
+
+async def test_a_page_whose_sources_vanished_keeps_its_body_back(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """No sources means no computable audience, and unknown means withheld — but the
+    row stays visible so a curator can see there is something to regenerate."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    engine = create_async_engine(database_url)
+    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        from estimo_connectors.db import CanonicalPage
+
+        session.add(
+            CanonicalPage(
+                topic="kayip",
+                title="Kayıp kaynaklar",
+                body=SECRET_TEXT,
+                status="draft",
+                source_refs=["code-wiki:repo://meridyen@sha1/billing"],
+            )
+        )
+        await session.commit()
+    await engine.dispose()
+
+    listed = await client.get("/v1/canonical")
+    page = next(entry for entry in listed.json() if entry["topic"] == "kayip")
+    assert page["sources_missing"] is True
+    assert page["body"] is None, "an unknowable audience must not ship the body"
+    assert SECRET_TEXT not in listed.text

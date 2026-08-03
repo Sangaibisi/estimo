@@ -305,11 +305,62 @@ class ApproveIn(BaseModel):
 
 
 @router.get("/canonical")
-async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
+async def list_canonical(
+    session: SessionDep,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> list[dict[str, Any]]:
+    """Canonical pages the caller may actually read.
+
+    A canonical page's body is a distillation of its sources' text, so it inherits
+    their audience. Before this filter existed, closing the write-side escalation was
+    only half the job: any reviewer in the tenant could still read back every page,
+    including ones distilled from a restricted space they have no access to.
+
+    The audience is derived, not stored: for an approved page it is the ACL of the
+    chunk that publication wrote, and for a draft it is the audience its sources share.
+    A page whose sources have since been pruned has an audience that cannot be
+    determined, and unknown means withheld — the row stays visible so a curator can see
+    it needs regenerating, but the body does not travel.
+    """
     from estimo_knowledge import KnowledgeChunk
+
+    from estimo_core import restricting_audiences
 
     result = await session.execute(select(CanonicalPage).order_by(CanonicalPage.topic))
     pages = list(result.scalars())
+
+    # Every chunk that could carry an audience for these pages, in one query: the
+    # published canonical chunks, plus the source chunks the drafts point at.
+    wanted: set[str] = {f"canonical://{page.topic}" for page in pages}
+    for page in pages:
+        wanted.update(ref.split(":", 1)[1] for ref in (page.source_refs or []) if ":" in ref)
+    acl_rows = await session.execute(
+        select(KnowledgeChunk.source_ref, KnowledgeChunk.acl_keys).where(
+            KnowledgeChunk.source_ref.in_(wanted)
+        )
+    )
+    acl_by_ref: dict[str, list[str]] = {ref: list(keys or []) for ref, keys in acl_rows.all()}
+
+    def audience(page: CanonicalPage) -> set[str] | None:
+        if page.status == "approved":
+            published = acl_by_ref.get(f"canonical://{page.topic}")
+            return set(published) if published else None
+        refs = [ref.split(":", 1)[1] for ref in (page.source_refs or []) if ":" in ref]
+        if not refs or any(ref not in acl_by_ref for ref in refs):
+            return None  # a source vanished: the audience is unknowable
+        return restricting_audiences([set(acl_by_ref[ref]) for ref in refs])
+
+    entitled = principal.acl_keys
+    audiences = {page.id: audience(page) for page in pages}
+
+    # A page the caller shares no audience with is not listed at all. An indeterminate
+    # one is listed without its body, because its existence is not the secret — its
+    # text is, and a curator needs to know there is something to regenerate.
+    def readable(page: CanonicalPage) -> bool:
+        page_audience = audiences[page.id]
+        return page_audience is None or bool(page_audience & entitled)
+
+    pages = [page for page in pages if readable(page)]
     # Staleness follows the published chunk, which carries the OLDEST SOURCE's
     # freshness — curation time would hide a page built on stale sources.
     freshness_rows = await session.execute(
@@ -323,7 +374,10 @@ async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
             "id": str(page.id),
             "topic": page.topic,
             "title": page.title,
-            "body": page.body,
+            "body": page.body if audiences[page.id] is not None else None,
+            # True when the sources this page was distilled from no longer resolve, so
+            # no audience can be computed: the body is withheld and approval refuses.
+            "sources_missing": audiences[page.id] is None,
             "status": page.status,
             "version": page.version,
             "approved_by": page.approved_by,

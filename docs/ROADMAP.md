@@ -398,14 +398,20 @@ that overstate the build. Each names what blocked it.
   external audience needs versioned docs.
 - [ ] S11-6b Marketplace readiness assessment (S10-6) — genuinely blocked: it assesses the
   Forge/Rovo surface, which is itself deferred (S10-4 is `[~]`).
-- [ ] S11-7 Per-user ACL filtering on canonical pages — chunk ACL keys are stored and the
-  endpoint is reviewer-gated, but there is no user→ACL-key mapping to filter against, so a
-  reviewer sees every canonical page in their tenant. Scoping it surfaced a **live
-  escalation that is more urgent than the read filter**: `POST /v1/canonical` passes the
-  request body's `acl_keys` straight into the retrieval pre-filter, so any reviewer can
-  name any ACL key, pull restricted source text into a draft body, and read it back. The
-  pre-filter must never take its permissions from the requester (SECURITY.md); the
-  sourcing clamp ships first and applies in single-tenant open mode too.
+- [x] S11-7 Per-user ACL filtering on canonical pages. Three separate holes, all closed:
+  the **sourcing** clamp (`POST /v1/canonical` passed the request body's `acl_keys`
+  straight into the retrieval pre-filter, so any reviewer could name any audience, pull
+  restricted text into a draft body and read it back), the **publish** clamp (explicit
+  keys replaced the sources' common audience instead of narrowing it), and the **read**
+  filter — a page's body inherits its sources' audience, so `GET /v1/canonical` now lists
+  only pages the caller shares an audience with. The audience is derived rather than
+  stored: the published chunk's ACL for an approved page, the sources' common audience
+  for a draft. A page whose sources have been pruned has an audience that cannot be
+  computed, and unknown means withheld — the row stays listed (with `sources_missing`)
+  so a curator can regenerate it, but the body does not travel and approval refuses.
+  Entitlement comes from `ESTIMO_AUTH__ACL_CLAIM`; unset, or single-tenant open mode,
+  means public-only, because a pre-filter that cannot identify its reader must show
+  less, not more.
 
 ---
 
