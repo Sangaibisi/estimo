@@ -23,19 +23,22 @@ Containers are the only supported runtime ([ADR-0006](docs/adr/0006-fully-contai
 
 ```bash
 git clone https://github.com/Sangaibisi/estimo.git && cd estimo
-cp .env.example .env          # then set ESTIMO_GATEWAY__* to your LiteLLM endpoint
-docker compose up --build
+cp .env.example .env
+docker compose --profile mock up --build
 ```
 
 The web app comes up on <http://localhost:3000> and the API on <http://localhost:8000>
-(OpenAPI at `/docs`). Migrations run automatically on API start.
+(OpenAPI at `/docs`), both bound to loopback. A `migrate` service runs Alembic to head
+before the API starts.
 
 Two things to know before you read anything into the output:
 
-- **No gateway configured means no estimation.** Parsing, decomposition and the
-  question gate are deterministic and work offline, but effort bands need a model.
-  For a look around without one, `docker compose --profile mock up` serves a stub
-  gateway that returns fixed responses.
+- **`--profile mock` is what makes that command work out of the box.** `.env.example`
+  points `ESTIMO_GATEWAY__BASE_URL` at a stub gateway that returns canned responses, and
+  that stub only runs under the `mock` profile. Parsing, decomposition and the question
+  gate are deterministic and need no model at all, but effort bands do — so for anything
+  you intend to believe, point `ESTIMO_GATEWAY__*` at a real LiteLLM endpoint and drop
+  the profile flag.
 - **A default install is unauthenticated and single-tenant.** Leave `ESTIMO_AUTH__ISSUER`
   empty and every endpoint is open and every request runs as the default tenant. Set an
   OIDC issuer — and connect as the `estimo_app` role, not the owner — before exposing it

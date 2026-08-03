@@ -21,3 +21,9 @@ updates:
       # split upgrade produces a peer-dependency conflict that never builds.
       next-react:
         patterns: ["next", "react", "react-dom", "@types/react", "@types/react-dom", "eslint-config-next"]
+    ignore:
+      # Next 16 requires the TypeScript 6 compiler API and refuses to build against 7
+      # ("does not provide the compiler API required by Next.js"). Lift this when Next
+      # ships TS 7 support; until then the bump only produces a red PR every week.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
