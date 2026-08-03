@@ -127,7 +127,7 @@ continue/fix decision made.
 
 ---
 
-## S5 — Code Awareness · `Status: 🟡 In progress` (all items done; exit gate awaits green CI)
+## S5 — Code Awareness · `Status: 🟢 Done` (2026-08-03 — exit gate met: fixture-repo change scenarios at accepted thresholds, every impact claim evidence-URI'd, CI green)
 
 **Goal:** Tie work items to the real codebase: repo map → symbol graph → module wikis →
 impact map.
@@ -146,7 +146,7 @@ the fixture repo; every impact claim carries an evidence URI.
 
 ---
 
-## S6 — Effort Bands & Calibration v1 · `Status: 🔵 Planned`
+## S6 — Effort Bands & Calibration v1 · `Status: 🟡 In progress`
 
 **Goal:** Analogy-based three-point bands + assumption/risk registers + the BoE document.
 
