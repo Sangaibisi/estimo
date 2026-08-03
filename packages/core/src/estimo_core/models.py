@@ -120,8 +120,11 @@ class Requirement(EstimoModel):
     text: str = Field(min_length=1)
     source_ref: str | None = None
     language: str = "tr"
+    extraction: Literal["coded", "table", "heuristic"] = "coded"
+    acceptance_criteria: str | None = None
     anchors: tuple[AnchorFlag, ...] = ()
     ambiguity_score: float | None = Field(default=None, ge=0, le=1)
+    ambiguity_issues: tuple[str, ...] = ()
 
 
 class ClarificationQuestion(EstimoModel):

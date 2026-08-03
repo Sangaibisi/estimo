@@ -1,0 +1,19 @@
+[project]
+name = "estimo-parse"
+version = "0.1.0"
+description = "BRD ingestion: structural parsing, requirement segmentation, anchor quarantine, ambiguity pre-score"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = [
+    "estimo-core",
+    "estimo-gateway",
+    "docling-slim[convert-core,format-docx,format-pdf-pypdfium2]>=2.117,<3",
+    "pydantic>=2.13.4,<3",
+]
+
+[project.scripts]
+estimo-parse = "estimo_parse.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

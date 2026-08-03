@@ -70,18 +70,18 @@ the compose environment; provider-SDK guard proven by a test.
 
 ---
 
-## S2 — BRD Intake & Structural Parsing · `Status: 🔵 Planned`
+## S2 — BRD Intake & Structural Parsing · `Status: 🟡 In progress` (all items done; exit gate awaits green CI run)
 
 **Goal:** Turn a Turkish `.docx` BRD into a structural requirements table with stable IDs.
 
 **Architecture slice:** `packages/parse` (Docling + python-docx).
 
-- [ ] S2-1 Docling integration: heading hierarchy, tables, lists → intermediate representation
-- [ ] S2-2 Requirement segmentation: item/heading-based splitting, **stable requirement ID** generation (`REQ-…`), source page/paragraph trace
-- [ ] S2-3 **Anchor quarantine**: detect budget/date/effort hints, flag them, keep them out of the estimation context (humans see them, the model does not — PRINCIPLES #5)
-- [ ] S2-4 Ambiguity pre-score v0 (rule + LLM blend): missing actor/condition/acceptance-criteria signals
-- [ ] S2-5 Parse eval: golden comparison of segmentation accuracy on the fixtures; broken-template resilience tests
-- [ ] S2-6 CLI: `estimo parse <brd.docx>` → JSON requirements table
+- [x] S2-1 Docling integration: heading hierarchy, tables, lists → intermediate representation
+- [x] S2-2 Requirement segmentation: item/heading-based splitting, **stable requirement ID** generation (`REQ-…`), source page/paragraph trace
+- [x] S2-3 **Anchor quarantine**: detect budget/date/effort hints, flag them, keep them out of the estimation context (humans see them, the model does not — PRINCIPLES #5)
+- [x] S2-4 Ambiguity pre-score v0 (rule + LLM blend): missing actor/condition/acceptance-criteria signals
+- [x] S2-5 Parse eval: golden comparison of segmentation accuracy on the fixtures; broken-template resilience tests
+- [x] S2-6 CLI: `estimo-parse <brd.docx>` → JSON requirements table (console script in packages/parse)
 
 **Exit gate:** All fixture BRDs parse with stable IDs; anchor detection catches every
 planted anchor in the fixtures; parse eval in CI.

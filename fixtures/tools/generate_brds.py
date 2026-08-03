@@ -279,7 +279,7 @@ MANIFEST = {
             "title": "Kampanya Bazlı Cihaz Taksitlendirme",
             "maturity": "clean-templated",
             "requirement_count": 8,
-            "tables": 2,
+            "tables": 3,
             "planted_anchors": [
                 {"type": "budget", "snippet": "azami 90 adam-gün"},
                 {"type": "deadline", "snippet": "30 Eylül 2026"},
@@ -309,7 +309,7 @@ MANIFEST = {
             "title": "Konsolide Fatura",
             "maturity": "clean-templated",
             "requirement_count": 6,
-            "tables": 2,
+            "tables": 3,
             "planted_anchors": [],
             "planted_ambiguities": [],
             "expected_modules": ["billing-core", "invoice-render", "crm-suite", "selfcare-web"],

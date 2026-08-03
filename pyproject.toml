@@ -16,6 +16,7 @@ members = ["apps/*", "packages/*"]
 estimo-core = { workspace = true }
 estimo-gateway = { workspace = true }
 estimo-api = { workspace = true }
+estimo-parse = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -26,6 +27,7 @@ dev = [
     "respx>=0.22,<1",
     "httpx>=0.28,<0.29",
     "asgi-lifespan>=2,<3",
+    "python-docx>=1.2,<2",
     "pre-commit>=4,<5",
 ]
 
@@ -49,7 +51,13 @@ strict = true
 python_version = "3.13"
 plugins = ["pydantic.mypy"]
 explicit_package_bases = true
-mypy_path = ["apps/api/src", "packages/core/src", "packages/gateway/src", "apps/api/tests"]
+mypy_path = [
+    "apps/api/src",
+    "packages/core/src",
+    "packages/gateway/src",
+    "packages/parse/src",
+    "apps/api/tests",
+]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]

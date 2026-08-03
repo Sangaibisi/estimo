@@ -9,6 +9,14 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S2 BRD parsing** (`packages/parse`): Turkish `.docx` BRDs → stable-ID requirement
+  tables via Docling's DOCX backend (slim install, no ML models — ADR-0005 scope
+  discipline). Extraction ladder: explicit codes → requirement tables (acceptance
+  criteria captured) → modal-verb heuristics for messy documents. Anchor quarantine
+  detection (budget/deadline/analogy/effort-hint, PRINCIPLES #5), deterministic
+  ambiguity pre-score with an optional gateway LLM blend that can only raise the rule
+  floor, document-level open-point extraction, and the `estimo-parse` CLI. Golden eval
+  in CI asserts every planted anchor/ambiguity in the fixture manifest is caught.
 - **S1 skeleton (first code):** uv-workspace monorepo (Python 3.13/3.14) with
   `packages/core` (pydantic domain models that structurally enforce the product laws —
   three-point ranges, evidence-required estimate lines), `packages/gateway` (the single

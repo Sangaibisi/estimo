@@ -7,7 +7,7 @@
       "title": "Kampanya Bazlı Cihaz Taksitlendirme",
       "maturity": "clean-templated",
       "requirement_count": 8,
-      "tables": 2,
+      "tables": 3,
       "planted_anchors": [
         {
           "type": "budget",
@@ -43,7 +43,7 @@
       "title": "Konsolide Fatura",
       "maturity": "clean-templated",
       "requirement_count": 6,
-      "tables": 2,
+      "tables": 3,
       "planted_anchors": [],
       "planted_ambiguities": [],
       "expected_modules": [
