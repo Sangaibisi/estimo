@@ -72,13 +72,12 @@ async def gate_requirements(
             text = f"{req.text} [{_CLEARING_MARKER} {answered_by_req[req.id]}]"
             req = req.model_copy(update={"text": text})
         score, issues = rule_score(req)
-        if req.id in answered_by_req:
-            # The answer clears the asked-for content gaps ONLY if it survives the gate
-            # itself (_answer_clears); otherwise the item stays blocked and the open
-            # question is re-asked. The answer text stays appended for estimation.
-            if _answer_clears(answered_by_req[req.id]):
-                issues = tuple(i for i in issues if not i.startswith(("vague-terms", "undefined")))
-                score = min(score, GATE_THRESHOLD - 0.05)
+        # The answer clears the asked-for content gaps ONLY if it survives the gate
+        # itself (_answer_clears); otherwise the item stays blocked and the open
+        # question is re-asked. The answer text stays appended for estimation.
+        if req.id in answered_by_req and _answer_clears(answered_by_req[req.id]):
+            issues = tuple(i for i in issues if not i.startswith(("vague-terms", "undefined")))
+            score = min(score, GATE_THRESHOLD - 0.05)
         if client is not None:
             try:
                 llm = await llm_score(
