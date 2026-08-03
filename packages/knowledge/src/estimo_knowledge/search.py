@@ -241,6 +241,62 @@ async def dense_ledger_ids(
     return list(result.scalars())
 
 
+async def dense_chunk_ids(
+    session: AsyncSession,
+    embedding: list[float],
+    *,
+    acl_keys: list[str],
+    limit: int = 20,
+) -> list[uuid.UUID]:
+    """Nearest chunks by vector distance, behind the SAME ACL pre-filter as the
+    lexical leg.
+
+    The pre-filter is not optional here and not a copy-paste of the lexical one for
+    tidiness: a dense leg without it would be a complete ACL bypass reachable by anyone
+    who can phrase a query, since vector similarity has no notion of permission.
+    SECURITY.md requires the filter at query time, on every path that returns rows.
+
+    `embedding_dim` is matched so a corpus embedded by a previous model drops out
+    rather than being scored in the wrong vector space.
+    """
+    stmt = (
+        select(KnowledgeChunk.id)
+        .where(
+            KnowledgeChunk.embedding.is_not(None),
+            KnowledgeChunk.embedding_dim == len(embedding),
+            KnowledgeChunk.acl_keys.op("&&")(bindparam("acl", acl_keys, type_=ARRAY(String(80)))),
+        )
+        .order_by(KnowledgeChunk.embedding.cosine_distance(embedding), KnowledgeChunk.id)
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars())
+
+
+async def hybrid_chunk_ids(
+    session: AsyncSession,
+    query: str,
+    *,
+    acl_keys: list[str],
+    client: GatewayClient | None = None,
+    limit: int = 20,
+) -> list[uuid.UUID]:
+    """Lexical always; the dense leg joins in when a gateway client is provided.
+
+    Until this existed the chunk shelf had no dense path at all, so the embedding
+    writer filled `knowledge_chunks.embedding` for a column no query read — cost with
+    no retrieval benefit. The ledger shelf had both legs; this brings the wiki and
+    code shelves to parity.
+    """
+    rankings = [await lexical_chunk_ids(session, query, acl_keys=acl_keys, limit=limit * 2)]
+    if client is not None:
+        embedded = await client.embed([query])
+        rankings.append(
+            await dense_chunk_ids(session, embedded.vectors[0], acl_keys=acl_keys, limit=limit * 2)
+        )
+    return [chunk_id for chunk_id, _ in rrf_merge(rankings)][:limit]
+
+
 async def hybrid_ledger_ids(
     session: AsyncSession,
     query: str,

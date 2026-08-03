@@ -12,6 +12,8 @@ from estimo_knowledge.embedding import EmbedReport, embed_pending, embed_text
 from estimo_knowledge.importer import ImportReport, import_seed, to_ledger_entry
 from estimo_knowledge.ingest import is_stale, upsert_document, upsert_generated_chunks
 from estimo_knowledge.search import (
+    dense_chunk_ids,
+    hybrid_chunk_ids,
     hybrid_ledger_ids,
     lexical_chunk_ids,
     lexical_ledger_ids,
@@ -27,9 +29,11 @@ __all__ = [
     "ImportReport",
     "KnowledgeChunk",
     "LedgerEntryRow",
+    "dense_chunk_ids",
     "embed_pending",
     "embed_text",
     "find_analogs",
+    "hybrid_chunk_ids",
     "hybrid_ledger_ids",
     "import_seed",
     "is_stale",

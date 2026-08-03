@@ -9,6 +9,13 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **A dense leg for the chunk shelf** (`dense_chunk_ids`, `hybrid_chunk_ids`). S11-8's
+  first cut wrote `knowledge_chunks.embedding` for a column nothing read: only the
+  *ledger* had a dense path, so every chunk embedded was cost without retrieval benefit,
+  and "retrieval is hybrid" was true of analog lookup but not of the wiki or code
+  shelves. Both dense legs carry the same ACL pre-filter as their lexical counterparts —
+  vector similarity has no notion of permission, so a dense path without it is a full
+  bypass reachable by anyone who can phrase a query.
 - **S11-8 embedding writer — retrieval is hybrid in fact, not just in the diagram.**
   Nothing in this repository had ever written an embedding: the only `.embed()` call
   embedded the *query*, so `dense_ledger_ids` filtered `embedding IS NOT NULL` against

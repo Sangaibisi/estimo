@@ -238,3 +238,45 @@ async def test_refresh_re_embeds_rows_a_plain_run_skips_forever(
     report = await embed_pending(session, second, batch_size=2, refresh=True)  # type: ignore[arg-type]
     assert report.embedded == 3, "refresh must cover the whole table, not one batch"
     assert len(second.embedded_texts) == 3
+
+
+async def test_the_chunk_dense_leg_exists_and_honours_the_acl_prefilter(
+    session: AsyncSession, clean_tables: None
+) -> None:
+    """Chunk embeddings were write-only: `dense_ledger_ids` covered the ledger shelf,
+    but nothing read `knowledge_chunks.embedding`, so the writer billed for a column no
+    query touched. The dense leg must exist AND must carry the same ACL pre-filter —
+    vector similarity has no notion of permission, so a dense path without it is a
+    complete bypass reachable by anyone who can phrase a query."""
+    from estimo_knowledge.search import dense_chunk_ids, hybrid_chunk_ids
+
+    await _chunk(session, "wiki://pub@1", "Genel", "Taksitlendirme genel akış")
+    await upsert_document(
+        session,
+        source_type="confluence",
+        source_ref="wiki://sec@1",
+        title="Gizli",
+        text="Taksitlendirme gizli marj tablosu",
+        acl_keys=["confluence-group:finans"],
+    )
+    await session.commit()
+
+    probe = [0.5] * DIM
+    assert await dense_chunk_ids(session, probe, acl_keys=["public"]) == []
+
+    assert (await embed_pending(session, FakeEmbedder())).embedded == 2  # type: ignore[arg-type]
+
+    public_hits = await dense_chunk_ids(session, probe, acl_keys=["public"])
+    assert len(public_hits) == 1, "the dense leg must return rows once vectors exist"
+
+    entitled_hits = await dense_chunk_ids(
+        session, probe, acl_keys=["public", "confluence-group:finans"]
+    )
+    assert len(entitled_hits) == 2
+    assert set(public_hits) < set(entitled_hits), "the dense leg leaked a restricted chunk"
+
+    # And the fused path carries the filter through.
+    fused = await hybrid_chunk_ids(
+        session, "taksitlendirme", acl_keys=["public"], client=FakeEmbedder()
+    )  # type: ignore[arg-type]
+    assert len(fused) == 1

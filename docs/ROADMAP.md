@@ -386,6 +386,10 @@ that overstate the build. Each names what blocked it.
   ⚠️ **Whether the dense leg improves ranking is still unmeasured** — that needs a live
   embedding endpoint and the S3-2 shoot-out. This ships the data path, not a quality
   claim: before it, `dense_ledger_ids` matched zero rows in every deployment.
+  Corrected after review: the first cut wrote `knowledge_chunks.embedding` while nothing
+  read it — the ledger shelf had a dense leg, the wiki and code shelves did not, so the
+  writer billed for a column no query touched. `dense_chunk_ids` / `hybrid_chunk_ids`
+  close that, behind the same ACL pre-filter as the lexical leg.
 - [ ] S11-5 OAuth workspace/repo picker for Bitbucket/GitHub/GitLab (S9-2) — needs the
   OAuth app-install flow; today Admin → Connections takes a clone URL and a JSON config.
 - [x] S11-6a Documentation site — **decided against, deliberately.** The corpus is ~20
