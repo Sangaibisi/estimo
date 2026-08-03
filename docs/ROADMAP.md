@@ -341,6 +341,11 @@ that overstate the build. Each names what blocked it.
   moderator role and no reveal audit trail, and revealing names before sign-off is the
   social-pressure sibling of the anchoring effect the flow exists to prevent; the
   design's caption promising it was changed rather than shipped as a false promise.
+  *Known limitation, accepted:* the panel updates incrementally, so an observer who
+  reads the desk before and after a colleague records can attribute the newly appearing
+  band to whoever recorded in that window. The response carries no identity — the attack
+  needs out-of-band knowledge of who acted when — but the property is inherent to any
+  live panel and is worth knowing before enabling it on a small team.
 - [ ] S11-4 Team/domain calibration curves (S8-3) — **the blocker previously recorded here
   was wrong**: `ledger_entries` has carried `team` and `domain_tags` since migration 0002
   and the seed importer already populates both. The real gaps are (a) grouping inside the
@@ -373,6 +378,11 @@ that overstate the build. Each names what blocked it.
   vector **only when the embedded text actually changed** — the unconditional reset would
   have wiped every vector in Confluence's 26-hour overlap window on each incremental sync
   and re-billed the embedder forever to recompute identical text.
+  Re-embedding after a model switch needs `estimo-embed --refresh`: the default
+  predicate is `embedding IS NULL`, so old rows keep the old model's vector and are
+  skipped forever while the dimension filter keeps them out of results — invisible to
+  retrieval and to a plain re-run at once. Under the RLS-bound app role the CLI also
+  needs `--tenant`, or it reports "embedded 0 rows" for a corpus it cannot see.
   ⚠️ **Whether the dense leg improves ranking is still unmeasured** — that needs a live
   embedding endpoint and the S3-2 shoot-out. This ships the data path, not a quality
   claim: before it, `dense_ledger_ids` matched zero rows in every deployment.

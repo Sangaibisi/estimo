@@ -2,11 +2,17 @@
 
 The dense leg of hybrid retrieval matches on `embedding IS NOT NULL`, so until rows
 carry vectors it contributes nothing and RRF fuses a single ranking. This is the
-backfill that turns that on, and the command to re-run after switching embedders
-(rows keep their old model id and dimension, so they simply drop out of the dense leg
-until re-embedded — never mixed into the wrong vector space).
+backfill that turns that on.
 
-Idempotent: it only selects rows whose embedding is NULL.
+By default it is idempotent, selecting only rows whose embedding is NULL. After
+switching embedding models you must pass `--refresh`: old rows keep their old vector,
+which is not NULL, so a plain run skips them forever while the dimension filter keeps
+them out of the dense leg — invisible to retrieval and invisible to a re-run.
+
+Tenancy: the CLI uses whatever the connection can see. Run it with an owner-role URL to
+cover every tenant, or pass `--tenant` to scope it to one under the RLS-bound app role,
+where an unscoped connection would report "embedded 0 rows" for a corpus it simply
+cannot see.
 """
 
 from __future__ import annotations
@@ -15,14 +21,33 @@ import argparse
 import asyncio
 import os
 import sys
+from typing import Any
 
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from estimo_gateway import GatewayClient, GatewaySettings
 from estimo_knowledge.embedding import DEFAULT_BATCH_SIZE, embed_pending
 
 
-async def _run(batch_size: int, limit: int | None) -> int:
+def _bind_tenant(session: Any, tenant: str) -> None:
+    """Re-apply the tenant GUC on every transaction this session opens.
+
+    `set_config(..., true)` is transaction-local, so a per-batch commit would drop it;
+    the listener puts it back on each `after_begin`. The SET must be issued on the
+    connection the event hands us — routing it through `session.execute` re-enters a
+    session that is mid-provisioning and raises.
+    """
+
+    def _apply(_session: Any, _transaction: Any, connection: Any) -> None:
+        connection.execute(
+            text("SELECT set_config('app.current_tenant', :tenant, true)"), {"tenant": tenant}
+        )
+
+    event.listen(session.sync_session, "after_begin", _apply)
+
+
+async def _run(batch_size: int, limit: int | None, refresh: bool, tenant: str | None) -> int:
     database_url = os.environ.get("ESTIMO_DATABASE_URL")
     if not database_url:
         print("error: ESTIMO_DATABASE_URL is not set", file=sys.stderr)
@@ -38,7 +63,16 @@ async def _run(batch_size: int, limit: int | None) -> int:
     try:
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:
-            report = await embed_pending(session, client, batch_size=batch_size, limit=limit)
+            if tenant:
+                # Under the NOSUPERUSER app role every table is RLS-guarded on this
+                # GUC; without it the CLI sees nothing and cheerfully reports success.
+                # Applied per transaction (embed_pending commits each batch), and set
+                # here rather than imported from apps/api — a library package must not
+                # depend on the application that uses it.
+                _bind_tenant(session, tenant)
+            report = await embed_pending(
+                session, client, batch_size=batch_size, limit=limit, refresh=refresh
+            )
     finally:
         await client.aclose()
         await engine.dispose()
@@ -61,10 +95,20 @@ def main() -> None:
     )
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="re-embed rows that already have a vector (required after a model switch)",
+    )
+    parser.add_argument(
+        "--tenant",
+        default=None,
+        help="tenant UUID to scope to; required when connecting as the RLS-bound app role",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
         help="stop after this many rows per table (for a metered first run)",
     )
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(_run(args.batch_size, args.limit)))
+    raise SystemExit(asyncio.run(_run(args.batch_size, args.limit, args.refresh, args.tenant)))

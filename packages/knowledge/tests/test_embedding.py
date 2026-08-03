@@ -214,3 +214,27 @@ async def test_a_different_embedder_dimension_is_excluded_not_mixed(
     assert len(await dense_ledger_ids(session, [0.5] * DIM)) == 1
     # A query embedded by a DIFFERENT model, with a different width.
     assert await dense_ledger_ids(session, [0.5] * (DIM + 4)) == []
+
+
+async def test_refresh_re_embeds_rows_a_plain_run_skips_forever(
+    session: AsyncSession, clean_tables: None
+) -> None:
+    """After a model switch, old rows hold a non-NULL vector from the old model, so the
+    default `embedding IS NULL` predicate never selects them again — while the dense
+    leg's dimension filter keeps them out of results. Invisible to retrieval AND
+    invisible to a re-run is the worst combination; --refresh is the only way out."""
+    for index in range(3):
+        await _chunk(session, f"wiki://r{index}@1", f"R{index}", f"metin {index}")
+
+    first = FakeEmbedder()
+    assert (await embed_pending(session, first)).embedded == 3  # type: ignore[arg-type]
+
+    # A plain re-run is correctly a no-op...
+    assert (await embed_pending(session, first)).embedded == 0  # type: ignore[arg-type]
+
+    # ...and refresh walks every row, advancing its cursor rather than re-selecting
+    # the same lowest ids forever.
+    second = FakeEmbedder()
+    report = await embed_pending(session, second, batch_size=2, refresh=True)  # type: ignore[arg-type]
+    assert report.embedded == 3, "refresh must cover the whole table, not one batch"
+    assert len(second.embedded_texts) == 3

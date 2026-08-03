@@ -82,12 +82,19 @@ async def embed_pending(
     *,
     batch_size: int = DEFAULT_BATCH_SIZE,
     limit: int | None = None,
+    refresh: bool = False,
 ) -> EmbedReport:
     """Give every un-embedded chunk and ledger row a vector. Idempotent.
 
-    Selects only rows whose `embedding IS NULL`, so re-running after a partial failure
-    resumes rather than recomputing, and a steady state costs one query. Returns a
-    report; the caller decides whether a partial run is acceptable.
+    By default selects only rows whose `embedding IS NULL`, so re-running after a
+    partial failure resumes rather than recomputing, and a steady state costs one query.
+
+    `refresh=True` selects rows that already have a vector too. That is the ONLY way to
+    re-embed after switching embedding models: a switch leaves old rows holding the old
+    model's vector, which is not NULL, so the default predicate skips them forever while
+    the dense leg's dimension filter keeps them out of results — invisible to retrieval
+    AND invisible to a re-run. Returns a report; the caller decides whether a partial
+    run is acceptable.
     """
     if client is None:
         return EmbedReport()
@@ -101,14 +108,16 @@ async def embed_pending(
         (LedgerEntryRow, LedgerEntryRow.item_title, LedgerEntryRow.item_description),
     ):
         remaining = limit
+        cursor: Any = None
         while remaining is None or remaining > 0:
             take = batch_size if remaining is None else min(batch_size, remaining)
-            stmt = (
-                select(entity.id, title_col, body_col)
-                .where(entity.embedding.is_(None))
-                .order_by(entity.id)
-                .limit(take)
-            )
+            stmt = select(entity.id, title_col, body_col).order_by(entity.id).limit(take)
+            if not refresh:
+                stmt = stmt.where(entity.embedding.is_(None))
+            elif cursor is not None:
+                # Re-embedding walks the whole table, so the cursor must advance —
+                # without it every batch re-selects the same lowest ids forever.
+                stmt = stmt.where(entity.id > cursor)
             rows = (await session.execute(stmt)).all()
             if not rows:
                 break
@@ -168,6 +177,21 @@ async def embed_pending(
             # Commit per batch: a later rate limit must not undo this work.
             await session.commit()
             embedded += len(ids)
+            # Guard the loop's only progress invariant. If a future edit drops the
+            # cursor predicate, refresh mode re-selects the same lowest ids forever —
+            # and an infinite loop in a backfill is worse than a wrong answer, because
+            # it presents as a hung deploy rather than a failed one. CI would time out
+            # instead of reporting, so the check lives here rather than in a test.
+            if refresh and cursor is not None and not ids[-1] > cursor:
+                failed += 1
+                logger.error(
+                    "refresh made no progress past id=%s on %s; aborting to avoid a "
+                    "non-terminating backfill",
+                    cursor,
+                    entity.__tablename__,
+                )
+                break
+            cursor = ids[-1]
             if remaining is not None:
                 remaining -= len(ids)
             if len(rows) < take:
