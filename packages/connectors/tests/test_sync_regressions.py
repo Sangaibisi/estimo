@@ -5,13 +5,11 @@ import uuid
 from pathlib import Path
 
 import pytest
+from estimo_connectors import Connection, SyncRun, run_sync
+from estimo_connectors.sync import _last_checkpoint, _workdir_name, sweep_interrupted_runs
 from estimo_knowledge import KnowledgeChunk
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from estimo_connectors import Connection, SyncRun, run_sync
-from estimo_connectors.db import CanonicalPage
-from estimo_connectors.sync import _last_checkpoint, _workdir_name, sweep_interrupted_runs
 
 pytestmark = pytest.mark.db
 
@@ -41,7 +39,7 @@ def test_workdir_name_is_path_safe() -> None:
     conn = Connection(id=uuid.uuid4(), kind="git", name="../../etc/passwd", base_url="x")
     name = _workdir_name(conn)
     assert "/" not in name and ".." not in name
-    assert name.startswith("etc_passwd-") or name.startswith("_etc_passwd-")
+    assert name.startswith(("etc_passwd-", "_etc_passwd-"))
 
 
 async def test_interrupted_run_sweep_unblocks_and_resume_reads_failed_checkpoint(

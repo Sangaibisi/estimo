@@ -7,7 +7,6 @@ import hmac
 import httpx
 import pytest
 import respx
-
 from estimo_connectors import ConfluenceConnector, RatePlan, storage_to_text, verify_webhook
 
 BASE = "https://aurora.atlassian.net"

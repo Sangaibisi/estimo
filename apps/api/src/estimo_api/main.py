@@ -40,7 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 logging.getLogger("estimo.api").warning(
                     "marked %d interrupted sync run(s) as failed", swept
                 )
-        except Exception:  # noqa: BLE001 - the sweep is a janitor, not a gate
+        except Exception:
             logging.getLogger("estimo.api").warning(
                 "interrupted-run sweep skipped (db not ready at startup)", exc_info=True
             )
