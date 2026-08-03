@@ -18,6 +18,7 @@ members = [
     "estimo",
     "estimo-api",
     "estimo-code",
+    "estimo-connectors",
     "estimo-core",
     "estimo-estimate",
     "estimo-gateway",
@@ -400,6 +401,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "estimo-code" },
+    { name = "estimo-connectors" },
     { name = "estimo-core" },
     { name = "estimo-estimate" },
     { name = "estimo-gateway" },
@@ -421,6 +423,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.5,<2" },
     { name = "asyncpg", specifier = ">=0.31,<0.32" },
     { name = "estimo-code", editable = "packages/code" },
+    { name = "estimo-connectors", editable = "packages/connectors" },
     { name = "estimo-core", editable = "packages/core" },
     { name = "estimo-estimate", editable = "packages/estimate" },
     { name = "estimo-gateway", editable = "packages/gateway" },
@@ -458,6 +461,29 @@ requires-dist = [
     { name = "tree-sitter", specifier = ">=0.26,<0.27" },
     { name = "tree-sitter-java", specifier = ">=0.23,<0.24" },
     { name = "tree-sitter-typescript", specifier = ">=0.23,<0.24" },
+]
+
+[[package]]
+name = "estimo-connectors"
+version = "0.1.0"
+source = { editable = "packages/connectors" }
+dependencies = [
+    { name = "estimo-core" },
+    { name = "estimo-gateway" },
+    { name = "estimo-knowledge" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estimo-core", editable = "packages/core" },
+    { name = "estimo-gateway", editable = "packages/gateway" },
+    { name = "estimo-knowledge", editable = "packages/knowledge" },
+    { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51,<2.1" },
 ]
 
 [[package]]

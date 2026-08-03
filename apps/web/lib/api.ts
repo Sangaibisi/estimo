@@ -137,7 +137,66 @@ export const api = {
     }),
   listActuals: (id: string) => request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
   metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
+  listConnections: () => request<ConnectionEntry[]>("/v1/connections"),
+  createConnection: (payload: {
+    kind: string;
+    name: string;
+    base_url: string;
+    config: Record<string, unknown>;
+    secret_env: string | null;
+    acl_keys: string[] | null;
+  }) =>
+    request<ConnectionEntry>("/v1/connections", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteConnection: (id: string) =>
+    request<void>(`/v1/connections/${id}`, { method: "DELETE" }),
+  triggerSync: (id: string) =>
+    request<{ status: string }>(`/v1/connections/${id}/sync`, { method: "POST" }),
+  listCanonical: () => request<CanonicalEntry[]>("/v1/canonical"),
+  createCanonical: (topic: string) =>
+    request<{ id: string; status: string }>("/v1/canonical", {
+      method: "POST",
+      body: JSON.stringify({ topic }),
+    }),
+  approveCanonical: (id: string, approver: string) =>
+    request<{ id: string; status: string; version: number }>(
+      `/v1/canonical/${id}/approve`,
+      { method: "POST", body: JSON.stringify({ approver }) },
+    ),
 };
+
+export interface ConnectionEntry {
+  id: string;
+  kind: string;
+  name: string;
+  base_url: string;
+  config: Record<string, unknown>;
+  secret_env: string | null;
+  secret_present: boolean;
+  acl_keys: string[] | null;
+  last_run: {
+    status: string;
+    started_at: string;
+    finished_at: string | null;
+    stats: Record<string, unknown> | null;
+    error: string | null;
+  } | null;
+}
+
+export interface CanonicalEntry {
+  id: string;
+  topic: string;
+  title: string;
+  body: string;
+  status: string;
+  version: number;
+  approved_by: string | null;
+  source_refs: string[] | null;
+  stale: boolean;
+  updated_at: string;
+}
 
 export interface ActualEntry {
   work_item_id: string;

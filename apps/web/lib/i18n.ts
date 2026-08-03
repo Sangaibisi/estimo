@@ -67,6 +67,22 @@ const dict = {
     lowSampleNote: "Small sample — coverage within ±5% needs ~100 completed items.",
     noData: "No data yet — record actuals to light this up.",
     tableView: "Data table",
+    connectionsTitle: "Connections",
+    newConnection: "New connection",
+    connectionName: "Name",
+    secretEnvHint:
+      "Credentials never pass through this UI or the database — enter the NAME of an env var set on the API container.",
+    aclKeysPlaceholder: "ACL keys (comma-separated)",
+    lastSync: "Last sync",
+    syncNow: "Sync now",
+    secretMissing: "secret env missing",
+    canonicalTitle: "Canonical pages",
+    canonicalHint:
+      "The LLM drafts candidates from existing knowledge; only human-approved pages enter retrieval (top authority).",
+    canonicalTopic: "Topic…",
+    generateCandidate: "Generate candidate",
+    approve: "Approve",
+    staleSource: "stale",
   },
   tr: {
     appTitle: "Estimo",
@@ -133,6 +149,22 @@ const dict = {
     lowSampleNote: "Küçük örneklem — ±%5 kapsama için ~100 tamamlanmış kalem gerekir.",
     noData: "Henüz veri yok — gerçekleşme kaydedince burası canlanır.",
     tableView: "Veri tablosu",
+    connectionsTitle: "Bağlantılar",
+    newConnection: "Yeni bağlantı",
+    connectionName: "Ad",
+    secretEnvHint:
+      "Kimlik bilgileri bu arayüzden veya veritabanından ASLA geçmez — API konteynerinde tanımlı env değişkeninin ADINI girin.",
+    aclKeysPlaceholder: "ACL anahtarları (virgülle)",
+    lastSync: "Son senkron",
+    syncNow: "Şimdi senkronla",
+    secretMissing: "secret env eksik",
+    canonicalTitle: "Kanonik sayfalar",
+    canonicalHint:
+      "LLM mevcut bilgiden aday taslak çıkarır; yalnız insan onaylı sayfalar aramaya girer (en yüksek otorite).",
+    canonicalTopic: "Konu…",
+    generateCandidate: "Aday üret",
+    approve: "Onayla",
+    staleSource: "bayat",
   },
 } as const;
 

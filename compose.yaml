@@ -44,6 +44,11 @@ services:
     image: estimo-api:local
     build: *api-build
     env_file: [.env]
+    environment:
+      ESTIMO_REPOS_DIR: /data/repos
+    volumes:
+      # Synced repo working trees (S9 git connectors) survive restarts.
+      - estimo-repos:/data/repos
     ports:
       # Loopback-only by default; non-local exposure goes through an explicit reverse
       # proxy or a compose override.
@@ -241,6 +246,7 @@ services:
 
 volumes:
   estimo-pgdata:
+  estimo-repos:
   estimo-langfuse-pgdata:
   estimo-langfuse-clickhouse:
   estimo-langfuse-redis:

@@ -66,6 +66,7 @@ export default function WorkspacePage() {
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <Link href="/dashboard">{t(locale, "dashboard")}</Link>
+          <Link href="/connections">{t(locale, "connectionsTitle")}</Link>
           <select
             aria-label="Language"
             value={locale}

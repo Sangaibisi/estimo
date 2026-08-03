@@ -22,8 +22,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.14.6-slim-trixie
 LABEL org.opencontainers.image.source="https://github.com/Sangaibisi/estimo" \
       org.opencontainers.image.licenses="Apache-2.0"
-RUN groupadd --system --gid 999 app \
-    && useradd --system --uid 999 --gid app --home /app app
+# git: the S9 repo-sync connectors shell out to the real client (web-verified
+# choice — credential/transport edge cases beat pure-Python implementations).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 999 app \
+    && useradd --system --uid 999 --gid app --home /app app \
+    && mkdir -p /data/repos \
+    && chown app:app /data/repos
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/apps/api/alembic.ini /app/apps/api/alembic.ini

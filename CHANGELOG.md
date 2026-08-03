@@ -9,6 +9,25 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S9 connectors** (`packages/connectors`, migration `0007`): live knowledge from
+  real sources. Confluence Cloud crawler (v2 cursor pagination, v1-only read
+  restrictions mapped onto retrieval ACL keys, checkpointed CQL incremental sync,
+  points-budget pacing that honors `Retry-After` and slows on
+  `X-RateLimit-NearLimit`); **Bitbucket-first** git hosting (access-token auth —
+  app passwords were removed upstream 2026-07-28 — repo listing via the `next`
+  URL, webhook secrets with `X-Hub-Signature` HMAC verification over raw bytes)
+  plus GitHub/GitLab equivalents and a plain-git fallback; repo sync clones with
+  the git binary (credentials via an ephemeral `GIT_ASKPASS`, never in URLs or
+  argv) and feeds the S5 index → module wikis with connection ACL and commit-time
+  freshness; optional Jira pull on the post-410 `/search/jql` endpoint with
+  per-site story-points field discovery.
+- **S9 curation + honesty**: canonical-pages flow (LLM drafts a candidate with
+  recorded provenance; only HUMAN-approved pages enter retrieval, at top
+  authority 0.95), authority as a relevance tie-breaker, `is_stale` (18-month)
+  staleness surfaced in the curation UI, and a mandatory ACL pre-filter
+  regression test (a restricted chunk is mechanically invisible to other keys).
+  Admin → Connections UI: env-indirected secrets (names only), sync status,
+  webhook endpoint per connection.
 - **S8 calibration loop** (`packages/estimate/loop.py`, migration `0006`): recording an
   actual turns the signed line into a first-class ledger row
   (`origin_ref = estimate://…`), applies bounded outcome feedback to the `ledger://`

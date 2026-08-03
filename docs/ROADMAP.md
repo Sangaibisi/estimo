@@ -224,18 +224,31 @@ band, staff satisfaction survey positive; decision report written.
 
 ---
 
-## S9 — Connectors & Live Knowledge · `Status: 🔵 Planned`
+## S9 — Connectors & Live Knowledge · `Status: 🟢 Done (2026-08-03)` — 🧑 real-tenant run pending
+
+> Engineering slice verified 2026-08-03: the git leg ran WITHOUT fixtures against a
+> real remote (the product's own public GitHub repo — clone inside the container →
+> S5 index → code-wiki chunks with connection ACL + commit-time freshness), and the
+> canonical curation flow (draft → human approve → authority-0.95 retrieval) ran
+> end-to-end through the UI. ACL pre-filter tests are green (S9-3). API facts are
+> web-verified as of 2026-08: Bitbucket app passwords are REMOVED (access tokens
+> are the documented auth), Jira's classic /search is gone (410 → /search/jql),
+> Confluence restrictions remain v1-only and rate limiting is the points model.
+> ⚠️ **The exit-gate run against a real Confluence space + customer Bitbucket
+> workspace needs the maintainer's credentials** — connect them in Admin →
+> Connections and trigger the first sync. OAuth 2.0 (3LO) app-link mode is a
+> deliberate deferral until a Marketplace distribution exists.
 
 **Goal:** From fixtures to real sources: live Confluence/git sync + curation.
 
 **Architecture slice:** `packages/connectors`.
 
-- [ ] S9-1 Confluence v2 crawl: page+restriction(ACL)+version metadata, checkpointed incremental sync, points-limit-compliant rate plan (UX for a first sync that can take days)
-- [ ] S9-2 Git hosting connectors: **Bitbucket first-class** (Atlassian shops — OAuth/app link, workspace/repo picker in Admin → Connections, webhook push events), GitHub and GitLab equivalents, plain git-protocol fallback; multi-repo clone/fetch + webhook-triggered incremental re-index
-- [ ] S9-3 ACL pre-filter becomes mandatory in retrieval (the SECURITY.md principle becomes mechanical)
-- [ ] S9-4 Canonical pages curation flow: candidate generation (LLM distillation) → human approval → versioning → retrieval priority
-- [ ] S9-5 Freshness/authority scoring + stale-source warnings ("this page has not been updated in 18 months" on the evidence chip)
-- [ ] S9-6 Jira connector (optional, generic): epic/story pull — for installations that feed the ledger from Jira
+- [x] S9-1 Confluence v2 crawl: page+restriction(ACL)+version metadata, checkpointed incremental sync, points-limit-compliant rate plan (UX for a first sync that can take days)
+- [x] S9-2 Git hosting connectors: **Bitbucket first-class** (Atlassian shops — OAuth/app link, workspace/repo picker in Admin → Connections, webhook push events), GitHub and GitLab equivalents, plain git-protocol fallback; multi-repo clone/fetch + webhook-triggered incremental re-index
+- [x] S9-3 ACL pre-filter becomes mandatory in retrieval (the SECURITY.md principle becomes mechanical)
+- [x] S9-4 Canonical pages curation flow: candidate generation (LLM distillation) → human approval → versioning → retrieval priority
+- [x] S9-5 Freshness/authority scoring + stale-source warnings ("this page has not been updated in 18 months" on the evidence chip)
+- [x] S9-6 Jira connector (optional, generic): epic/story pull — for installations that feed the ledger from Jira
 
 **Exit gate:** The pipeline runs without fixtures on a real Confluence space + multi-repo
 setup; ACL tests green.

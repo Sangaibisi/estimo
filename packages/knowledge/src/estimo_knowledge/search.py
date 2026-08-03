@@ -214,7 +214,11 @@ async def lexical_chunk_ids(
             # ACL PRE-filter: the row must share at least one key with the caller.
             KnowledgeChunk.acl_keys.op("&&")(bindparam("acl", acl_keys, type_=ARRAY(String(80)))),
         )
-        .order_by(coordination.desc(), density.desc(), KnowledgeChunk.id)
+        # Authority breaks relevance ties (S9-5): canonical (0.95) > generated code
+        # wikis (0.7) > raw source chunks (0.5). Relevance stays primary.
+        .order_by(
+            coordination.desc(), density.desc(), KnowledgeChunk.authority.desc(), KnowledgeChunk.id
+        )
         .limit(limit)
     )
     result = await session.execute(stmt)

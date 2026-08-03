@@ -12,6 +12,7 @@ dependencies = [
     "estimo-pipeline",
     "estimo-estimate",
     "estimo-code",
+    "estimo-connectors",
     "fastapi>=0.141.1,<0.142",
     "uvicorn>=0.52,<0.53",
     "sqlalchemy[asyncio]>=2.0.51,<2.1",
