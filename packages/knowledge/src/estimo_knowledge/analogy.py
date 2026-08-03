@@ -11,7 +11,7 @@ import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_core import ThreePoint
@@ -81,4 +81,33 @@ async def find_analogs(
         return []
     result = await session.execute(select(LedgerEntryRow).where(LedgerEntryRow.id.in_(ids)))
     by_id = {row.id: row for row in result.scalars()}
-    return [_card(rank, by_id[i]) for rank, i in enumerate(ids, start=1) if i in by_id]
+    ordered = await _feedback_reorder(session, [i for i in ids if i in by_id])
+    return [_card(rank, by_id[i]) for rank, i in enumerate(ordered, start=1)]
+
+
+# Outcome feedback folds into ranking as a bounded nudge (PRINCIPLES #8): retrieval
+# similarity stays primary; cumulative outcome weight moves an analog at most
+# ±MAX_FEEDBACK_SHIFT positions. Deterministic: base rank breaks ties.
+MAX_FEEDBACK_SHIFT = 2.0
+
+
+async def _feedback_reorder(session: AsyncSession, ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    if len(ids) < 2:
+        return ids
+    from estimo_knowledge.db import AnalogFeedback
+
+    result = await session.execute(
+        select(AnalogFeedback.entry_id, func.sum(AnalogFeedback.weight))
+        .where(AnalogFeedback.entry_id.in_(ids))
+        .group_by(AnalogFeedback.entry_id)
+    )
+    weights = {entry_id: float(total) for entry_id, total in result}
+    if not weights:
+        return ids
+
+    def adjusted(pair: tuple[int, uuid.UUID]) -> tuple[float, int]:
+        base_rank, entry_id = pair
+        shift = max(-MAX_FEEDBACK_SHIFT, min(MAX_FEEDBACK_SHIFT, weights.get(entry_id, 0.0)))
+        return (base_rank - shift, base_rank)
+
+    return [entry_id for _, entry_id in sorted(enumerate(ids, start=1), key=adjusted)]

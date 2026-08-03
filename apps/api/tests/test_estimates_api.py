@@ -36,7 +36,12 @@ async def client(database_url: str) -> AsyncIterator[httpx.AsyncClient]:
     engine = create_async_engine(database_url)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as session:
-        await session.execute(text("TRUNCATE estimates, ledger_entries, knowledge_chunks CASCADE"))
+        await session.execute(
+            text(
+                "TRUNCATE estimates, ledger_entries, knowledge_chunks, "
+                "calibration_snapshots CASCADE"
+            )
+        )
         await session.commit()
         from estimo_knowledge import import_seed
 
@@ -165,6 +170,27 @@ async def test_full_workflow_clean_brd(client: httpx.AsyncClient) -> None:
     disposition = docx.headers["content-disposition"]
     assert "filename=" in disposition and "filename*=UTF-8''" in disposition
     assert "\n" not in disposition and "\r" not in disposition
+
+    # S8-1: an actual closes the loop — ledger row + feedback + calibration snapshot.
+    actual = await client.post(
+        f"/v1/estimates/{estimate_id}/actuals",
+        json={"work_item_id": item_id, "actual_effort": 9, "actual_source": "timesheet"},
+    )
+    assert actual.status_code == 201
+    assert actual.json()["deviation"] is not None
+
+    listed = (await client.get(f"/v1/estimates/{estimate_id}/actuals")).json()
+    assert len(listed) == 1
+    assert listed[0]["work_item_id"] == item_id
+    assert listed[0]["actual_effort"] == 9
+
+    # S8-3: the dashboard overview reflects the loop.
+    overview = (await client.get("/v1/metrics/overview")).json()
+    assert overview["product_accuracy"]["samples"] >= 1
+    assert overview["calibration"]["current"]["samples"] >= 0
+    assert overview["calibration"]["series"], "actual must have snapshotted calibration"
+    assert overview["anchoring"]["samples"] >= 1  # desk reveals logged deltas
+    assert overview["workflow"]["estimates"] >= 1
 
 
 async def test_answers_flow_and_boe_invalidation(client: httpx.AsyncClient) -> None:
@@ -306,11 +332,40 @@ async def test_event_capture(client: httpx.AsyncClient) -> None:
     )
     assert response.status_code == 201
 
-    forged = await client.post(
-        f"/v1/estimates/{summary['id']}/events",
-        json={"kind": "draft-revealed", "payload": {"work_item_id": "WI-X"}},
+    for reserved in ("draft-revealed", "independent-recorded", "actual-recorded"):
+        forged = await client.post(
+            f"/v1/estimates/{summary['id']}/events",
+            json={"kind": reserved, "payload": {"work_item_id": "WI-X"}},
+        )
+        assert forged.status_code == 422  # server-reserved kinds are not forgeable
+
+
+async def test_actuals_require_fully_signed_estimate(client: httpx.AsyncClient) -> None:
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+    desk = (
+        await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "E. Kaya"})
+    ).json()
+    item_id = desk["items"][0]["work_item"]["id"]
+    response = await client.post(
+        f"/v1/estimates/{estimate_id}/actuals",
+        json={"work_item_id": item_id, "actual_effort": 5, "actual_source": "timesheet"},
     )
-    assert forged.status_code == 422  # server-reserved telemetry kinds are not forgeable
+    assert response.status_code == 409  # actuals attach to the signed estimate of record
+
+
+def test_telemetry_is_noop_without_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    from estimo_api import telemetry
+
+    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+    telemetry.reset_cached_client()
+    try:
+        assert telemetry.emit_event("section-edit", "x", {"a": 1}) is False
+        assert telemetry.emit_score("anchoring-delta-likely", 1.5, "x") is False
+    finally:
+        telemetry.reset_cached_client()
 
 
 def test_independent_unique_constraint_exists_on_model() -> None:

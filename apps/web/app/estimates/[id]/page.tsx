@@ -4,7 +4,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type DeskItem, type EstimateSummary } from "@/lib/api";
+import { api, type ActualEntry, type DeskItem, type EstimateSummary } from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { RangeBar } from "@/components/RangeBar";
 import { EvidenceChip } from "@/components/EvidenceChip";
@@ -29,9 +29,15 @@ interface StateShape {
   questions: Question[];
   answers: Record<string, string>;
   blocked_ids: string[];
+  work_items: { id: string; title: string }[];
 }
 
-type Tab = "requirements" | "questions" | "desk" | "boe";
+type Tab = "requirements" | "questions" | "desk" | "boe" | "actuals";
+
+interface BoeLineShape {
+  work_item_id: string;
+  range: { optimistic: number; likely: number; pessimistic: number };
+}
 
 export default function EstimateDetail({
   params,
@@ -48,6 +54,8 @@ export default function EstimateDetail({
   const [deskItems, setDeskItems] = useState<DeskItem[]>([]);
   const [critic, setCritic] = useState<string[]>([]);
   const [fullySigned, setFullySigned] = useState(false);
+  const [actuals, setActuals] = useState<ActualEntry[]>([]);
+  const [boeLines, setBoeLines] = useState<BoeLineShape[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +67,14 @@ export default function EstimateDetail({
     setState(detail.state as unknown as StateShape);
     setCritic(detail.critic);
     setFullySigned(detail.fully_signed);
+    setBoeLines(((detail.boe as { lines?: BoeLineShape[] } | null)?.lines ?? []) as BoeLineShape[]);
   }, [id]);
+
+  useEffect(() => {
+    if (tab === "actuals") {
+      api.listActuals(id).then(setActuals).catch((err) => setError(String(err)));
+    }
+  }, [tab, id]);
 
   useEffect(() => {
     refresh().catch((err) => setError(String(err)));
@@ -116,6 +131,7 @@ export default function EstimateDetail({
             ["questions", `${t(locale, "questionsTab")} (${openQuestions.length})`],
             ["desk", t(locale, "deskTab")],
             ["boe", t(locale, "boeTab")],
+            ...(fullySigned ? [["actuals", t(locale, "actualsTab")] as [Tab, string]] : []),
           ] as [Tab, string][]
         ).map(([key, label]) => (
           <button
@@ -282,6 +298,35 @@ export default function EstimateDetail({
         </div>
       )}
 
+      {tab === "actuals" && (
+        <div className="card">
+          <p className="muted">{t(locale, "actualsHint")}</p>
+          {boeLines.map((line) => {
+            const item = state.work_items.find((wi) => wi.id === line.work_item_id);
+            const existing = actuals.find((a) => a.work_item_id === line.work_item_id);
+            return (
+              <ActualRow
+                key={line.work_item_id}
+                locale={locale}
+                title={item?.title ?? line.work_item_id}
+                line={line}
+                existing={existing}
+                busy={busy}
+                onSave={(actual) =>
+                  run(async () => {
+                    await api.recordActual(id, {
+                      work_item_id: line.work_item_id,
+                      ...actual,
+                    });
+                    setActuals(await api.listActuals(id));
+                  })
+                }
+              />
+            );
+          })}
+        </div>
+      )}
+
       {tab === "boe" && (
         <div className="card">
           {summary.has_boe ? (
@@ -312,6 +357,94 @@ export default function EstimateDetail({
     </main>
   );
 }
+
+function ActualRow({
+  locale,
+  title,
+  line,
+  existing,
+  busy,
+  onSave,
+}: {
+  locale: Locale;
+  title: string;
+  line: BoeLineShape;
+  existing?: ActualEntry;
+  busy: boolean;
+  onSave: (actual: {
+    actual_effort: number;
+    actual_source: string;
+    scope_changed: boolean;
+  }) => void;
+}) {
+  const [effort, setEffort] = useState("");
+  const [source, setSource] = useState("timesheet");
+  const [scopeChanged, setScopeChanged] = useState(false);
+
+  return (
+    <div style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
+      <strong>{title}</strong>{" "}
+      <span className="muted">
+        {line.range.optimistic} / {line.range.likely} / {line.range.pessimistic} pd
+      </span>
+      {existing ? (
+        <p style={{ margin: "6px 0 0" }}>
+          {existing.actual_effort} pd{" "}
+          <span className="chip">{existing.actual_source}</span>{" "}
+          {existing.scope_changed && (
+            <span className="chip" style={{ color: "var(--crit)" }}>
+              {t(locale, "scopeChanged")}
+            </span>
+          )}
+          {existing.deviation !== null && !existing.scope_changed && (
+            <span className="muted" style={{ marginLeft: 8 }}>
+              ×{existing.deviation} {t(locale, "deviationLabel")}
+            </span>
+          )}
+        </p>
+      ) : (
+        <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
+          <input
+            style={{ width: 90 }}
+            placeholder={t(locale, "actualEffort")}
+            value={effort}
+            onChange={(event) => setEffort(event.target.value)}
+          />
+          <select
+            aria-label={t(locale, "actualSource")}
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+          >
+            <option value="timesheet">timesheet</option>
+            <option value="project-report">project-report</option>
+            <option value="expert-recall">expert-recall</option>
+          </select>
+          <label className="muted" style={{ fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={scopeChanged}
+              onChange={(event) => setScopeChanged(event.target.checked)}
+            />{" "}
+            {t(locale, "scopeChanged")}
+          </label>
+          <button
+            disabled={busy || !effort || Number(effort) <= 0}
+            onClick={() =>
+              onSave({
+                actual_effort: Number(effort),
+                actual_source: source,
+                scope_changed: scopeChanged,
+              })
+            }
+          >
+            {t(locale, "save")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function DeskRow({
   locale,

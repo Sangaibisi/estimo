@@ -64,7 +64,8 @@ export default function WorkspacePage() {
           <h1 style={{ margin: 0 }}>{t(locale, "appTitle")}</h1>
           <span className="muted">{t(locale, "tagline")}</span>
         </div>
-        <div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <Link href="/dashboard">{t(locale, "dashboard")}</Link>
           <select
             aria-label="Language"
             value={locale}

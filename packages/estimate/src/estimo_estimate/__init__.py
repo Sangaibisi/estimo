@@ -10,6 +10,11 @@ from estimo_estimate.calibration import (
 from estimo_estimate.critic import review_boe
 from estimo_estimate.estimator import estimate_state
 from estimo_estimate.evals import EffortEvalResult, leave_one_out
+from estimo_estimate.loop import (
+    record_actual,
+    rolling_coverage,
+    snapshot_calibration,
+)
 
 __all__ = [
     "BandResult",
@@ -19,7 +24,10 @@ __all__ = [
     "error_distribution",
     "estimate_state",
     "leave_one_out",
+    "record_actual",
     "render_boe_docx",
     "review_boe",
+    "rolling_coverage",
+    "snapshot_calibration",
     "transfer_distribution",
 ]

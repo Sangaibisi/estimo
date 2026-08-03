@@ -9,6 +9,27 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S8 calibration loop** (`packages/estimate/loop.py`, migration `0006`): recording an
+  actual turns the signed line into a first-class ledger row
+  (`origin_ref = estimate://…`), applies bounded outcome feedback to the `ledger://`
+  analogs that backed the line (folded into `find_analogs` ranking as a ±2-position
+  nudge — retrieval similarity stays primary), and snapshots the transfer-error
+  quantiles + rolling coverage per event. Design web-verified: at this ledger scale,
+  event-driven full recompute beats online/streaming conformal updates; drift
+  surfaces via rolling coverage, never chased silently.
+- **S8 actuals entry**: `POST/GET /v1/estimates/{id}/actuals` (attach to the fully
+  signed estimate of record; scope-changed actuals are stored but excluded from
+  feedback and calibration) + an Actuals tab in the web UI with per-line deviation.
+- **S8 honesty dashboards**: `GET /v1/metrics/overview` + `/dashboard` page — interval
+  coverage vs nominal over calibration snapshots, anchoring telemetry (mean |Δ| and
+  near-zero-delta share), MAE vs the naive median baseline, and DORA-style
+  second-order tiles (WIP, question-revision rate, rebuild share). Every rate ships
+  with its sample count; small samples are labeled, never hidden.
+- **S8 observability (opt-in)**: `docker compose --profile observability up` runs a
+  pinned Langfuse v4 self-host stack (web/worker + dedicated Postgres, ClickHouse,
+  Redis, MinIO — upstream sizes it at ~4 cores/16 GiB); the api forwards telemetry
+  events and anchoring scores via the MIT `langfuse` SDK **only when `LANGFUSE_*`
+  env is set** — unset means a complete no-op.
 - **S7 review UI** (`apps/web` + `apps/api` workflow endpoints): Next.js estimation
   workspace — BRD upload, requirement/question board with quality-gated answers, the
   **independent-first Estimate Desk** (the server keeps the AI band locked until the

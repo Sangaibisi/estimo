@@ -1,7 +1,13 @@
 """Estimo knowledge layer (S3): estimate ledger, hybrid Turkish retrieval, analogy cards."""
 
 from estimo_knowledge.analogy import AnalogyCard, find_analogs
-from estimo_knowledge.db import Base, KnowledgeChunk, LedgerEntryRow
+from estimo_knowledge.db import (
+    AnalogFeedback,
+    Base,
+    CalibrationSnapshot,
+    KnowledgeChunk,
+    LedgerEntryRow,
+)
 from estimo_knowledge.importer import ImportReport, import_seed, to_ledger_entry
 from estimo_knowledge.ingest import upsert_generated_chunks
 from estimo_knowledge.search import (
@@ -12,8 +18,10 @@ from estimo_knowledge.search import (
 )
 
 __all__ = [
+    "AnalogFeedback",
     "AnalogyCard",
     "Base",
+    "CalibrationSnapshot",
     "ImportReport",
     "KnowledgeChunk",
     "LedgerEntryRow",

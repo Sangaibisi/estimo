@@ -13,15 +13,18 @@ estimators from each other needs real authentication and lands with S10.
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import re
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
-from estimo_estimate import estimate_state, render_boe_docx, review_boe
+from estimo_estimate import estimate_state, record_actual, render_boe_docx, review_boe
+from estimo_estimate.loop import origin_ref as make_origin_ref
+from estimo_knowledge import LedgerEntryRow
 from estimo_pipeline import PipelineState, resume_with_answers, run_brd
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -30,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from estimo_api import telemetry
 from estimo_api.db import get_session
 from estimo_api.estimates_models import (
     EstimateRecord,
@@ -47,7 +51,7 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 # Kinds the server writes with integrity semantics; clients may not forge them.
-RESERVED_EVENT_KINDS = frozenset({"independent-recorded", "draft-revealed"})
+RESERVED_EVENT_KINDS = frozenset({"independent-recorded", "draft-revealed", "actual-recorded"})
 
 
 class EstimateSummary(BaseModel):
@@ -279,6 +283,9 @@ async def record_independent(
         raise HTTPException(
             status_code=409, detail="independent estimate already recorded"
         ) from exc
+    telemetry.emit_event(
+        "independent-recorded", str(estimate_id), {"work_item_id": payload.work_item_id}
+    )
     return {"status": "recorded"}
 
 
@@ -344,6 +351,9 @@ async def estimate_desk(
                             "boe_version": record.boe_version,
                         },
                     )
+                )
+                telemetry.emit_score(
+                    "anchoring-delta-likely", float(entry["delta_likely"]), str(estimate_id)
                 )
         items.append(entry)
     await session.commit()
@@ -438,4 +448,88 @@ async def record_event(
     await _get_record(session, estimate_id)
     session.add(UiEvent(estimate_id=estimate_id, kind=payload.kind, payload=payload.payload))
     await session.commit()
+    telemetry.emit_event(payload.kind, str(estimate_id), payload.payload)
     return {"status": "recorded"}
+
+
+class ActualIn(BaseModel):
+    work_item_id: str
+    actual_effort: float = Field(gt=0)
+    actual_source: Literal["timesheet", "project-report", "expert-recall"]
+    completed_at: dt.date | None = None
+    scope_changed: bool = False
+
+
+@router.post("/{estimate_id}/actuals", status_code=status.HTTP_201_CREATED)
+async def record_actual_for_line(
+    estimate_id: uuid.UUID, payload: ActualIn, session: SessionDep
+) -> dict[str, Any]:
+    """S8-1: an actual closes the loop — the signed line becomes a ledger row, its
+    analogs receive outcome feedback, and the calibration state is snapshotted."""
+    record = await _get_record(session, estimate_id)
+    if record.boe is None:
+        raise HTTPException(status_code=409, detail="no BoE draft")
+    if not await _fully_signed(session, record):
+        raise HTTPException(
+            status_code=409, detail="actuals attach to the fully signed estimate of record"
+        )
+    boe = BoeDocument.model_validate(record.boe)
+    line = next((line for line in boe.lines if line.work_item_id == payload.work_item_id), None)
+    if line is None:
+        raise HTTPException(status_code=404, detail="estimate line not found")
+    state = PipelineState.model_validate(record.state)
+    item = next(item for item in state.work_items if item.id == payload.work_item_id)
+    await record_actual(
+        session,
+        estimate_id=estimate_id,
+        brd_ref=record.brd_ref,
+        brd_title=record.title,
+        item=item,
+        line=line,
+        actual_effort=payload.actual_effort,
+        actual_source=payload.actual_source,
+        completed_at=payload.completed_at,
+        scope_changed=payload.scope_changed,
+    )
+    deviation = round(payload.actual_effort / line.range.likely, 2) if line.range.likely else None
+    session.add(
+        UiEvent(
+            estimate_id=estimate_id,
+            kind="actual-recorded",
+            payload={
+                "work_item_id": payload.work_item_id,
+                "actual_source": payload.actual_source,
+                "scope_changed": payload.scope_changed,
+                "deviation": deviation,
+            },
+        )
+    )
+    await session.commit()
+    telemetry.emit_event(
+        "actual-recorded", str(estimate_id), {"work_item_id": payload.work_item_id}
+    )
+    return {"status": "recorded", "deviation": deviation}
+
+
+@router.get("/{estimate_id}/actuals")
+async def list_actuals(estimate_id: uuid.UUID, session: SessionDep) -> list[dict[str, Any]]:
+    await _get_record(session, estimate_id)
+    prefix = make_origin_ref(estimate_id, "")
+    result = await session.execute(
+        select(LedgerEntryRow).where(LedgerEntryRow.origin_ref.like(f"{prefix}%"))
+    )
+    entries: list[dict[str, Any]] = []
+    for row in result.scalars():
+        likely = float(row.est_likely) if row.est_likely else None
+        actual = float(row.actual_effort) if row.actual_effort is not None else None
+        entries.append(
+            {
+                "work_item_id": (row.origin_ref or "").removeprefix(prefix),
+                "actual_effort": actual,
+                "actual_source": row.actual_source,
+                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+                "scope_changed": row.scope_changed,
+                "deviation": (round(actual / likely, 2) if actual is not None and likely else None),
+            }
+        )
+    return entries

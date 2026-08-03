@@ -43,5 +43,5 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 @pytest.fixture
 async def clean_tables(session: AsyncSession) -> None:
-    await session.execute(text("TRUNCATE ledger_entries, knowledge_chunks"))
+    await session.execute(text("TRUNCATE ledger_entries, knowledge_chunks CASCADE"))
     await session.commit()

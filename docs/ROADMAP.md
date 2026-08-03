@@ -196,19 +196,28 @@ independent-first review → sign-off → export) completes through the UI.
 
 ---
 
-## S8 — Calibration Loop & Dashboards · `Status: 🟡 In progress`
+## S8 — Calibration Loop & Dashboards · `Status: 🟢 Done (2026-08-03)` — 🧑 pilot pending
+
+> Engineering slice verified 2026-08-03: recording an actual upserts the ledger row
+> (`origin_ref = estimate://…`), applies bounded outcome feedback to the analogs that
+> backed the line (folded into `find_analogs` ranking), and snapshots transfer-error
+> quantiles + rolling coverage per event (web-verified design: full recompute beats
+> online conformal at this ledger scale; drift surfaces via rolling coverage). The
+> dashboard is measured-or-absent by construction, with sample counts on every rate.
+> ⚠️ **S8-5 dogfood pilot and the exit-gate pilot metrics need the maintainer** —
+> the F2→F3 decision report cannot be written from synthetic data.
 
 **Goal:** Turn the product into a learning system: actuals flow in, intervals and analogy
 selection update, honesty dashboards open to everyone.
 
 **Architecture slice:** `packages/calibrate` loop, `apps/web` dashboards, Langfuse self-host.
 
-- [ ] S8-1 Actuals entry: manual form + bulk import; the work item ↔ actuals matching experience
-- [ ] S8-2 Calibration jobs: error distribution update → interval widths; feedback into analogy ranking (edit + actuals signals — PRINCIPLES #8)
-- [ ] S8-3 Dashboards: interval coverage vs nominal, team/domain curves, anchoring telemetry, naive-baseline comparison, post-question revision rate
-- [ ] S8-4 Langfuse self-host integration: traces + user feedback + evaluation queue
+- [x] S8-1 Actuals entry: manual form + bulk import; the work item ↔ actuals matching experience
+- [x] S8-2 Calibration jobs: error distribution update → interval widths; feedback into analogy ranking (edit + actuals signals — PRINCIPLES #8)
+- [x] S8-3 Dashboards: interval coverage vs nominal, team/domain curves, anchoring telemetry, naive-baseline comparison, post-question revision rate
+- [x] S8-4 Langfuse self-host integration: traces + user feedback + evaluation queue
 - [ ] S8-5 Dogfood pilot run: N BRDs in the real workflow (in-house) — only anonymized metric summaries enter the repo
-- [ ] S8-6 DORA-style second-order monitoring: rework/WIP watch notes while draft speed ↑
+- [x] S8-6 DORA-style second-order monitoring: rework/WIP watch notes while draft speed ↑
 
 **Exit gate (F2→F3):** Pilot metrics: cycle time meaningfully ↓, coverage in the nominal
 band, staff satisfaction survey positive; decision report written.

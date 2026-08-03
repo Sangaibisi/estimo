@@ -21,6 +21,8 @@ dependencies = [
     "python-multipart>=0.0.18,<0.1",
     "pydantic>=2.13.4,<3",
     "pydantic-settings>=2.14.2,<3",
+    # Observability client (S8-4, MIT): a complete no-op unless LANGFUSE_* env is set.
+    "langfuse>=4,<5",
 ]
 
 [build-system]

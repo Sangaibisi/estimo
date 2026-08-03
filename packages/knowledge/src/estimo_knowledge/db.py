@@ -19,6 +19,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Float,
+    ForeignKey,
     Index,
     Integer,
     MetaData,
@@ -64,6 +65,10 @@ class LedgerEntryRow(Base):
     completed_at: Mapped[dt.date | None] = mapped_column(Date, default=None)
     scope_changed: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Provenance for rows written by the product itself (S8 loop):
+    # "estimate://{estimate_id}/{work_item_id}". NULL for imported history.
+    origin_ref: Mapped[str | None] = mapped_column(String(200), default=None)
+
     embedding: Mapped[Any | None] = mapped_column(VECTOR, default=None)
     embedding_model: Mapped[str | None] = mapped_column(String(120), default=None)
     embedding_dim: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -81,7 +86,57 @@ class LedgerEntryRow(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    __table_args__ = (Index("ix_ledger_entries_search_tsv", "search_tsv", postgresql_using="gin"),)
+    __table_args__ = (
+        Index("ix_ledger_entries_search_tsv", "search_tsv", postgresql_using="gin"),
+        Index("uq_ledger_entries_origin_ref", "origin_ref", unique=True),
+    )
+
+
+class AnalogFeedback(Base):
+    """Outcome feedback on an analog's usefulness (S8-2, PRINCIPLES #8).
+
+    Written by the calibration loop when an actual lands: the analogs that backed a
+    line (its `ledger://` evidence) receive a weight from the line's realized error.
+    `find_analogs` folds the cumulative weight into ranking — analogs that keep
+    backing bad bands sink; ones that back accurate bands rise."""
+
+    __tablename__ = "analog_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    entry_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ledger_entries.id", ondelete="CASCADE"))
+    origin_ref: Mapped[str] = mapped_column(String(200))
+    weight: Mapped[float] = mapped_column(Numeric(6, 3))
+    reason: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        # One verdict per (analog, estimated line): re-recording an actual revises
+        # instead of stacking duplicate weight.
+        Index("uq_analog_feedback_entry_origin", "entry_id", "origin_ref", unique=True),
+    )
+
+
+class CalibrationSnapshot(Base):
+    """Point-in-time calibration state (S8-2/S8-3): quantiles of the transfer-error
+    distribution plus rolling empirical coverage — the drift signal the dashboard
+    plots against the nominal band."""
+
+    __tablename__ = "calibration_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    samples: Mapped[int] = mapped_column(Integer)
+    prior_based: Mapped[bool] = mapped_column(Boolean, default=False)
+    q10: Mapped[float] = mapped_column(Numeric(8, 3))
+    q50: Mapped[float] = mapped_column(Numeric(8, 3))
+    q90: Mapped[float] = mapped_column(Numeric(8, 3))
+    nominal: Mapped[float] = mapped_column(Numeric(4, 2), default=0.8)
+    rolling_coverage: Mapped[float | None] = mapped_column(Numeric(4, 3), default=None)
+    trigger: Mapped[str] = mapped_column(String(60), default="actual-recorded")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class KnowledgeChunk(Base):

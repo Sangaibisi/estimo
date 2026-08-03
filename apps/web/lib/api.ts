@@ -122,4 +122,69 @@ export const api = {
       body: JSON.stringify({ kind, payload }),
     }),
   boeDocxUrl: (id: string) => `${apiBase()}/v1/estimates/${id}/boe.docx`,
+  recordActual: (
+    id: string,
+    payload: {
+      work_item_id: string;
+      actual_effort: number;
+      actual_source: string;
+      scope_changed: boolean;
+    },
+  ) =>
+    request<{ status: string; deviation: number | null }>(`/v1/estimates/${id}/actuals`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listActuals: (id: string) => request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
+  metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
 };
+
+export interface ActualEntry {
+  work_item_id: string;
+  actual_effort: number | null;
+  actual_source: string | null;
+  completed_at: string | null;
+  scope_changed: boolean;
+  deviation: number | null;
+}
+
+export interface MetricsOverview {
+  calibration: {
+    current: {
+      samples: number;
+      prior_based: boolean;
+      q10: number;
+      q50: number;
+      q90: number;
+      rolling_coverage: number | null;
+    };
+    series: {
+      at: string;
+      samples: number;
+      prior_based: boolean;
+      q10: number;
+      q50: number;
+      q90: number;
+      nominal: number;
+      rolling_coverage: number | null;
+    }[];
+  };
+  product_accuracy: {
+    samples: number;
+    coverage: number | null;
+    nominal: number;
+    mae_product: number | null;
+    mae_naive_median: number | null;
+  };
+  anchoring: {
+    samples: number;
+    mean_abs_delta: number | null;
+    zero_delta_share: number | null;
+  };
+  workflow: {
+    estimates: number;
+    wip: number;
+    question_revision_rate: number | null;
+    rebuild_share: number | null;
+  };
+}
