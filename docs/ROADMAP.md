@@ -106,7 +106,7 @@ fixture ledger.
 
 ---
 
-## S4 — Decomposition & Ambiguity Gate · `Status: 🟡 In progress`
+## S4 — Decomposition & Ambiguity Gate · `Status: 🟢 Done` (2026-08-03 — all items done, CI green; offline AI-arm eval: module attribution 92% vs 31% naive, zero gate failures — evals/reports/2026-08-03-s4-offline-eval.md. ⚠️ The F1 blinded-evaluation gate's HUMAN and HYBRID arms require human estimators and remain open — continuing to S5 per the maintainer's directive; the blinded comparison runs when the maintainer schedules the human arm)
 
 **Goal:** The heart of the PoC: BRD → work items → clarification questions; first blinded
 evaluation on the golden set.
@@ -127,7 +127,7 @@ continue/fix decision made.
 
 ---
 
-## S5 — Code Awareness · `Status: 🔵 Planned`
+## S5 — Code Awareness · `Status: 🟡 In progress`
 
 **Goal:** Tie work items to the real codebase: repo map → symbol graph → module wikis →
 impact map.
