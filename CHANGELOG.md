@@ -9,6 +9,17 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **Ledger attribution (part of S11-4; the sliced curves themselves are not built).**
+  `record_actual` copied `team` and `domain_tags` off the `WorkItem`, and the pipeline
+  never sets either — a BRD says what to build, not who builds it — so every ledger row
+  the product wrote landed with `team = NULL`. Measured on a live instance: zero of
+  zero product-origin rows carried a team. That is unrecoverable data, since nobody
+  reconstructs delivery attribution a year later, which is why it ships now rather than
+  with the curves it enables. `POST /actuals` takes optional `team`/`domain_tags` from
+  whoever closes the loop, normalized with `tr_lower` at both write paths so `Billing`
+  and `billing` cannot become two slices, and `GET /v1/metrics/overview` gained an
+  `attribution` block so "attribution shipped" stays distinguishable from "attribution
+  arrives" — the field is optional, so silence is a real outcome and worth counting.
 - **S11-3 Delphi overlay**: the estimate desk shows every panelist's band for an item as
   anonymous lines over the consensus range, with the spread and an intersect/disjoint
   verdict. Two server-side gates, each proven load-bearing by removing it and watching

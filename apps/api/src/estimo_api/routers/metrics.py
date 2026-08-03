@@ -178,6 +178,34 @@ async def _workflow(session: AsyncSession) -> dict[str, Any]:
     }
 
 
+async def _attribution(session: AsyncSession) -> dict[str, Any]:
+    """How much of the ledger the product itself wrote can be sliced.
+
+    Team and domain arrive only if whoever records the actual supplies them, and the
+    field is optional — so "attribution shipped" and "attribution arrives" are
+    different claims. This reports the second one. Calibration slices need
+    MIN_SAMPLES rows PER slice; a high unattributed count is the honest reason a
+    team curve does not exist yet, and without this number that would look like a
+    missing feature rather than missing data.
+    """
+    rows = (
+        await session.execute(
+            select(LedgerEntryRow.team, LedgerEntryRow.domain_tags).where(
+                LedgerEntryRow.origin_ref.is_not(None)
+            )
+        )
+    ).all()
+    if not rows:
+        return {"product_rows": 0, "with_team": 0, "with_domain": 0, "teams": []}
+    teams = sorted({team for team, _ in rows if team})
+    return {
+        "product_rows": len(rows),
+        "with_team": sum(1 for team, _ in rows if team),
+        "with_domain": sum(1 for _, domains in rows if domains),
+        "teams": teams,
+    }
+
+
 @router.get("/overview")
 async def overview(session: SessionDep) -> dict[str, Any]:
     return {
@@ -185,4 +213,5 @@ async def overview(session: SessionDep) -> dict[str, Any]:
         "product_accuracy": await _product_accuracy(session),
         "anchoring": await _anchoring(session),
         "workflow": await _workflow(session),
+        "attribution": await _attribution(session),
     }

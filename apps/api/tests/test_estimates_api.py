@@ -572,3 +572,49 @@ async def test_delphi_is_per_item_not_per_estimate(client: httpx.AsyncClient) ->
     other = next(i for i in desk["items"] if i["work_item"]["id"] != item_id)
     assert other["delphi"]["state"] == "you_first"
     assert other["delphi"]["estimators"] == 0
+
+
+async def test_actual_carries_team_and_domain_attribution(client: httpx.AsyncClient) -> None:
+    """Without this the ledger's team column is NULL on every row the product writes,
+    and no calibration slice can ever exist — a loss that is unrecoverable later."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+    desk = await _desk(client, estimate_id, "D. Aksoy")
+    for entry in desk["items"]:
+        wid = entry["work_item"]["id"]
+        assert (await _record_band(client, estimate_id, wid, "D. Aksoy")).status_code == 201
+        assert (
+            await client.post(
+                f"/v1/estimates/{estimate_id}/sign",
+                json={"work_item_id": wid, "name": "D. Aksoy", "role": "Reviewer"},
+            )
+        ).status_code == 201
+    item_id = desk["items"][0]["work_item"]["id"]
+
+    recorded = await client.post(
+        f"/v1/estimates/{estimate_id}/actuals",
+        json={
+            "work_item_id": item_id,
+            "actual_effort": 9,
+            "actual_source": "timesheet",
+            # Deliberately mixed case: slice keys are compared, so "Billing" and
+            # "billing" must not become two teams. Turkish-aware lowering matters —
+            # str.lower() would map "I" to "i" rather than "ı".
+            "team": "  Billing-Core  ",
+            "domain_tags": ["Billing", "billing", "Tahsilat"],
+        },
+    )
+    assert recorded.status_code == 201, recorded.text
+
+    listed = (await client.get(f"/v1/estimates/{estimate_id}/actuals")).json()
+    row = next(entry for entry in listed if entry["work_item_id"] == item_id)
+    assert row["team"] == "billing-core", "team must be trimmed and normalized"
+    assert row["domain_tags"] == ["billing", "tahsilat"], "duplicates must collapse"
+
+    # And the overview reports how much attribution actually ARRIVES, so that
+    # "attribution shipped" cannot be mistaken for "the ledger is sliceable".
+    attribution = (await client.get("/v1/metrics/overview")).json()["attribution"]
+    assert attribution["product_rows"] >= 1
+    assert attribution["with_team"] >= 1
+    assert "billing-core" in attribution["teams"]

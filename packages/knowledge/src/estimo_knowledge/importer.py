@@ -201,8 +201,13 @@ def to_ledger_entry(row: dict[str, str]) -> LedgerEntry:
         module_tags=tuple(
             m.strip() for m in row.get("modules", "").replace(";", ",").split(",") if m.strip()
         ),
-        domain_tags=tuple(d.strip() for d in row.get("domain", "").split(",") if d.strip()),
-        team=row.get("team") or None,
+        # Slice keys are compared, so they are normalized at the boundary — the same
+        # rule the product write applies (estimo_estimate.loop), or the seed set and
+        # the product would put two vocabularies in one column.
+        domain_tags=tuple(
+            tag for tag in (tr_lower(d.strip()) for d in row.get("domain", "").split(",")) if tag
+        ),
+        team=tr_lower((row.get("team") or "").strip()) or None,
         estimate=estimate,
         estimate_single=estimate_single,
         estimated_at=_parse_date(row["est_date"]) if row.get("est_date") else None,

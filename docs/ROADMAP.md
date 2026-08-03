@@ -349,7 +349,19 @@ that overstate the build. Each names what blocked it.
   domain slice 7, both under the existing `MIN_SAMPLES = 8` gate, so every slice would
   render "inherited from global". The attribution half is worth shipping now; the curve
   itself waits for the S8-5 pilot ledger. Drawing a per-slice curve at this sample size
-  would violate PRINCIPLES #1 and #6.
+  would violate PRINCIPLES #1 and #6 — with one row in a slice the weighted quantiles
+  degenerate and q10 == q50 == q90, i.e. a zero-width "range", which is a point
+  estimate wearing a band's clothes.
+  **Shipped so far (deliberately NOT enough to tick):** `POST /actuals` accepts optional
+  `team` and `domain_tags`, threaded into the ledger row and normalized with `tr_lower`
+  at both write paths (product and importer) so `Billing` and `billing` cannot become
+  two slices; the actuals form exposes a team field; and `GET /v1/metrics/overview`
+  reports an `attribution` block (`product_rows`, `with_team`, `with_domain`, `teams`)
+  so "attribution shipped" stays checkable against "attribution actually arrives" —
+  the field is optional, so a client that never sends it keeps writing NULLs silently.
+  **Still open:** grouping inside `transfer_distribution`, slice columns on
+  `calibration_snapshots`, the sliced endpoint and the dashboard section — all of which
+  need a pilot ledger to be worth rendering.
 - [ ] S11-8 Indexer-side embedding writer — **nothing in the repo writes an embedding.**
   The only `.embed()` call embeds the query; `upsert_document` NULLs the vector columns on
   every write. So `dense_ledger_ids` matches zero rows and RRF fuses a single ranking:

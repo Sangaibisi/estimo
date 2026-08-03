@@ -625,6 +625,14 @@ class ActualIn(BaseModel):
     actual_source: Literal["timesheet", "project-report", "expert-recall"]
     completed_at: dt.date | None = None
     scope_changed: bool = False
+    # Who delivered it, and in which domain. The pipeline cannot know either — a BRD
+    # states what to build, not who builds it — so without these the ledger's team and
+    # domain columns stay NULL on every row the product writes, and no calibration
+    # slice can ever exist. Optional so existing clients keep working; the metrics
+    # overview reports how many rows arrive unattributed, so "shipped" stays checkable
+    # against "actually used".
+    team: str | None = Field(default=None, max_length=80)
+    domain_tags: list[str] | None = None
 
 
 @router.post("/{estimate_id}/actuals", status_code=status.HTTP_201_CREATED)
@@ -658,6 +666,8 @@ async def record_actual_for_line(
             actual_source=payload.actual_source,
             completed_at=payload.completed_at,
             scope_changed=payload.scope_changed,
+            team=payload.team,
+            domain_tags=payload.domain_tags,
         )
     except IntegrityError as exc:
         # Concurrent duplicate lost the check-then-insert race on origin_ref.
@@ -703,6 +713,8 @@ async def list_actuals(estimate_id: uuid.UUID, session: SessionDep) -> list[dict
                 "actual_source": row.actual_source,
                 "completed_at": row.completed_at.isoformat() if row.completed_at else None,
                 "scope_changed": row.scope_changed,
+                "team": row.team,
+                "domain_tags": list(row.domain_tags or ()),
                 # The band the actual was recorded AGAINST — after a rebuild the
                 # current draft's band may differ; mixing the two fakes the deviation.
                 "recorded_band": {

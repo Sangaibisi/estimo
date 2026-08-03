@@ -23,13 +23,14 @@ from __future__ import annotations
 import datetime as dt
 import math
 import uuid
+from collections.abc import Iterable
 
 from estimo_knowledge.db import AnalogFeedback, CalibrationSnapshot, LedgerEntryRow
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from estimo_core import EstimateLine, WorkItem
+from estimo_core import EstimateLine, WorkItem, tr_lower
 from estimo_estimate.calibration import transfer_distribution
 
 ROLLING_WINDOW = 20
@@ -53,6 +54,21 @@ def _feedback_weight(actual: float, line: EstimateLine) -> tuple[float, str]:
     return -miss, "band-missed-actual"
 
 
+def _normalize_tag(value: str | None) -> str | None:
+    """Ledger slice keys are compared, so they are normalized at the boundary."""
+    cleaned = tr_lower((value or "").strip())
+    return cleaned or None
+
+
+def _normalize_tags(values: Iterable[str] | None) -> list[str]:
+    seen: list[str] = []
+    for value in values or ():
+        tag = _normalize_tag(value)
+        if tag and tag not in seen:
+            seen.append(tag)
+    return seen
+
+
 async def record_actual(
     session: AsyncSession,
     *,
@@ -66,6 +82,8 @@ async def record_actual(
     completed_at: dt.date | None = None,
     scope_changed: bool = False,
     estimated_at: dt.date | None = None,
+    team: str | None = None,
+    domain_tags: list[str] | None = None,
 ) -> LedgerEntryRow:
     """Upsert the ledger row for this line, then re-derive feedback + snapshot.
 
@@ -85,8 +103,15 @@ async def record_actual(
     row.item_title = item.title
     row.item_description = item.description
     row.module_tags = list(item.module_tags)
-    row.domain_tags = list(item.domain_tags)
-    row.team = item.team
+    # Attribution comes from whoever closes the loop, falling back to the work item.
+    # The pipeline cannot supply it: a BRD says what to build, never which team will
+    # build it, so `WorkItem` is constructed without a team and every product-written
+    # row landed with team = NULL. Slicing calibration by team needs this column, and
+    # a NULL written today is unrecoverable — nobody reconstructs it a year later.
+    # Normalized so "Billing" and "billing" are one slice, not two (Turkish-aware:
+    # str.lower() maps "I" to "i", not "ı").
+    row.domain_tags = _normalize_tags(domain_tags if domain_tags is not None else item.domain_tags)
+    row.team = _normalize_tag(team if team is not None else item.team)
     row.est_optimistic = line.range.optimistic
     row.est_likely = line.range.likely
     row.est_pessimistic = line.range.pessimistic

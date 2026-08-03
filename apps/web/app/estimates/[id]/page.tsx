@@ -1129,9 +1129,11 @@ function BoePreview({
     actual_effort: number;
     actual_source: string;
     scope_changed: boolean;
+    team?: string;
   }) => void;
 }) {
   const [effort, setEffort] = useState<Record<string, string>>({});
+  const [team, setTeam] = useState<Record<string, string>>({});
   const titleOf = (workItemId: string) =>
     workItems.find((item) => item.id === workItemId)?.title ?? workItemId;
 
@@ -1241,6 +1243,17 @@ function BoePreview({
                                 })
                               }
                             />
+                            <input
+                              style={{ width: 110 }}
+                              placeholder={t(locale, "teamPlaceholder")}
+                              value={team[line.work_item_id] ?? ""}
+                              onChange={(event) =>
+                                setTeam({
+                                  ...team,
+                                  [line.work_item_id]: event.target.value,
+                                })
+                              }
+                            />
                             <button
                               type="button"
                               className="btn"
@@ -1259,6 +1272,12 @@ function BoePreview({
                                   actual_effort: value,
                                   actual_source: "timesheet",
                                   scope_changed: false,
+                                  // Optional, but the only moment anyone knows it:
+                                  // a BRD never says which team delivered the work,
+                                  // so an unattributed row can never be sliced later.
+                                  team:
+                                    (team[line.work_item_id] ?? "").trim() ||
+                                    undefined,
                                 });
                               }}
                             >

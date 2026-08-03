@@ -146,6 +146,7 @@ export const api = {
       actual_effort: number;
       actual_source: string;
       scope_changed: boolean;
+      team?: string;
     },
   ) =>
     request<{ status: string; deviation: number | null }>(
@@ -234,6 +235,8 @@ export interface ActualEntry {
   actual_source: string | null;
   completed_at: string | null;
   scope_changed: boolean;
+  team: string | null;
+  domain_tags: string[];
   recorded_band: {
     optimistic: number | null;
     likely: number | null;
