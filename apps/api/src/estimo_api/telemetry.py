@@ -31,7 +31,11 @@ def sanitize_metadata(payload: dict[str, Any] | None) -> dict[str, Any]:
     for key, value in (payload or {}).items():
         if not isinstance(key, str) or not _IDENTIFIER.match(key):
             continue
-        if isinstance(value, bool | int | float) or isinstance(value, str) and _IDENTIFIER.match(value):
+        if (
+            isinstance(value, bool | int | float)
+            or isinstance(value, str)
+            and _IDENTIFIER.match(value)
+        ):
             clean[key] = value
     return clean
 
