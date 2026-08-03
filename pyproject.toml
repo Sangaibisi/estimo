@@ -18,6 +18,7 @@ estimo-gateway = { workspace = true }
 estimo-api = { workspace = true }
 estimo-parse = { workspace = true }
 estimo-knowledge = { workspace = true }
+estimo-pipeline = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -59,6 +60,7 @@ mypy_path = [
     "packages/gateway/src",
     "packages/parse/src",
     "packages/knowledge/src",
+    "packages/pipeline/src",
     "apps/api/tests",
 ]
 exclude = ["alembic/"]

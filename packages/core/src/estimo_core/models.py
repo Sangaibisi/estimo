@@ -154,6 +154,11 @@ class WorkItem(EstimoModel):
     module_tags: tuple[str, ...] = ()
     domain_tags: tuple[str, ...] = ()
     team: str | None = None
+    anchors: tuple[AnchorFlag, ...] = Field(
+        default=(),
+        description="Quarantined anchors inherited from the source requirements — "
+        "estimation prompts MUST redact these (PRINCIPLES #5).",
+    )
 
 
 class AssumptionRisk(EstimoModel):

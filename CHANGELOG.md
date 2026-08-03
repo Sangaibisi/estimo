@@ -9,6 +9,17 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S4 pipeline** (`packages/pipeline`): LangGraph state machine parse → ambiguity gate →
+  clarification questions → decomposition, with an offline deterministic floor at every
+  node (a down or misbehaving gateway degrades quality, never correctness). The gate
+  law is mechanical: blocked requirements own no work items; human answers re-enter
+  through the gate, which re-evaluates. Versioned prompt files (loader fails loudly on
+  unversioned prompts; 11 Turkish few-shot examples for question generation),
+  ontology-guided module attribution over the Aurora taxonomy, `estimo-pipeline`
+  run/resume CLI, and the `estimo-eval` offline harness asserted in CI — first report:
+  module attribution 92% vs 31% naive baseline (+62), zero gate failures, zero
+  question gaps (`evals/reports/2026-08-03-s4-offline-eval.md`). Pydantic AI was
+  deliberately not adopted (its own model clients would bypass ADR-0001).
 - **S3 knowledge layer** (`packages/knowledge`): estimate-ledger Postgres schema
   (migration 0002) with Turkish-FTS generated tsvectors and dimension-flexible
   embeddings (model id + dim recorded per row); seed-set importer

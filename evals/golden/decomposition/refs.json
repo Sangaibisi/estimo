@@ -1,0 +1,35 @@
+{
+  "description": "Human-authored decomposition references for the Aurora fixture BRDs (S4-6). primary_module is the expected FIRST module tag per requirement; expected_gated lists requirements that must fail the ambiguity gate (PRINCIPLES #3).",
+  "brds": {
+    "BRD-AUR-26-01-taksitlendirme.docx": {
+      "expected_gated": ["REQ-G-04"],
+      "primary_module": {
+        "REQ-G-01": "campaign-engine",
+        "REQ-G-02": "campaign-engine",
+        "REQ-G-03": "billing-core",
+        "REQ-G-05": "dealer-portal",
+        "REQ-G-06": "campaign-engine",
+        "REQ-G-07": "campaign-engine",
+        "REQ-G-08": "integration-hub"
+      }
+    },
+    "BRD-AUR-26-02-konsolide-fatura.docx": {
+      "expected_gated": [],
+      "primary_module": {
+        "REQ-G-01": "crm-suite",
+        "REQ-G-02": "billing-core",
+        "REQ-G-03": "billing-core",
+        "REQ-G-04": "billing-core",
+        "REQ-G-05": "payment-adapter",
+        "REQ-G-06": "invoice-render"
+      }
+    },
+    "BRD-AUR-26-03-bayi-siparis-entegrasyonu.docx": {
+      "min_gated": 4,
+      "allowed_clear_modules": ["dealer-portal", "integration-hub"]
+    },
+    "BRD-AUR-26-04-bakiye-tasima.docx": {
+      "all_gated": true
+    }
+  }
+}

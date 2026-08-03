@@ -113,13 +113,13 @@ evaluation on the golden set.
 
 **Architecture slice:** `packages/pipeline` (LangGraph v0), `evals/` harness.
 
-- [ ] S4-1 LangGraph pipeline v0: parse → decompose → gate → questions; checkpoint/resume; Pydantic AI typed nodes
-- [ ] S4-2 Decomposition node: ontology-guided (module taxonomy from the S0 universe; telco eTOM/SID labels as an optional field)
-- [ ] S4-3 Ambiguity gate: ambiguity score threshold; an item that fails drops into "question generation" and **cannot enter** effort estimation (PRINCIPLES #3 enforced mechanically)
-- [ ] S4-4 Clarification question generator: company-style few-shot with 10+ examples (from the fixture universe), question quality rubric
-- [ ] S4-5 HITL checkpoint v0 (at the CLI/JSON level): answers feed back into the pipeline, the gate re-evaluates
-- [ ] S4-6 Eval harness v1 (DeepEval/promptfoo): decomposition coverage, question quality (rubric + human-labeled mini set), report format including the **naive baseline calculation**
-- [ ] S4-7 Prompt versioning scheme: `packages/pipeline/prompts/` + a prompt-change→eval trigger in CI
+- [x] S4-1 LangGraph pipeline v0: parse → decompose → gate → questions; checkpoint/resume; typed nodes via plain pydantic models — **Pydantic AI deliberately not adopted**: it ships its own model clients, which would bypass the gateway-only rule (ADR-0001); LangGraph + pydantic state covers the need
+- [x] S4-2 Decomposition node: ontology-guided (module taxonomy from the S0 universe; telco eTOM/SID labels as an optional field)
+- [x] S4-3 Ambiguity gate: ambiguity score threshold; an item that fails drops into "question generation" and **cannot enter** effort estimation (PRINCIPLES #3 enforced mechanically)
+- [x] S4-4 Clarification question generator: company-style few-shot with 10+ examples (from the fixture universe), question quality rubric
+- [x] S4-5 HITL checkpoint v0 (at the CLI/JSON level): answers feed back into the pipeline, the gate re-evaluates
+- [x] S4-6 Eval harness v1 (DeepEval/promptfoo): decomposition coverage, question quality (rubric + human-labeled mini set), report format including the **naive baseline calculation**
+- [x] S4-7 Prompt versioning scheme: `packages/pipeline/prompts/` + a prompt-change→eval trigger in CI
 
 **Exit gate (F1 blinded evaluation):** Decomposition+question outputs blind-compared
 against the human reference on the golden set; results report under `evals/reports/`;

@@ -68,6 +68,18 @@ _DETECTORS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+def redact_anchors(text: str) -> str:
+    """Replace anchor-bearing sentences with quarantine markers (PRINCIPLES #5).
+
+    Uses the SAME detection regexes, so anything detectable is guaranteed redacted —
+    substring replacement of stored snippets would miss whitespace-normalized copies.
+    Humans keep seeing the raw text; only LLM prompt boundaries use this.
+    """
+    for anchor_type, pattern in _DETECTORS:
+        text = pattern.sub(f" [{anchor_type}-karantina] ", text)
+    return text
+
+
 def detect_anchors(text: str) -> tuple[AnchorFlag, ...]:
     """Return anchors found in `text`, first match per type, snippet-trimmed."""
     found: list[AnchorFlag] = []
