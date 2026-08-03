@@ -70,7 +70,7 @@ the compose environment; provider-SDK guard proven by a test.
 
 ---
 
-## S2 — BRD Intake & Structural Parsing · `Status: 🟡 In progress` (all items done; exit gate awaits green CI run)
+## S2 — BRD Intake & Structural Parsing · `Status: 🟢 Done` (2026-08-03 — exit gate met: all fixtures parse with stable IDs, every planted anchor caught, parse eval green in CI)
 
 **Goal:** Turn a Turkish `.docx` BRD into a structural requirements table with stable IDs.
 
@@ -88,7 +88,7 @@ planted anchor in the fixtures; parse eval in CI.
 
 ---
 
-## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🔵 Planned`
+## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🟡 In progress`
 
 **Goal:** The import pipeline that takes in the seed set + hybrid search proven on Turkish.
 
