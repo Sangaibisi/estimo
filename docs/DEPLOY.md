@@ -80,6 +80,29 @@ Mirror `ghcr.io/sangaibisi/estimo-api` and `estimo-web` into the internal regist
 via the token's role claim (`ESTIMO_AUTH__ROLE_CLAIM`). Reads and estimator actions need
 an estimator; sign-off needs a signing authority; connectors/admin need an admin.
 
+## Source-system audiences (`ESTIMO_AUTH__ACL_CLAIM`)
+
+Roles say what a caller may *do* in Estimo. They say nothing about what the caller may
+*read in Confluence* — and Estimo indexes content whose permissions belong to the source
+system. Those permissions travel with each chunk as `acl_keys`, written by the connector
+(a Confluence page's effective restrictions, or the connection's declared default).
+
+`ESTIMO_AUTH__ACL_CLAIM` is the dotted path to the token claim carrying the caller's own
+audiences, in the same vocabulary your connectors write. Set it to the claim holding the
+IdP group ids you used as `acl_keys` (`groups` on Okta/Entra, `realm_access.roles` or a
+dedicated claim on Keycloak).
+
+**Leaving it unset is safe but restrictive.** Estimo can then attribute no audience to
+anyone, so ACL-filtered surfaces serve only content keyed `public`. It never falls back
+to serving everything: a pre-filter that cannot identify the reader must show less, not
+more. The same applies in single-tenant open mode — the synthetic local principal holds
+every *role* but no extra audience, because your Estimo users are a superset of the
+people allowed to read a restricted space.
+
+Concretely, `POST /v1/canonical` treats the request body's `acl_keys` as a *narrowing*
+preference over the caller's own audiences, never as a grant, and approving a canonical
+page can only narrow the audience its sources share.
+
 ## Model Context Protocol (MCP)
 
 The API mounts an MCP server at `/mcp` (streamable HTTP) exposing read tools

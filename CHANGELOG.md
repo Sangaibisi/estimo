@@ -170,6 +170,27 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Security
+- **The ACL pre-filter no longer takes its permissions from the requester.**
+  `POST /v1/canonical` passed the request body's `acl_keys` straight into
+  `lexical_chunk_ids`, so any reviewer could name a restricted audience, have its text
+  distilled into a draft body, and read that body back from `GET /v1/canonical` — which
+  returns page bodies to every reviewer in the tenant. `Principal` now carries the
+  audiences Estimo can actually attribute to a caller (from `ESTIMO_AUTH__ACL_CLAIM`),
+  and `clamp_acl_keys` treats a requested key list as a *narrowing preference over that
+  set*, never as a grant. Unset claim, or single-tenant open mode, means public-only —
+  a pre-filter that cannot identify its reader must show less, not more (SECURITY.md).
+  The synthetic open-mode principal deliberately does **not** inherit every audience
+  along with every role: ACL keys model the *source* system's permissions, and Estimo's
+  users are a superset of who may read a restricted Confluence space.
+- **Approving a canonical page can no longer widen it.** Explicit `acl_keys` overrode
+  the computed source intersection outright, so text distilled from a restricted space
+  could be published to a wider audience — the same widening the pre-filter prevents,
+  applied at write time. Explicit keys may now only narrow. Fixing this exposed why the
+  override existed: the intersection treated `public` as a constraint, so one public
+  source plus one restricted source looked unpublishable when the correct audience is
+  simply the restricted one. `restricting_audiences` (in `estimo_core`, shared by the
+  API clamp and the publish clamp) now excludes universally-held keys, and genuinely
+  disjoint audiences stay unpublishable together.
 - **S10 review hardening** (adversarial review; 10 confirmed findings fixed): the MCP
   endpoint is now an OAuth2 resource server (FastMCP `JWTVerifier`) that pins the
   caller's tenant from the validated token — it was reachable unauthenticated and read

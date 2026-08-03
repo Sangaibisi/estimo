@@ -69,6 +69,10 @@ auth:
   audience: "estimo-api"
   roleClaim: "realm_access.roles"
   tenantClaim: "tenant"
+  # Claim carrying the caller's source-system audiences, matched against the
+  # acl_keys your connectors write. Empty => ACL-filtered surfaces serve public
+  # content only; it never falls back to serving everything.
+  aclClaim: ""
 
 # LiteLLM gateway (ADR-0001). Required for real LLM calls.
 gateway:

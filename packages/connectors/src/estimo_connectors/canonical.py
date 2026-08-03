@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_connectors.db import CanonicalPage
+from estimo_core import restricting_audiences
 from estimo_gateway import GatewayClient, GatewayError
 
 logger = logging.getLogger("estimo.connectors.canonical")
@@ -114,10 +115,16 @@ async def approve(
     """Human gate: version-bump, mark approved, publish into retrieval.
 
     ACL discipline: the page contains its sources' text, so it may only be visible
-    to readers who can see EVERY source — the published ACL is the intersection of
-    the source chunks' keys. When that intersection is empty (mixed audiences) the
-    approver must state the audience explicitly; publishing "public" by default
-    would widen access.
+    to readers who can see EVERY source. `acl_keys` may only NARROW that audience; it
+    cannot replace it. Overriding it outright (the previous behaviour) let an approver
+    publish text distilled from a restricted space to a wider one, the same widening
+    the pre-filter exists to prevent, just applied at write time.
+
+    PUBLIC_ACL does not constrain the intersection, because every reader holds it —
+    a page built from one public source and one `finans` source is readable by
+    `finans`, not by nobody. Getting that wrong is what made the ordinary case look
+    unpublishable and made an arbitrary override feel necessary. Sources with
+    genuinely disjoint audiences stay unpublishable together.
 
     Freshness is the OLDEST source's freshness, not curation time — a page distilled
     from stale sources must still trip the staleness warning.
@@ -126,15 +133,22 @@ async def approve(
         return page
 
     sources = await _source_chunks(session, page)
+    computed = restricting_audiences([set(chunk.acl_keys or []) for chunk in sources])
+    if computed is None:
+        raise ValueError(
+            "sources have no common ACL audience, so no audience can read every "
+            "source — remove the sources that do not share an audience, then approve"
+        )
     if acl_keys is None:
-        key_sets = [set(chunk.acl_keys or []) for chunk in sources]
-        computed = set.intersection(*key_sets) if key_sets else set()
-        if not computed:
-            raise ValueError(
-                "sources have no common ACL audience — pass acl_keys explicitly "
-                "to state who may read the approved page"
-            )
         acl_keys = sorted(computed)
+    else:
+        narrowed = computed & set(acl_keys)
+        if not narrowed:
+            raise ValueError(
+                f"acl_keys may only narrow the sources' common audience "
+                f"{sorted(computed)}; {sorted(set(acl_keys))} shares nothing with it"
+            )
+        acl_keys = sorted(narrowed)
     freshness_candidates = [
         chunk.freshness_at for chunk in sources if chunk.freshness_at is not None
     ]

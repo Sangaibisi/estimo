@@ -37,7 +37,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from estimo_api.auth import require_admin, require_reviewer
+from estimo_api.auth import (
+    Principal,
+    clamp_acl_keys,
+    current_principal,
+    require_admin,
+    require_reviewer,
+)
 from estimo_api.db import get_session
 from estimo_api.settings import Settings
 from estimo_api.tenancy import bind_tenant_guc, get_current_tenant, set_current_tenant
@@ -337,12 +343,19 @@ async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
     "/canonical", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_reviewer)]
 )
 async def create_candidate(
-    payload: CandidateIn, session: SessionDep, request: Request
+    payload: CandidateIn,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict[str, str]:
+    # The body's acl_keys select WHICH of the caller's own audiences to search; they
+    # never grant one. Unclamped, this endpoint was a read primitive for any
+    # restricted chunk in the tenant (the excerpts land in page.body, which
+    # GET /v1/canonical hands back).
     page = await generate_candidate(
         session,
         topic=payload.topic,
-        acl_keys=payload.acl_keys,
+        acl_keys=clamp_acl_keys(principal, payload.acl_keys),
         client=_gateway_client(request.app.state.settings),
     )
     await session.commit()
@@ -351,13 +364,25 @@ async def create_candidate(
 
 @router.post("/canonical/{page_id}/approve", dependencies=[Depends(require_reviewer)])
 async def approve_candidate(
-    page_id: uuid.UUID, payload: ApproveIn, session: SessionDep
+    page_id: uuid.UUID,
+    payload: ApproveIn,
+    session: SessionDep,
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict[str, Any]:
     page = await session.get(CanonicalPage, page_id)
     if page is None:
         raise HTTPException(status_code=404, detail="canonical page not found")
     try:
-        page = await approve(session, page, approver=payload.approver, acl_keys=payload.acl_keys)
+        page = await approve(
+            session,
+            page,
+            approver=payload.approver,
+            acl_keys=(
+                clamp_acl_keys(principal, payload.acl_keys)
+                if payload.acl_keys is not None
+                else None
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await session.commit()

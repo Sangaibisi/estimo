@@ -31,6 +31,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from pydantic import BaseModel, Field
 
+from estimo_core import PUBLIC_ACL
+
 logger = logging.getLogger("estimo.api.auth")
 
 # The tenant column is a UUID (RLS keys on it). IdPs supply a tenant identifier of
@@ -75,6 +77,13 @@ class AuthSettings(BaseModel):
     algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
     role_claim: str = "realm_access.roles"
     tenant_claim: str = "tenant"
+    # Dotted path to the claim carrying the caller's source-system audiences — the
+    # groups/space-keys that Confluence restrictions are expressed in. Empty (the
+    # default) means Estimo cannot attribute ANY audience to a caller, and the ACL
+    # clamp falls back to PUBLIC_ACL. It never falls back to "everything": a
+    # pre-filter that cannot identify the reader must show less, not more
+    # (SECURITY.md).
+    acl_claim: str = ""
     jwks_ttl_seconds: int = 300
     leeway_seconds: int = 30
 
@@ -89,6 +98,38 @@ class Principal(BaseModel):
     subject: str
     tenant: str
     roles: frozenset[str]
+    # Source-system audiences this caller can be PROVEN to hold. Never taken from a
+    # request body — see clamp_acl_keys.
+    acl_keys: frozenset[str] = frozenset({PUBLIC_ACL})
+
+
+def clamp_acl_keys(principal: Principal, requested: list[str] | None) -> list[str]:
+    """The ACL keys a request may actually search with.
+
+    SECURITY.md: source ACLs are enforced as a PRE-FILTER at query time, and the
+    pre-filter must never widen access. A caller-supplied key list is a *narrowing*
+    preference, never an authorization — before this existed, POST /v1/canonical
+    passed the request body's acl_keys straight into retrieval, so any reviewer could
+    name a restricted audience, pull its text into a draft body, and read it back.
+
+    So: the caller's proven audiences are the ceiling, and `requested` may only
+    intersect it. An empty intersection is an error rather than a silent widening to
+    public, because silently returning public results for a restricted query looks
+    like "that space has nothing about X" — a false negative the curator would act on.
+    """
+    entitled = principal.acl_keys or frozenset({PUBLIC_ACL})
+    if requested is None:
+        return sorted(entitled)
+    narrowed = entitled & frozenset(requested)
+    if not narrowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "none of the requested acl_keys are held by this caller; "
+                f"available: {sorted(entitled)}"
+            ),
+        )
+    return sorted(narrowed)
 
 
 def _pluck(claims: dict[str, Any], dotted: str) -> Any:
@@ -133,10 +174,19 @@ class OidcVerifier:
                 detail=f"token has no tenant claim at {self.settings.tenant_claim!r}",
             )
         roles = _as_role_list(_pluck(claims, self.settings.role_claim))
+        # Same normalization as roles: an IdP may emit groups as a list or as a
+        # space-delimited string, and a bare string iterated per-character would
+        # produce single-letter "audiences" that match nothing.
+        audiences = (
+            _as_role_list(_pluck(claims, self.settings.acl_claim))
+            if self.settings.acl_claim
+            else []
+        )
         return Principal(
             subject=str(claims["sub"]),
             tenant=tenant_to_uuid(tenant),
             roles=frozenset(roles),
+            acl_keys=frozenset(audiences) | {PUBLIC_ACL},
         )
 
 
@@ -160,6 +210,10 @@ async def current_principal(
     if verifier is None:
         from estimo_api.tenancy import DEFAULT_TENANT
 
+        # Single-tenant open mode: a synthetic admin. The ACL entitlement is NOT
+        # widened along with the roles — ACL keys model the SOURCE system's
+        # permissions (who may read a restricted Confluence space), and Estimo's
+        # users are a superset of that population even when Estimo itself is open.
         return Principal(subject="local", tenant=DEFAULT_TENANT, roles=frozenset(ROLES))
     if credentials is None:
         raise HTTPException(

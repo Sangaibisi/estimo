@@ -152,14 +152,10 @@ async def test_canonical_approve_refuses_mixed_audience_without_explicit_acl(
     page = await generate_candidate(
         session, topic="taksitli fatura kırılımı", acl_keys=["public", "confluence-group:finans"]
     )
-    # Sources share no common audience → publishing would widen; must be refused.
-    with pytest.raises(ValueError, match="common ACL audience"):
-        await approve(session, page, approver="D. Aksoy")
-
-    # With an explicit narrower audience it publishes to exactly that key.
-    approved = await approve(
-        session, page, approver="D. Aksoy", acl_keys=["confluence-group:finans"]
-    )
+    # PUBLIC_ACL is held by every reader, so it constrains nothing: the audience that
+    # can read BOTH sources is exactly the restricted one. This used to raise and hand
+    # the approver a free-text audience instead — the widening this test now guards.
+    approved = await approve(session, page, approver="D. Aksoy")
     chunk = await session.scalar(
         select(KnowledgeChunk).where(KnowledgeChunk.source_type == "canonical")
     )
@@ -200,3 +196,47 @@ async def test_canonical_reapproval_does_not_accumulate_versions(
         ).scalars()
     )
     assert len(canonical) == 1  # replaced, not accumulated
+
+
+async def test_canonical_approve_refuses_to_widen_past_the_source_audience(
+    clean: AsyncSession,
+) -> None:
+    """SECURITY.md: the ACL pre-filter must never widen access. An approver naming a
+    wider audience than the sources' own would publish restricted text to it."""
+    session = clean
+    from estimo_connectors import approve, generate_candidate
+    from estimo_knowledge import upsert_document
+
+    await upsert_document(
+        session,
+        source_type="confluence",
+        source_ref="wiki://secret@1",
+        title="Gizli",
+        text="Taksitli fatura kırılımı gizli tarafı.",
+        acl_keys=["confluence-group:finans"],
+    )
+    await session.commit()
+    page = await generate_candidate(
+        session, topic="taksitli fatura kırılımı", acl_keys=["confluence-group:finans"]
+    )
+
+    with pytest.raises(ValueError, match="may only narrow"):
+        await approve(session, page, approver="D. Aksoy", acl_keys=["public"])
+
+    # Disjoint audiences stay unpublishable: no reader can see every source.
+    await upsert_document(
+        session,
+        source_type="confluence",
+        source_ref="wiki://other@1",
+        title="Satış",
+        text="Taksitli fatura kırılımı satış tarafı.",
+        acl_keys=["confluence-group:satis"],
+    )
+    await session.commit()
+    mixed = await generate_candidate(
+        session,
+        topic="taksitli fatura kırılımı",
+        acl_keys=["confluence-group:finans", "confluence-group:satis"],
+    )
+    with pytest.raises(ValueError, match="no common ACL audience"):
+        await approve(session, mixed, approver="D. Aksoy")
