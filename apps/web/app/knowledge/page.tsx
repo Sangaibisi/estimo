@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type CanonicalEntry } from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
+import { IconKnowledge } from "@/components/icons";
 
 export default function KnowledgePage() {
   const [locale, setLocale] = useState<Locale>("en");
@@ -57,11 +58,10 @@ export default function KnowledgePage() {
 
   return (
     <section className="scr">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
-          {t(locale, "knowledge")}
-        </h2>
-        <span style={{ fontSize: 13, color: "var(--mut)" }}>{t(locale, "knowledgeSubtitle")}</span>
+      <div className="page-h">
+        <IconKnowledge size={18} />
+        <h2>{t(locale, "knowledge")}</h2>
+        <span className="sub">{t(locale, "knowledgeSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>

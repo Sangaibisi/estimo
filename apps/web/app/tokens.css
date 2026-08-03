@@ -29,6 +29,14 @@
   --ev-ans: #3a6428;
   --sh: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
   --sh2: 0 8px 24px rgba(20, 24, 28, 0.1);
+  /* Brand identity: the tone-on-tone navy gradient behind chrome accents (top
+     strip, active-rail edge). Chrome only — never inside data graphics — and
+     deliberately monochrome-blue: a second hue would collide with the reserved
+     evidence colors (--ev-wiki teal came uncomfortably close). The logo tile
+     itself uses a FIXED pair in the SVGs (favicon parity), not these tokens. */
+  --brand-a: var(--acc);
+  --brand-b: #16355e;
+  --grad-brand: linear-gradient(135deg, var(--brand-a), var(--brand-b));
   --r: 6px;
   --r2: 10px;
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
@@ -62,6 +70,7 @@
   --ev-ans: #8fbf72;
   --sh: 0 1px 2px rgba(0, 0, 0, 0.5);
   --sh2: 0 10px 28px rgba(0, 0, 0, 0.55);
+  --brand-b: #4a7fd4;
 }
 
 /* Row density (the design ships two modes; comfortable is the default). */
@@ -81,7 +90,16 @@
 
 body {
   margin: 0;
+  /* A whisper of brand tint at the top of the document; settles to --bg by ~340px
+     and scrolls away with the page. Plain --bg first: the gradient needs
+     color-mix(), which the oldest supported Firefox lacks — without the fallback
+     those browsers would drop the whole declaration and paint white. */
   background: var(--bg);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--acc) 3%, var(--bg)),
+    var(--bg) 340px
+  );
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -203,8 +221,23 @@ a:hover {
   cursor: not-allowed;
 }
 
+/* ---- Top bar brand strip ---- */
+.topbar {
+  position: relative;
+}
+.topbar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--grad-brand);
+}
+
 /* ---- Left rail navigation ---- */
 .rail-i {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -216,6 +249,9 @@ a:hover {
   border: 1px solid transparent;
   text-decoration: none;
 }
+.rail-i svg {
+  color: var(--mut);
+}
 .rail-i:hover {
   background: var(--surf3);
   text-decoration: none;
@@ -225,6 +261,41 @@ a:hover {
   border-color: var(--acc-line);
   color: var(--acc);
   font-weight: 500;
+}
+.rail-i.on svg {
+  color: var(--acc);
+}
+.rail-i.on::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--grad-brand);
+}
+
+/* ---- Page heading with its section icon ---- */
+.page-h {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.page-h svg {
+  color: var(--acc);
+  align-self: center;
+}
+.page-h h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.page-h .sub {
+  font-size: 13px;
+  color: var(--mut);
 }
 
 /* ---- Stage stepper ---- */
@@ -261,7 +332,13 @@ a:hover {
 
 /* ---- Placeholder / drop target ---- */
 .ph {
+  /* color-mix fallback first, as on body. */
   background: var(--surf2);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--acc) 3%, var(--surf2)),
+    var(--surf2)
+  );
   border: 1px dashed var(--line2);
   border-radius: var(--r);
   display: flex;

@@ -9,6 +9,25 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **Admin → Model gateway & runtime panels + `GET /v1/system`.** The design's Admin
+  screen always promised a model-profile table; the **stage→profile half** of that
+  contract now exists (the token/cost meters half still needs per-stage usage
+  accounting and stays open), fed by a new admin-only endpoint that reports the
+  *redacted* runtime configuration — gateway base URL (userinfo stripped), key
+  **presence** (never the value), profiles, auth mode/claims, database
+  host/name/role (never the DSN), CORS. A companion `POST /v1/system/gateway-check`
+  does one timed round-trip through the configured gateway so an operator can verify
+  LLM connectivity from the product instead of the container logs; failure reasons
+  are sanitized to *our* words, because upstream gateways have been known to echo
+  the API key they were shown back into error bodies. Config stays environment-only
+  (ADR-0006): the panel reports, it never edits.
+- **Visual identity layer.** A logo mark built from the product's own RangeBar
+  (three O/L/P bars on the brand gradient), shipped as the favicon and the top-bar
+  brand; a drawn SVG icon set (16px grid, stroke, `currentColor`) for the left rail
+  and page headings; brand-gradient chrome accents (top strip, active-rail edge,
+  background washes) in both themes. Data graphics are untouched — gradients live on
+  chrome only, and status/evidence colors keep their reserved meanings
+  (docs/design/README.md, "Identity layer").
 - **A dense leg for the chunk shelf** (`dense_chunk_ids`, `hybrid_chunk_ids`). S11-8's
   first cut wrote `knowledge_chunks.embedding` for a column nothing read: only the
   *ledger* had a dense path, so every chunk embedded was cost without retrieval benefit,

@@ -196,7 +196,38 @@ export const api = {
       `/v1/canonical/${id}/approve`,
       { method: "POST", body: JSON.stringify({ approver }) },
     ),
+  systemInfo: () => request<SystemInfo>("/v1/system"),
+  gatewayCheck: () =>
+    request<GatewayCheckResult>("/v1/system/gateway-check", { method: "POST" }),
 };
+
+export interface SystemInfo {
+  version: string;
+  auth: {
+    mode: "oidc" | "open";
+    issuer: string | null;
+    audience: string | null;
+    role_claim: string;
+    tenant_claim: string;
+    acl_claim: string | null;
+  };
+  gateway: {
+    base_url: string;
+    api_key_present: boolean;
+    profiles: Record<string, string>;
+    timeout_seconds: number;
+    max_retries: number;
+  };
+  database: { host: string | null; name: string | null; role: string | null };
+  cors_origins: string[];
+}
+
+export interface GatewayCheckResult {
+  ok: boolean;
+  model?: string;
+  latency_ms: number;
+  error?: string;
+}
 
 export interface ConnectionEntry {
   id: string;

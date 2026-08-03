@@ -108,6 +108,19 @@ async def test_estimator_token_reads_but_cannot_admin(client: httpx.AsyncClient)
     assert denied.status_code == 403
 
 
+async def test_system_surface_is_admin_only(client: httpx.AsyncClient) -> None:
+    """/v1/system is deployment recon (DB host+role, claim paths, gateway routing)
+    and gateway-check spends gateway money — the mount-time require_admin is the
+    ONLY gate, so it must be pinned here or dropping the `dependencies=` kwarg in
+    main.py would ship green."""
+    reviewer = {"Authorization": f"Bearer {_token(roles=['reviewer'])}"}
+    assert (await client.get("/v1/system", headers=reviewer)).status_code == 403
+    assert (await client.post("/v1/system/gateway-check", headers=reviewer)).status_code == 403
+
+    admin = {"Authorization": f"Bearer {_token(roles=['admin'])}"}
+    assert (await client.get("/v1/system", headers=admin)).status_code == 200
+
+
 async def test_admin_token_may_admin(client: httpx.AsyncClient) -> None:
     headers = {"Authorization": f"Bearer {_token(roles=['admin'])}"}
     created = await client.post(

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { api, type EstimateSummary } from "@/lib/api";
 import { detectLocale, statusLabel, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
+import { IconEstimates } from "@/components/icons";
 
 /** Stage of an estimate expressed the way the design's StageStrip reads. */
 function stageOf(estimate: EstimateSummary): { index: number; label: string } {
@@ -83,13 +84,10 @@ export default function WorkspacePage() {
 
   return (
     <section className="scr">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
-          {t(locale, "estimates")}
-        </h2>
-        <span style={{ fontSize: 13, color: "var(--mut)" }}>
-          {t(locale, "workspaceSubtitle")}
-        </span>
+      <div className="page-h">
+        <IconEstimates size={18} />
+        <h2>{t(locale, "estimates")}</h2>
+        <span className="sub">{t(locale, "workspaceSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>

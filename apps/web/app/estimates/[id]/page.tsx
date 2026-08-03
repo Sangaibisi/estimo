@@ -30,6 +30,7 @@ import {
   DelphiOverlay,
   StatusChip,
 } from "@/components/ui";
+import { IconEstimates } from "@/components/icons";
 
 interface Question {
   id: string;
@@ -195,30 +196,13 @@ export default function EstimateWorkspace({
 
   return (
     <section className="scr">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: 12,
-          marginBottom: 12,
-        }}
-      >
+      <div className="page-h">
         <Link href="/" className="lbl">
           ← {t(locale, "estimates")}
         </Link>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 19,
-            fontWeight: 600,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {summary.brd_ref}
-        </h2>
-        <span style={{ fontSize: 13, color: "var(--mut)" }}>
-          {summary.title}
-        </span>
+        <IconEstimates size={18} />
+        <h2>{summary.brd_ref}</h2>
+        <span className="sub">{summary.title}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden", marginBottom: 18 }}>

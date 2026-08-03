@@ -7,9 +7,10 @@
  * stores only the NAME of an env var on the API container. */
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type ConnectionEntry } from "@/lib/api";
+import { api, type ConnectionEntry, type GatewayCheckResult, type SystemInfo } from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
+import { IconAdmin } from "@/components/icons";
 
 const KINDS = ["confluence", "bitbucket", "github", "gitlab", "git", "jira"];
 
@@ -27,6 +28,9 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [gatewayResult, setGatewayResult] = useState<GatewayCheckResult | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const [kind, setKind] = useState("bitbucket");
   const [name, setName] = useState("");
@@ -42,7 +46,20 @@ export default function AdminPage() {
   useEffect(() => {
     setLocale(detectLocale());
     refresh();
+    api.systemInfo().then(setSystem).catch((err) => setError(String(err)));
   }, [refresh]);
+
+  async function checkGateway() {
+    setChecking(true);
+    setGatewayResult(null);
+    try {
+      setGatewayResult(await api.gatewayCheck());
+    } catch (err) {
+      setGatewayResult({ ok: false, latency_ms: 0, error: String(err) });
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -66,11 +83,10 @@ export default function AdminPage() {
 
   return (
     <section className="scr">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
-          {t(locale, "admin")}
-        </h2>
-        <span style={{ fontSize: 13, color: "var(--mut)" }}>{t(locale, "adminSubtitle")}</span>
+      <div className="page-h">
+        <IconAdmin size={18} />
+        <h2>{t(locale, "admin")}</h2>
+        <span className="sub">{t(locale, "adminSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
@@ -304,6 +320,138 @@ export default function AdminPage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Model gateway — the design's stage → profile table (ADR-0001 UI contract). */}
+      <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
+        <BandHeader
+          title={t(locale, "gatewaySection")}
+          right={
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {gatewayResult &&
+                (gatewayResult.ok ? (
+                  <StatusChip status="ok">
+                    {gatewayResult.model} · {gatewayResult.latency_ms} ms ·{" "}
+                    {t(locale, "gatewayOk")}
+                  </StatusChip>
+                ) : (
+                  <StatusChip status="crit">
+                    {(gatewayResult.error ?? "error").slice(0, 90)}
+                  </StatusChip>
+                ))}
+              <button type="button" className="btn" disabled={checking} onClick={checkGateway}>
+                {checking ? t(locale, "testing") : t(locale, "testGateway")}
+              </button>
+            </div>
+          }
+        />
+        <div style={{ padding: "14px 18px" }}>
+          {system ? (
+            <>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <Mn>{system.gateway.base_url}</Mn>
+                {system.gateway.api_key_present ? (
+                  <StatusChip status="ok">{t(locale, "keyConfigured")}</StatusChip>
+                ) : (
+                  <StatusChip status="crit">{t(locale, "keyMissing")}</StatusChip>
+                )}
+                <Chip>
+                  {t(locale, "timeoutShort")} {system.gateway.timeout_seconds}s
+                </Chip>
+                <Chip>
+                  {t(locale, "retriesShort")} {system.gateway.max_retries}
+                </Chip>
+              </div>
+              {Object.keys(system.gateway.profiles).length === 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  <StatusChip status="crit">{t(locale, "noProfiles")}</StatusChip>
+                </div>
+              ) : (
+                <table className="dt" style={{ marginTop: 12 }}>
+                  <thead>
+                    <tr>
+                      <th>{t(locale, "stageHeader")}</th>
+                      <th>{t(locale, "profileHeader")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(system.gateway.profiles).map(([stage, profile]) => (
+                      <tr key={stage}>
+                        <td style={{ color: "var(--ink2)" }}>{stage}</td>
+                        <td>
+                          <Mn>{profile}</Mn>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <div style={{ marginTop: 10, textWrap: "pretty" }}>
+                <Lbl>{t(locale, "gatewayHint")}</Lbl>
+              </div>
+            </>
+          ) : (
+            <div style={{ color: "var(--mut)", fontSize: 13 }}>—</div>
+          )}
+        </div>
+      </div>
+
+      {/* Runtime & authentication — reported, never edited (env-only config). */}
+      <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
+        <BandHeader title={t(locale, "runtimeSection")} />
+        <div style={{ padding: "14px 18px" }}>
+          {system ? (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "170px 1fr",
+                  rowGap: 9,
+                  columnGap: 14,
+                  alignItems: "baseline",
+                  fontSize: 13,
+                }}
+              >
+                <Lbl>{t(locale, "authModeLabel")}</Lbl>
+                <span style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {system.auth.mode === "oidc" ? (
+                    <>
+                      <StatusChip status="ok">{t(locale, "authModeOidc")}</StatusChip>
+                      <Mn>{system.auth.issuer}</Mn>
+                      {system.auth.audience && <Chip>aud {system.auth.audience}</Chip>}
+                      <Chip>roles ← {system.auth.role_claim}</Chip>
+                      <Chip>tenant ← {system.auth.tenant_claim}</Chip>
+                      {system.auth.acl_claim ? (
+                        <Chip>acl ← {system.auth.acl_claim}</Chip>
+                      ) : (
+                        <StatusChip status="warn">{t(locale, "aclClaimUnset")}</StatusChip>
+                      )}
+                    </>
+                  ) : (
+                    <StatusChip status="warn">{t(locale, "authModeOpen")}</StatusChip>
+                  )}
+                </span>
+                <Lbl>{t(locale, "apiVersionLabel")}</Lbl>
+                <Mn>{system.version}</Mn>
+                <Lbl>{t(locale, "databaseLabel")}</Lbl>
+                <Mn>
+                  {system.database.role}@{system.database.host}/{system.database.name}
+                </Mn>
+                <Lbl>{t(locale, "corsLabel")}</Lbl>
+                <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {system.cors_origins.map((origin) => (
+                    <Chip key={origin}>{origin}</Chip>
+                  ))}
+                </span>
+              </div>
+              <div style={{ marginTop: 12, textWrap: "pretty" }}>
+                <Lbl>{t(locale, "envOnlyHint")}</Lbl>
+              </div>
+            </>
+          ) : (
+            <div style={{ color: "var(--mut)", fontSize: 13 }}>—</div>
+          )}
+        </div>
       </div>
 
       {/* Roles */}

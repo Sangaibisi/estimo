@@ -2,18 +2,43 @@
 
 Estimo ships as OCI images (ADR-0006). Three supported paths, easiest first.
 
-## 1. Local / single-tenant — `docker compose`
+## 1. From source / single-tenant — `docker compose`
+
+The compose file **builds from the working tree** (`estimo-api:local`,
+`estimo-web:local`) — no registry, no release tags, and none of the repo's release
+automation is involved. Cloning the repo inside your company network is a complete
+deployment story:
 
 ```bash
 cp .env.example .env          # then edit gateway + (optional) auth values
-docker compose up -d          # db + migrate + api + web
+docker compose up --build -d  # db + migrate + api + web, built from this checkout
 ```
 
 - API on `http://localhost:8000`, web on `http://localhost:3000`.
 - Runs **open in single-tenant mode** — no OIDC required. Every row belongs to the
   implicit DEFAULT_TENANT.
+- Point the gateway at your real endpoint before first start: in `.env` set
+  `ESTIMO_GATEWAY__BASE_URL` (your LiteLLM or any OpenAI-compatible endpoint),
+  `ESTIMO_GATEWAY__API_KEY`, and `ESTIMO_GATEWAY__PROFILES` (the `.env.example`
+  values target the `--profile mock` stub LLM, which is for development only).
+- Upgrades are `git pull && docker compose up --build -d` — the one-shot `migrate`
+  service brings the schema to head before the API starts.
 - Optional profiles: `--profile mock` (a stub LLM for smoke tests),
   `--profile observability` (self-hosted Langfuse — see its resource note).
+
+### Where is everything configured?
+
+| What | Where |
+|---|---|
+| LLM gateway URL, API key, stage→model profiles | `ESTIMO_GATEWAY__*` env vars; **verified** in the product under Admin → Model gateway (profile table + one-click round-trip test, `POST /v1/system/gateway-check`) |
+| Bitbucket / GitHub / GitLab / Confluence / Jira integrations | In the product: Admin → Connections (kind, base URL, config, ACL keys). The credential itself is **never** typed into the UI — the connection stores the *name* of an env var set on the API container, and the tile warns when that var is missing |
+| OIDC / roles / tenancy | `ESTIMO_AUTH__*` env vars; current mode is shown under Admin → Runtime & authentication |
+| Database | `ESTIMO_DATABASE_URL` (+ `ESTIMO_OWNER_DATABASE_URL` for multi-tenant system paths) |
+| Everything at a glance | `GET /v1/system` (admin-only, redacted — booleans for secrets, never values) |
+
+Configuration is **environment-only by design** (ADR-0006): the Admin screen reports
+config, it never edits it. That keeps credentials out of the database and makes every
+change auditable through your normal env/secret management.
 
 ## 2. Kubernetes / BYOC — Helm
 

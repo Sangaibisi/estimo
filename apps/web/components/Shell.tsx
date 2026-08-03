@@ -3,42 +3,40 @@
 /** App chrome: the sticky top bar and the 184px left rail from the design.
  *
  * The design is explicit that this is a desktop workstation UI (min-width 1280px,
- * no mobile breakpoint), that theme and density are root data attributes, and that
- * rail icons are CSS primitives rather than glyph fonts. */
+ * no mobile breakpoint) and that theme and density are root data attributes. The
+ * identity layer (docs/design/README.md) replaced the original CSS-primitive rail
+ * squares with the drawn SVG icon set — still no glyph font, no emoji. */
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { detectLocale, setLocale, t, type Locale } from "@/lib/i18n";
+import {
+  IconAdmin,
+  IconCalibration,
+  IconEstimates,
+  IconKnowledge,
+  IconLedger,
+  IconMoon,
+  IconSun,
+  LogoMark,
+} from "@/components/icons";
 
 type Theme = "light" | "dark";
 type Density = "dense" | "comfortable";
 
-const RAIL: { href: string; key: "estimates" | "ledger" | "calibration" | "knowledge" | "admin" }[] =
-  [
-    { href: "/", key: "estimates" },
-    { href: "/ledger", key: "ledger" },
-    { href: "/calibration", key: "calibration" },
-    { href: "/knowledge", key: "knowledge" },
-    { href: "/admin", key: "admin" },
-  ];
-
-function RailIcon() {
-  // CSS primitive, per the design — no icon font, no emoji.
-  return (
-    <span
-      aria-hidden
-      style={{
-        width: 14,
-        height: 14,
-        border: "1.5px solid currentColor",
-        borderRadius: 3,
-        flex: "none",
-      }}
-    />
-  );
-}
+const RAIL: {
+  href: string;
+  key: "estimates" | "ledger" | "calibration" | "knowledge" | "admin";
+  icon: (props: { size?: number }) => ReactNode;
+}[] = [
+  { href: "/", key: "estimates", icon: IconEstimates },
+  { href: "/ledger", key: "ledger", icon: IconLedger },
+  { href: "/calibration", key: "calibration", icon: IconCalibration },
+  { href: "/knowledge", key: "knowledge", icon: IconKnowledge },
+  { href: "/admin", key: "admin", icon: IconAdmin },
+];
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -68,6 +66,13 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
+    // CSS text-transform cases by the CONTENT language: Turkish uppercases i → İ
+    // only when the tree is marked tr, otherwise every uppercased label ships the
+    // wrong glyph ("PROFILI" for "PROFİLİ").
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  useEffect(() => {
     document.documentElement.dataset.density = density;
     window.localStorage.setItem("estimo-density", density);
   }, [density]);
@@ -83,6 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header
+        className="topbar"
         style={{
           position: "sticky",
           top: 0,
@@ -96,9 +102,14 @@ export function Shell({ children }: { children: ReactNode }) {
           boxShadow: "var(--sh)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Estimo</span>
-          <span className="lbl">{t(locale, "tagline")}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <LogoMark size={24} />
+          <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            Estimo
+          </span>
+          <span className="lbl" style={{ alignSelf: "center", paddingTop: 1 }}>
+            {t(locale, "tagline")}
+          </span>
         </div>
         <div style={{ flex: 1 }} />
         <select
@@ -122,6 +133,7 @@ export function Shell({ children }: { children: ReactNode }) {
           className="btn"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
         >
+          {theme === "light" ? <IconMoon size={14} /> : <IconSun size={14} />}
           {theme === "light" ? t(locale, "themeDark") : t(locale, "themeLight")}
         </button>
       </header>
@@ -145,7 +157,7 @@ export function Shell({ children }: { children: ReactNode }) {
               href={item.href}
               className={`rail-i ${active(item.href) ? "on" : ""}`.trim()}
             >
-              <RailIcon />
+              <item.icon size={16} />
               {t(locale, item.key)}
             </Link>
           ))}

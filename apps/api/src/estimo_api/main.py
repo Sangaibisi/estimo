@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from estimo_api.db import build_engine, build_sessionmaker
 from estimo_api.mcp_server import build_mcp
-from estimo_api.routers import connections, estimates, health, ledger, metrics, runs
+from estimo_api.routers import connections, estimates, health, ledger, metrics, runs, system
 from estimo_api.settings import Settings
 
 
@@ -107,6 +107,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # HMAC-authenticated and is mounted on its own unauthenticated router below.
     app.include_router(connections.router, dependencies=[Depends(require_reviewer)])
     app.include_router(connections.webhook_router)
+    # Redacted runtime config + gateway diagnostics — an operator surface, admin-only.
+    app.include_router(system.router, dependencies=[Depends(require_admin)])
     app.mount("/mcp", mcp_app)
     return app
 
