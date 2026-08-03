@@ -8,6 +8,7 @@ from estimo_knowledge.db import (
     KnowledgeChunk,
     LedgerEntryRow,
 )
+from estimo_knowledge.embedding import EmbedReport, embed_pending, embed_text
 from estimo_knowledge.importer import ImportReport, import_seed, to_ledger_entry
 from estimo_knowledge.ingest import is_stale, upsert_document, upsert_generated_chunks
 from estimo_knowledge.search import (
@@ -22,9 +23,12 @@ __all__ = [
     "AnalogyCard",
     "Base",
     "CalibrationSnapshot",
+    "EmbedReport",
     "ImportReport",
     "KnowledgeChunk",
     "LedgerEntryRow",
+    "embed_pending",
+    "embed_text",
     "find_analogs",
     "hybrid_ledger_ids",
     "import_seed",

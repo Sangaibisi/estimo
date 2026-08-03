@@ -23,8 +23,9 @@ exported `.docx`. Two kinds of work remain, and they are different in kind.
 now collected in **[S11](#s11--carried-forward--status--not-started)** instead of hiding
 inside a ticked box: the rerank slot, contextual chunk headers, Delphi aggregation,
 team/domain curves, the OAuth repo picker, the docs site, per-user canonical ACL filtering,
-and — found while scoping the others — the fact that **nothing writes an embedding, so
-retrieval is lexical in practice everywhere.** Each names what blocks it.
+and — found while scoping the others — the fact that nothing wrote an embedding, so
+retrieval was lexical in practice everywhere (**S11-8, now fixed**). Each names what
+blocks it.
 
 *Maintainer-owned* — cannot be produced from synthetic data or without customer
 credentials: the F1 blinded evaluation's human/hybrid arms (S4), the dogfood pilot and
@@ -362,13 +363,19 @@ that overstate the build. Each names what blocked it.
   **Still open:** grouping inside `transfer_distribution`, slice columns on
   `calibration_snapshots`, the sliced endpoint and the dashboard section — all of which
   need a pilot ledger to be worth rendering.
-- [ ] S11-8 Indexer-side embedding writer — **nothing in the repo writes an embedding.**
-  The only `.embed()` call embeds the query; `upsert_document` NULLs the vector columns on
-  every write. So `dense_ledger_ids` matches zero rows and RRF fuses a single ranking:
-  retrieval is lexical in practice, everywhere. The dense code is correct and tested — it
-  has no data. Needs a live embedding endpoint to be worth measuring (same blocker as the
-  S3-2 embedder shoot-out), and a re-embed strategy, since Confluence re-ingests a 26-hour
-  overlap window on every sync and the conditional reset must not wipe vectors each run.
+- [x] S11-8 Indexer-side embedding writer — `embed_pending` gives every chunk and ledger
+  row a vector through the gateway (profile `embedding`; inert when unconfigured), run
+  automatically after each connector sync and on demand via `estimo-embed`. Batches
+  commit independently so a rate limit mid-backfill keeps the completed half, an
+  oversized page is capped rather than failing the batch behind it, and the model id +
+  dimension are stored per row so switching embedders drops old rows OUT of the dense leg
+  instead of scoring them in the wrong vector space. `upsert_document` now invalidates a
+  vector **only when the embedded text actually changed** — the unconditional reset would
+  have wiped every vector in Confluence's 26-hour overlap window on each incremental sync
+  and re-billed the embedder forever to recompute identical text.
+  ⚠️ **Whether the dense leg improves ranking is still unmeasured** — that needs a live
+  embedding endpoint and the S3-2 shoot-out. This ships the data path, not a quality
+  claim: before it, `dense_ledger_ids` matched zero rows in every deployment.
 - [ ] S11-5 OAuth workspace/repo picker for Bitbucket/GitHub/GitLab (S9-2) — needs the
   OAuth app-install flow; today Admin → Connections takes a clone URL and a JSON config.
 - [x] S11-6a Documentation site — **decided against, deliberately.** The corpus is ~20

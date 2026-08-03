@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Iterable
+from typing import Any
 
 STALE_AFTER_DAYS = 548  # ~18 months (S9-5): older sources carry a staleness warning
 
@@ -21,6 +22,7 @@ def is_stale(freshness_at: dt.datetime | None, *, now: dt.datetime | None = None
     return (reference - freshness_at).days > STALE_AFTER_DAYS
 
 
+from sqlalchemy import case
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,6 +60,17 @@ async def upsert_generated_chunks(
     return count
 
 
+def _text_changed(stmt: Any) -> Any:
+    """True when this upsert changes what `embed_text` would feed the embedder.
+
+    `KnowledgeChunk.<col>` is the row already stored; `stmt.excluded.<col>` is the
+    incoming value — the standard ON CONFLICT pair.
+    """
+    return (KnowledgeChunk.text.is_distinct_from(stmt.excluded.text)) | (
+        KnowledgeChunk.title.is_distinct_from(stmt.excluded.title)
+    )
+
+
 async def upsert_document(
     session: AsyncSession,
     *,
@@ -91,9 +104,16 @@ async def upsert_document(
             "acl_keys": stmt.excluded.acl_keys,
             "freshness_at": stmt.excluded.freshness_at,
             "authority": stmt.excluded.authority,
-            "embedding": None,
-            "embedding_model": None,
-            "embedding_dim": None,
+            # Invalidate the vector ONLY when the embedded text actually changed.
+            # An unconditional reset looks harmless and is not: the Confluence lane
+            # re-ingests an overlap window of UNCHANGED pages on every incremental
+            # sync, so it would wipe every vector in that window on each run, and the
+            # embedder would keep re-billing to recompute identical text forever.
+            "embedding": case((_text_changed(stmt), None), else_=KnowledgeChunk.embedding),
+            "embedding_model": case(
+                (_text_changed(stmt), None), else_=KnowledgeChunk.embedding_model
+            ),
+            "embedding_dim": case((_text_changed(stmt), None), else_=KnowledgeChunk.embedding_dim),
         },
     )
     await session.execute(stmt)

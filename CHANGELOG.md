@@ -9,6 +9,22 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S11-8 embedding writer — retrieval is hybrid in fact, not just in the diagram.**
+  Nothing in this repository had ever written an embedding: the only `.embed()` call
+  embedded the *query*, so `dense_ledger_ids` filtered `embedding IS NOT NULL` against
+  zero rows and RRF fused a single ranking, in every deployment, for the whole life of
+  the project. `embed_pending` fills chunk and ledger vectors through the gateway
+  (profile `embedding`, inert when unconfigured), running after each connector sync and
+  on demand via a new `estimo-embed` CLI. Batches commit independently so a rate limit
+  mid-backfill keeps the completed half; an oversized page is capped and reported rather
+  than failing the batch behind it (there is no chunker yet, so a "chunk" is a whole
+  page); and the model id and dimension are stored per row, so switching embedders drops
+  old rows OUT of the dense leg rather than scoring them in the wrong vector space.
+  The embedding pass runs *after* a sync is marked succeeded and is reported separately:
+  a gateway outage must not turn a completed multi-day crawl into a failed run.
+  **Unmeasured on purpose** — whether the dense leg improves Turkish ranking still needs
+  a live embedding endpoint (the S3-2 shoot-out). This ships the data path, not a
+  quality claim.
 - **Ledger attribution (part of S11-4; the sliced curves themselves are not built).**
   `record_actual` copied `team` and `domain_tags` off the `WorkItem`, and the pipeline
   never sets either — a BRD says what to build, not who builds it — so every ledger row
@@ -190,6 +206,14 @@ Until the first code release, entries track documentation and foundation milesto
 - ADR-0005: OSS-first composition — adopt proven, license-safe components behind internal
   interfaces; from-scratch code reserved for the differentiation core. Linked from
   AGENTS.md golden rules and ARCHITECTURE.md.
+
+### Fixed
+- `upsert_document` invalidated a row's embedding on **every** write. The Confluence
+  lane re-ingests a 26-hour overlap window of unchanged pages on each incremental sync,
+  so that would have wiped every vector in the window on each run and re-billed the
+  embedder forever to recompute byte-identical text. It now invalidates only when the
+  embedded text actually changed — and still does when it did, because a stale vector
+  for edited text retrieves confidently against content that no longer says that.
 
 ### Security
 - **`GET /v1/estimates/{id}/desk` no longer mutates.** It flipped the caller's

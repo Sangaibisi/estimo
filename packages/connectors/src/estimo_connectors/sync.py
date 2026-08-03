@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from estimo_code import CodeGraph, generate_module_wikis
-from estimo_knowledge import KnowledgeChunk, upsert_document
+from estimo_knowledge import KnowledgeChunk, embed_pending, upsert_document
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,6 +104,17 @@ async def run_sync(
         else:
             raise ValueError(f"unsupported connection kind: {connection.kind}")
         run.status = "succeeded"
+        # Freshly ingested rows carry no vector, so without this the dense leg only
+        # sees whatever a separate backfill happened to catch. Deliberately AFTER the
+        # sync is marked succeeded and reported separately: embedding is a best-effort
+        # enrichment, and a gateway outage must not turn a completed crawl — the
+        # expensive, rate-limited part — into a failed run that re-crawls tomorrow.
+        embed_report = await embed_pending(session, client)
+        stats = {
+            **stats,
+            "embedded": embed_report.embedded,
+            "embed_failed_batches": embed_report.failed_batches,
+        }
         run.stats = stats
     except Exception as exc:
         logger.exception("sync failed for %s", connection.name)

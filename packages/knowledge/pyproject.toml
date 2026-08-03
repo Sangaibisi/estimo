@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 estimo-ledger-import = "estimo_knowledge.cli:main"
+estimo-embed = "estimo_knowledge.embed_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
