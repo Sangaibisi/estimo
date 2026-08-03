@@ -88,7 +88,7 @@ planted anchor in the fixtures; parse eval in CI.
 
 ---
 
-## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🟡 In progress` (all items done; exit gate awaits green CI; embedder shoot-out deferred to first live gateway — see S3-2)
+## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🟢 Done` (2026-08-03 — exit gate met: seed import e2e with reports, TR lexical choice locked by measurement in ADR-0004, analogy cards green on the fixture ledger; embedder shoot-out deferred to first live gateway — see S3-2)
 
 **Goal:** The import pipeline that takes in the seed set + hybrid search proven on Turkish.
 
@@ -106,7 +106,7 @@ fixture ledger.
 
 ---
 
-## S4 — Decomposition & Ambiguity Gate · `Status: 🔵 Planned`
+## S4 — Decomposition & Ambiguity Gate · `Status: 🟡 In progress`
 
 **Goal:** The heart of the PoC: BRD → work items → clarification questions; first blinded
 evaluation on the golden set.
