@@ -700,7 +700,10 @@ async def list_actuals(estimate_id: uuid.UUID, session: SessionDep) -> list[dict
     await _get_record(session, estimate_id)
     prefix = make_origin_ref(estimate_id, "")
     result = await session.execute(
-        select(LedgerEntryRow).where(LedgerEntryRow.origin_ref.like(f"{prefix}%"))
+        # autoescape as a matter of course: a UUID prefix cannot contain `_` or `%`,
+        # but prefix matching that reasons about its input each time eventually meets
+        # an input it was wrong about.
+        select(LedgerEntryRow).where(LedgerEntryRow.origin_ref.startswith(prefix, autoescape=True))
     )
     entries: list[dict[str, Any]] = []
     for row in result.scalars():

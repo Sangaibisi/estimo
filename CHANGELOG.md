@@ -239,6 +239,13 @@ Until the first code release, entries track documentation and foundation milesto
   for edited text retrieves confidently against content that no longer says that.
 
 ### Security
+- **Prefix pruning no longer reaches across connections.** `_` is a LIKE wildcard and the
+  connection name is user-supplied (`[A-Za-z0-9._ -]` is allowed at the API boundary), so
+  syncing a connection named `a_b` matched — and deleted — the indexed chunks of a
+  connection named `axb`. Verified in SQL: `'repo://axb@sha/f' LIKE 'repo://a_b@%'` is
+  true. All three prefix matches now use `startswith(..., autoescape=True)`, including
+  the two whose inputs cannot currently contain a wildcard: prefix matching that reasons
+  about its input each time eventually meets an input it was wrong about.
 - **Editing a Confluence page no longer leaves its previous version retrievable.** A
   Confluence `source_ref` embeds the page version (`wiki://{id}@{n}`), so every edit
   wrote a new chunk — and nothing ever removed the old one. The git lane has pruned by

@@ -414,3 +414,45 @@ def test_page_prefix_groups_every_version_of_one_page() -> None:
     assert _page_prefix("wiki://123@11") == "wiki://123@"
     # Defensive: a ref with no version must not collapse to a prefix matching siblings.
     assert _page_prefix("wiki://123") == "wiki://123"
+
+
+async def test_prefix_prune_does_not_reach_across_connections(clean: AsyncSession) -> None:
+    """`_` is a LIKE wildcard and the connection NAME is user-supplied (the API allows
+    `[A-Za-z0-9._ -]`). Unescaped, syncing `a_b` deletes the indexed chunks of `axb`.
+
+    Scope: this pins the PREDICATE, not the lane — it builds the prune the way
+    `_sync_git` does rather than driving a real clone. It would therefore not catch the
+    lane dropping `autoescape` at the call site, only the predicate being wrong. Driving
+    the lane needs a git fixture per connection, which buys little here because the
+    escaping is the whole behaviour under test.
+    """
+    session = clean
+    from estimo_knowledge import KnowledgeChunk, upsert_document
+
+    for name in ("a_b", "axb"):
+        await upsert_document(
+            session,
+            source_type="code-wiki",
+            source_ref=f"repo://{name}@sha1/billing",
+            title=f"{name} billing",
+            text="Modül dokümanı.",
+            acl_keys=["public"],
+        )
+    await session.commit()
+
+    # The shape the git lane prunes with, for connection `a_b`.
+    await session.execute(
+        delete(KnowledgeChunk).where(
+            KnowledgeChunk.source_type == "code-wiki",
+            KnowledgeChunk.source_ref.startswith("repo://a_b@", autoescape=True),
+            KnowledgeChunk.source_ref.not_in(["repo://a_b@sha2/billing"]),
+        )
+    )
+    await session.commit()
+
+    survivors = {
+        row.source_ref for row in (await session.execute(select(KnowledgeChunk))).scalars()
+    }
+    assert survivors == {"repo://axb@sha1/billing"}, (
+        f"pruning connection a_b reached into another connection: {survivors}"
+    )

@@ -191,7 +191,9 @@ async def _sync_confluence(
             await session.execute(
                 delete(KnowledgeChunk).where(
                     KnowledgeChunk.source_type == document.source_type,
-                    KnowledgeChunk.source_ref.like(f"{_page_prefix(document.source_ref)}%"),
+                    KnowledgeChunk.source_ref.startswith(
+                        _page_prefix(document.source_ref), autoescape=True
+                    ),
                     KnowledgeChunk.source_ref != document.source_ref,
                 )
             )
@@ -250,7 +252,10 @@ async def _sync_git(
     pruned = await session.execute(
         delete(KnowledgeChunk).where(
             KnowledgeChunk.source_type == "code-wiki",
-            KnowledgeChunk.source_ref.like(f"{prefix}%"),
+            # autoescape, because `_` is a LIKE wildcard and the connection NAME is
+            # user-supplied: a connection called `a_b` would otherwise match — and
+            # therefore delete — the indexed chunks of a connection called `axb`.
+            KnowledgeChunk.source_ref.startswith(prefix, autoescape=True),
             KnowledgeChunk.source_ref.not_in(current_refs),
         )
     )
