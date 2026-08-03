@@ -97,6 +97,102 @@ export default function LedgerPage() {
           </div>
         )}
 
+        {/* AnalogCard grid — the design's card view of the top matches, with the
+            actual-effort tick allowed to sit OUTSIDE the band (that is the finding). */}
+        {searched && entries.length > 0 && (
+          <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)" }}>
+            <Lbl>
+              {t(locale, "analogMatches")} · {Math.min(entries.length, 4)} /{" "}
+              {total} {t(locale, "closedJobsSuffix")}
+            </Lbl>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 12,
+                marginTop: 10,
+              }}
+            >
+              {entries.slice(0, 4).map((entry) => {
+                const band =
+                  entry.estimate.optimistic !== null &&
+                  entry.estimate.likely !== null &&
+                  entry.estimate.pessimistic !== null
+                    ? {
+                        optimistic: entry.estimate.optimistic,
+                        likely: entry.estimate.likely,
+                        pessimistic: entry.estimate.pessimistic,
+                      }
+                    : null;
+                return (
+                  <div key={entry.id} className="card" style={{ padding: "11px 13px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        alignItems: "baseline",
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>
+                        {entry.item_title}
+                      </span>
+                      <Mn style={{ color: "var(--mut)", flex: "none" }}>{entry.brd_ref}</Mn>
+                    </div>
+                    <div style={{ marginTop: 9 }}>
+                      {band ? (
+                        <RangeBar
+                          band={band}
+                          max={max}
+                          legend={false}
+                          actual={entry.actual_effort}
+                        />
+                      ) : (
+                        <Mn style={{ color: "var(--mut)" }}>—</Mn>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: "var(--ink2)",
+                      }}
+                    >
+                      <span className="mn">
+                        {band
+                          ? `${band.optimistic}–${band.pessimistic} pd ${t(locale, "estimatedWord")}`
+                          : "—"}
+                        {entry.actual_effort !== null &&
+                          ` · ${entry.actual_effort} pd ${t(locale, "actualWord")}`}
+                      </span>
+                      {band && entry.actual_effort !== null ? (
+                        entry.actual_effort > band.pessimistic ? (
+                          <StatusChip status="crit">
+                            {t(locale, "devAbove")}
+                            {band.pessimistic > 0 &&
+                              ` · +${Math.round(
+                                ((entry.actual_effort - band.pessimistic) /
+                                  band.pessimistic) *
+                                  100,
+                              )}%`}
+                          </StatusChip>
+                        ) : entry.actual_effort < band.optimistic ? (
+                          <StatusChip status="warn">{t(locale, "devBelow")}</StatusChip>
+                        ) : (
+                          <StatusChip status="ok">{t(locale, "devWithin")}</StatusChip>
+                        )
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div
             role="alert"
@@ -173,6 +269,23 @@ export default function LedgerPage() {
                     <td>
                       {entry.scope_changed ? (
                         <StatusChip status="crit">{t(locale, "scopeChanged")}</StatusChip>
+                      ) : entry.actual_effort !== null && band ? (
+                        // DeviationBadge: graded against the RANGE, not the single
+                        // likely value — an actual inside the band is a kept promise
+                        // even when it misses "likely".
+                        entry.actual_effort > band.pessimistic ? (
+                          <StatusChip status="crit">
+                            {t(locale, "devAbove")}
+                            {band.pessimistic > 0 &&
+                              ` · +${Math.round(
+                                ((entry.actual_effort - band.pessimistic) / band.pessimistic) * 100,
+                              )}%`}
+                          </StatusChip>
+                        ) : entry.actual_effort < band.optimistic ? (
+                          <StatusChip status="warn">{t(locale, "devBelow")}</StatusChip>
+                        ) : (
+                          <StatusChip status="ok">{t(locale, "devWithin")}</StatusChip>
+                        )
                       ) : entry.deviation !== null ? (
                         <Chip
                           tone={

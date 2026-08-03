@@ -28,17 +28,17 @@ docker compose up --build -d  # db + migrate + api + web, built from this checko
 
 ### Where is everything configured?
 
+Almost everything in the product (ADR-0008): the environment supplies *bootstrap
+defaults*, and what an admin saves in the panel overrides it per field, immediately.
+
 | What | Where |
 |---|---|
-| LLM gateway URL, API key, stage→model profiles | `ESTIMO_GATEWAY__*` env vars; **verified** in the product under Admin → Model gateway (profile table + one-click round-trip test, `POST /v1/system/gateway-check`) |
-| Bitbucket / GitHub / GitLab / Confluence / Jira integrations | In the product: Admin → Connections (kind, base URL, config, ACL keys). The credential itself is **never** typed into the UI — the connection stores the *name* of an env var set on the API container, and the tile warns when that var is missing |
-| OIDC / roles / tenancy | `ESTIMO_AUTH__*` env vars; current mode is shown under Admin → Runtime & authentication |
-| Database | `ESTIMO_DATABASE_URL` (+ `ESTIMO_OWNER_DATABASE_URL` for multi-tenant system paths) |
+| LLM gateway URL, API key, stage→model profiles, timeouts | **Admin → Model gateway** (editable form + one-click round-trip test). `ESTIMO_GATEWAY__*` env vars are the bootstrap defaults underneath |
+| Bitbucket / GitHub / GitLab / Confluence / Jira integrations | **Admin → Connections** (kind, base URL, config, ACL keys, and the credential itself — sealed into the DB; or the *name* of an env var if you prefer the env lane) |
+| Secret sealing | Set `ESTIMO_SECRET_KEY` (`openssl rand -hex 32`) so panel-entered secrets are **encrypted** at rest; without it they are stored `plain:`-prefixed and the panel shows a warning |
+| OIDC / roles / tenancy | `ESTIMO_AUTH__*` env vars — deliberately env-only: a bad save here would lock every admin out of the panel that could fix it. Current mode shown under Admin → Runtime & authentication |
+| Database | `ESTIMO_DATABASE_URL` (+ `ESTIMO_OWNER_DATABASE_URL` for multi-tenant system paths) — env-only bootstrap |
 | Everything at a glance | `GET /v1/system` (admin-only, redacted — booleans for secrets, never values) |
-
-Configuration is **environment-only by design** (ADR-0006): the Admin screen reports
-config, it never edits it. That keeps credentials out of the database and makes every
-change auditable through your normal env/secret management.
 
 ## 2. Kubernetes / BYOC — Helm
 

@@ -57,7 +57,14 @@ SYSTEM_SHAPE = {
     "gateway.api_key_present",
     "gateway.profiles",
     "gateway.timeout_seconds",
+    "gateway.connect_timeout_seconds",
     "gateway.max_retries",
+    # ADR-0008: where the effective config came from, whether stored secrets are
+    # encrypted (False = plain:-prefixed rows; the panel warns), and whether a
+    # stored key still unseals (False = running on the env key after a rotation).
+    "gateway.source",
+    "gateway.secrets_encrypted",
+    "gateway.stored_key_readable",
     "database",
     "database.host",
     "database.name",

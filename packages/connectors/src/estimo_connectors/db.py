@@ -42,8 +42,13 @@ class Connection(TenantScoped, Base):
     base_url: Mapped[str] = mapped_column(String(500))
     # Non-secret coordinates: space keys, workspace/repo slugs, JQL, branch, …
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    # NAME of the env var holding the credential — never the credential itself.
+    # NAME of the env var holding the credential (the strongest posture, still
+    # fully supported)…
     secret_env: Mapped[str | None] = mapped_column(String(120), default=None)
+    # …or the credential itself, SEALED via estimo_core.secrets before storage
+    # (ADR-0008: encrypted when ESTIMO_SECRET_KEY is set, `plain:`-prefixed when
+    # not). Never serialized back out of the API. Stored wins over secret_env.
+    secret: Mapped[str | None] = mapped_column(Text, default=None)
     # ACL keys stamped onto every chunk this connection ingests (retrieval
     # pre-filter input, SECURITY.md).
     acl_keys: Mapped[list[str] | None] = mapped_column(JSONB, default=None)

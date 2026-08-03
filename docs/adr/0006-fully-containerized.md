@@ -25,8 +25,10 @@ design is the customer's LiteLLM gateway (ADR-0001), reached over the network.
   tarball.
 - **Build discipline:** multi-stage Dockerfiles (slim runtime, non-root user, pinned base
   images), `.dockerignore` mirrors repo hygiene (no fixtures/secrets baked in),
-  healthchecks defined in the images, configuration exclusively via environment
-  (`.env` / injected secrets — never baked).
+  healthchecks defined in the images, configuration via environment
+  (`.env` / injected secrets — never baked). *Amended by ADR-0008:* the environment
+  is now the BOOTSTRAP layer; operator settings saved in the Admin panel
+  (`runtime_settings`) override it per field at runtime.
 - **Compose profiles** separate concerns: core (api, web, postgres) plus `--profile mock`
   (a stub gateway for a no-model walkthrough) and `--profile observability` (Langfuse
   self-host), so a minimal install stays minimal.

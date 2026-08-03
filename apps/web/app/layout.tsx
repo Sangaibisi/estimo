@@ -35,8 +35,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      // The design drives theme and row density from root data attributes; the
-      // toggles in the top bar rewrite them.
+      // The design drives theme and row density from root data attributes. The theme
+      // toggle in the top bar rewrites data-theme; density is pinned dense (the
+      // toggle was dropped — a workstation UI does not need the choice).
       data-theme="light"
       data-density="dense"
       className={`${sans.variable} ${mono.variable} ${serif.variable}`}

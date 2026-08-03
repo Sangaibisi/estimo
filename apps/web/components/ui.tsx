@@ -173,11 +173,15 @@ export function RangeBar({
   max,
   accent = "var(--acc)",
   legend = true,
+  actual,
 }: {
   band: { optimistic: number; likely: number; pessimistic: number };
   max: number;
   accent?: string;
   legend?: boolean;
+  /** Delivered actual effort — drawn as an ink tick that MAY sit outside the
+   * band (that is the finding, so it is never clamped into it visually). */
+  actual?: number | null;
 }) {
   const scale = (value: number) =>
     `${Math.min(100, Math.max(0, (value / max) * 100))}%`;
@@ -215,6 +219,18 @@ export function RangeBar({
             borderRadius: 2,
           }}
         />
+        {actual != null && (
+          <div
+            style={{
+              position: "absolute",
+              left: scale(actual),
+              top: -5,
+              bottom: -5,
+              width: 2,
+              background: "var(--ink)",
+            }}
+          />
+        )}
       </div>
       {legend && (
         <div

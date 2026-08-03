@@ -42,13 +42,28 @@ class Connector(Protocol):
 
 
 def resolve_secret(secret_env: str | None) -> str | None:
-    """Connections store the NAME of an env var, never the secret (SECURITY.md)."""
+    """Env-indirection lane: the connection stores the NAME of an env var."""
     if not secret_env:
         return None
     value = os.getenv(secret_env)
     if value is None:
         raise LookupError(f"secret env var {secret_env!r} is not set on this container")
     return value
+
+
+def connection_secret(connection: Any) -> str | None:
+    """The credential for a connection, from either lane (ADR-0008).
+
+    A SEALED credential stored on the row (Admin-panel lane) wins over the env-var
+    name — an operator who typed a token into the panel expects that token to be
+    used even if a same-named env var lingers from an earlier setup.
+    """
+    stored = getattr(connection, "secret", None)
+    if stored:
+        from estimo_core.secrets import unseal
+
+        return unseal(stored)
+    return resolve_secret(getattr(connection, "secret_env", None))
 
 
 class RatePlan:

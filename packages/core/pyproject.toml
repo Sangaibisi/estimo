@@ -5,6 +5,7 @@ description = "Estimo domain models: requirements, work items, estimate lines, B
 requires-python = ">=3.13"
 license = "Apache-2.0"
 dependencies = [
+    "cryptography>=44",
     "pydantic>=2.13.4,<3",
 ]
 

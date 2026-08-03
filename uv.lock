@@ -724,11 +724,15 @@ name = "estimo-core"
 version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
+    { name = "cryptography" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.13.4,<3" }]
+requires-dist = [
+    { name = "cryptography", specifier = ">=44" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
+]
 
 [[package]]
 name = "estimo-estimate"

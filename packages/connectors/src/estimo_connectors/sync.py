@@ -23,7 +23,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from estimo_connectors.base import resolve_secret
+from estimo_connectors.base import connection_secret
 from estimo_connectors.confluence import ConfluenceConnector
 from estimo_connectors.db import Connection, SyncRun
 from estimo_connectors.gitrepo import clone_or_fetch
@@ -158,9 +158,9 @@ async def _sync_confluence(
     session: AsyncSession, connection: Connection, run: SyncRun
 ) -> dict[str, Any]:
     config = connection.config or {}
-    token = resolve_secret(connection.secret_env)
+    token = connection_secret(connection)
     if not token:
-        raise ValueError("confluence connection requires secret_env (API token)")
+        raise ValueError("confluence connection requires a credential (stored or secret_env)")
     connector = ConfluenceConnector(
         base_url=connection.base_url,
         email=str(config.get("email", "")),
@@ -216,7 +216,7 @@ async def _sync_git(
     client: GatewayClient | None,
 ) -> dict[str, Any]:
     config = connection.config or {}
-    token = resolve_secret(connection.secret_env)
+    token = connection_secret(connection)
     state = await clone_or_fetch(
         connection.base_url,
         repos_dir / _workdir_name(connection),
@@ -273,9 +273,9 @@ async def _sync_jira(session: AsyncSession, connection: Connection, run: SyncRun
     must state the conversion (`points_to_pd`) — importing raw points as effort
     would silently corrupt calibration."""
     config = connection.config or {}
-    token = resolve_secret(connection.secret_env)
+    token = connection_secret(connection)
     if not token:
-        raise ValueError("jira connection requires secret_env (API token)")
+        raise ValueError("jira connection requires a credential (stored or secret_env)")
     factor = config.get("points_to_pd")
     if not isinstance(factor, int | float) or factor <= 0:
         raise ValueError(

@@ -56,8 +56,10 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
    templates (incoming customer BRDs are Turkish — that is an input-handling requirement,
    not a documentation language). The maintainer converses in Turkish — mirror them in
    conversation; repo artifacts stay English.
-9. **Security posture.** Secrets only via environment (`.env` is gitignored;
-   `.env.example` documents keys). Pin dependency versions for anything touching the
+9. **Security posture.** Secrets enter via environment (`.env` is gitignored;
+   `.env.example` documents keys) or via the Admin panel, where they are SEALED before
+   storage and never serialized back out (ADR-0008 — set `ESTIMO_SECRET_KEY` so the
+   sealing is encryption, not a `plain:` prefix). Pin dependency versions for anything touching the
    supply chain (the gateway client especially — see research §5.4). New third-party
    dependencies require a license check: MIT/Apache-2.0/BSD are fine; AGPL/SSPL/BUSL/ELv2
    need an ADR and maintainer approval. Never copy code from `ee/` or `enterprise/`

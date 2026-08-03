@@ -45,9 +45,10 @@ from estimo_api.auth import (
     require_reviewer,
 )
 from estimo_api.db import get_session
-from estimo_api.settings import Settings
+from estimo_api.runtime_config import effective_gateway
 from estimo_api.tenancy import bind_tenant_guc, get_current_tenant, set_current_tenant
-from estimo_gateway import GatewayClient
+from estimo_core.secrets import seal
+from estimo_gateway import GatewayClient, GatewayConfig
 
 router = APIRouter(prefix="/v1", tags=["connections"])
 # The webhook receiver authenticates by HMAC over the raw body, not a bearer
@@ -72,6 +73,9 @@ class ConnectionIn(BaseModel):
     base_url: str = Field(min_length=1, max_length=500)
     config: dict[str, Any] = Field(default_factory=dict)
     secret_env: str | None = Field(default=None, max_length=120)
+    # WRITE-ONLY panel lane (ADR-0008): the credential itself, sealed before
+    # storage and never serialized back out. Wins over secret_env at sync time.
+    secret: str | None = Field(default=None, min_length=1, max_length=4000)
     acl_keys: list[str] | None = None
 
 
@@ -83,9 +87,11 @@ def _connection_out(connection: Connection) -> dict[str, Any]:
         "base_url": connection.base_url,
         "config": connection.config,
         "secret_env": connection.secret_env,
-        "secret_present": bool(
-            connection.secret_env and os.getenv(connection.secret_env) is not None
-        ),
+        # True when a usable credential exists via EITHER lane; the value itself
+        # never leaves the API.
+        "secret_present": bool(connection.secret)
+        or bool(connection.secret_env and os.getenv(connection.secret_env) is not None),
+        "secret_stored": bool(connection.secret),
         "acl_keys": connection.acl_keys,
     }
 
@@ -121,7 +127,7 @@ async def list_connections(session: SessionDep) -> list[dict[str, Any]]:
     "/connections", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)]
 )
 async def create_connection(payload: ConnectionIn, session: SessionDep) -> dict[str, Any]:
-    if payload.secret_env is not None:
+    if payload.secret_env is not None and payload.secret is None:
         try:
             resolve_secret(payload.secret_env)
         except LookupError as exc:
@@ -133,6 +139,7 @@ async def create_connection(payload: ConnectionIn, session: SessionDep) -> dict[
         base_url=payload.base_url,
         config=payload.config,
         secret_env=payload.secret_env,
+        secret=seal(payload.secret) if payload.secret is not None else None,
         acl_keys=payload.acl_keys,
     )
     session.add(connection)
@@ -154,11 +161,14 @@ async def delete_connection(connection_id: uuid.UUID, session: SessionDep) -> No
     await session.commit()
 
 
-def _gateway_client(settings: Settings) -> GatewayClient | None:
+def _gateway_client(config: GatewayConfig | None) -> GatewayClient | None:
     """Best-effort gateway for distillation/wiki generation; connectors degrade to
-    deterministic skeletons when the gateway is unreachable."""
+    deterministic skeletons when the gateway is unreachable. Callers hand in the
+    EFFECTIVE config (panel override > env, ADR-0008)."""
+    if config is None:
+        return None
     try:
-        return GatewayClient(settings.gateway)
+        return GatewayClient(config)
     except Exception:  # noqa: BLE001 - observability of the LLM leg must not block sync
         return None
 
@@ -166,7 +176,7 @@ def _gateway_client(settings: Settings) -> GatewayClient | None:
 async def _run_sync_bg(
     sessionmaker: async_sessionmaker[AsyncSession],
     connection_id: uuid.UUID,
-    settings: Settings,
+    gateway_config: GatewayConfig | None,
     tenant: str,
 ) -> None:
     # A background task runs outside the request, so pin the tenant explicitly (the
@@ -182,7 +192,7 @@ async def _run_sync_bg(
                 session,
                 connection,
                 repos_dir=_repos_dir(),
-                client=_gateway_client(settings),
+                client=_gateway_client(gateway_config),
             )
         except SyncAlreadyRunningError:
             # The DB-level guard (one running run per connection) already refused
@@ -217,7 +227,7 @@ async def trigger_sync(
         _run_sync_bg,
         request.app.state.sessionmaker,
         connection_id,
-        request.app.state.settings,
+        await effective_gateway(request, session),
         get_current_tenant(),
     )
     return {"status": "scheduled"}
@@ -278,12 +288,13 @@ async def receive_webhook(
         if configured_branch and branches and configured_branch not in branches:
             return {"status": "ignored"}  # push to a branch we do not index
         tenant = str(connection.tenant_id)
+        gateway_config = await effective_gateway(request, session)
     # The sync itself runs as the app role, pinned to the connection's own tenant.
     background.add_task(
         _run_sync_bg,
         request.app.state.sessionmaker,
         connection_id,
-        request.app.state.settings,
+        gateway_config,
         tenant,
     )
     return {"status": "scheduled"}
@@ -410,7 +421,7 @@ async def create_candidate(
         session,
         topic=payload.topic,
         acl_keys=clamp_acl_keys(principal, payload.acl_keys),
-        client=_gateway_client(request.app.state.settings),
+        client=_gateway_client(await effective_gateway(request, session)),
     )
     await session.commit()
     return {"id": str(page.id), "status": page.status}

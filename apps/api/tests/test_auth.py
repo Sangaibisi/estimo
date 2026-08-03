@@ -116,6 +116,11 @@ async def test_system_surface_is_admin_only(client: httpx.AsyncClient) -> None:
     reviewer = {"Authorization": f"Bearer {_token(roles=['reviewer'])}"}
     assert (await client.get("/v1/system", headers=reviewer)).status_code == 403
     assert (await client.post("/v1/system/gateway-check", headers=reviewer)).status_code == 403
+    # Writing gateway config (ADR-0008) is the highest-impact call on the surface.
+    denied = await client.put(
+        "/v1/system/gateway", headers=reviewer, json={"base_url": "http://evil.invalid/v1"}
+    )
+    assert denied.status_code == 403
 
     admin = {"Authorization": f"Bearer {_token(roles=['admin'])}"}
     assert (await client.get("/v1/system", headers=admin)).status_code == 200

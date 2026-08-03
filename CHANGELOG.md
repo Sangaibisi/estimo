@@ -9,6 +9,35 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **Design parity, first pass (S12).** A 12-auditor sweep against the delivered
+  design found 99 verified gaps; the highest-value small ones shipped: desk
+  Confidence column and A/R column with an expandable assumptions/risks panel
+  (the data was already in the payload, never rendered), anchor quarantine pills
+  showing the withheld snippet (replacing an emoji count chip), the workspace's
+  labeled stage strip with a corrected stage derivation (BoE-stage rows displayed
+  one stage behind), ledger deviation graded against the RANGE (within/above/below,
+  shaped chips) instead of a bare multiplier, an analog-match card grid whose
+  actual-effort tick may sit outside the band, and the BoE's assumption register +
+  risks & contingency sections on screen. The remaining gaps are recorded honestly
+  as ROADMAP S12-1…S12-9 rather than left implied — including the design's
+  pre-signature draft view, which stays closed on purpose: the API withholds the
+  document until sign-off because it carries every line's band, and showing it
+  would defeat the independent-first gate on the desk (S12-5).
+- **Runtime configuration in the product (ADR-0008).** The Admin panel now EDITS the
+  model gateway — base URL, API key, stage→profile routing, timeouts — via
+  `PUT /v1/system/gateway`, stored in a new `runtime_settings` table and overriding
+  the environment per field, effective immediately (env vars become bootstrap
+  defaults). Connections accept the credential itself as an alternative to the
+  env-var-name lane. Panel-entered secrets are SEALED before storage: encrypted when
+  `ESTIMO_SECRET_KEY` is set, visibly `plain:`-prefixed with a UI warning when not —
+  and never serialized back out of the API either way. OIDC and database URLs stay
+  deliberately env-only (a bad auth save would lock admins out of the panel that
+  could fix it). Migration 0011.
+- **UI copy: Turkish terminology pass.** The invented loanword "estime" is gone —
+  the TR locale now uses the plain "tahmin" family, plus clearer rail labels
+  ("Kayıt Defteri", "Bilgi Bankası"). `<html lang>` follows the chosen locale so
+  Turkish labels uppercase İ correctly. The density toggle (Dense/Comfortable) was
+  removed as operator noise; the workstation layout is pinned dense.
 - **Admin → Model gateway & runtime panels + `GET /v1/system`.** The design's Admin
   screen always promised a model-profile table; the **stage→profile half** of that
   contract now exists (the token/cost meters half still needs per-stage usage
@@ -19,8 +48,9 @@ Until the first code release, entries track documentation and foundation milesto
   does one timed round-trip through the configured gateway so an operator can verify
   LLM connectivity from the product instead of the container logs; failure reasons
   are sanitized to *our* words, because upstream gateways have been known to echo
-  the API key they were shown back into error bodies. Config stays environment-only
-  (ADR-0006): the panel reports, it never edits.
+  the API key they were shown back into error bodies. (This surface shipped
+  read-only under ADR-0006 and became editable later the same day under ADR-0008 —
+  see the runtime-configuration entry above.)
 - **Visual identity layer.** A logo mark built from the product's own RangeBar
   (three O/L/P bars on the brand gradient), shipped as the favicon and the top-bar
   brand; a drawn SVG icon set (16px grid, stroke, `currentColor`) for the left rail

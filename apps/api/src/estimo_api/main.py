@@ -7,8 +7,10 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from estimo_api.db import build_engine, build_sessionmaker
@@ -83,6 +85,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await system_engine.dispose()
 
     app = FastAPI(title="Estimo API", lifespan=lifespan)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        """422 without the offending INPUT echoed back.
+
+        FastAPI's default handler serializes each failing field's value into the
+        response. Since ADR-0008 lets operators paste credentials into the API
+        (gateway key, connector tokens), that default turns any length/type slip
+        into a credential reflected to the caller — and, through the web client's
+        error banner, into the DOM and every HAR capture. Location and message are
+        enough to fix a bad request; the value never is.
+        """
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": [
+                    {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]}
+                    for error in exc.errors()
+                ]
+            },
+        )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,

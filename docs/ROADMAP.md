@@ -431,6 +431,61 @@ that overstate the build. Each names what blocked it.
 
 ---
 
+## S12 — Design parity · `Status: 🟡 In progress (2026-08-04)`
+
+A 12-auditor sweep of the delivered design (docs/design/*.dc.html) against the shipped
+UI found **99 verified gaps** (144 raw claims, deduped/refuted down). The design is far
+richer than the implementation; this sprint tracks closing it honestly instead of
+letting the design doc overstate the product.
+
+Shipped in the first pass (2026-08-04): desk **Confidence** column, desk **A/R column +
+expandable assumptions/risks panel**, anchor **quarantine pills** (snippet + dashed crit
+border, replacing the emoji count chip), workspace **labeled stage strip** + stage
+derivation fix (BoE rows showed one stage behind; 0-vs-— distinction), ledger
+**DeviationBadge graded against the range** (within / above·+% / below), ledger
+**AnalogCard match grid** with actual-effort ticks that may sit outside the band, BoE
+**assumption register + risks & contingency sections on screen**, BoE **draft visible
+before signatures** (export stays gated), dead duplicate components removed.
+
+Still open, grouped (feasibility from the audit):
+
+- [ ] **S12-1 Desk (medium):** ConeBadge (cone-of-uncertainty stage), Delta as
+  range-relationship chips (intersect/disjoint) instead of a bare signed number,
+  blocked requirements as held rows, explicit reveal controls (per-row + reveal-all),
+  rationale capture, per-row Status column, sticky footer + signature progress bar +
+  post-reveal total, weak-evidence/discovery chips, evidence per-kind aggregation,
+  REQ-id column, drag-to-set range input.
+- [ ] **S12-2 Reading Room (large):** the two-pane split view (serif source document
+  with inline highlights ↔ requirements), full ambiguity reason sentences, summary
+  chips, provenance column, re-read / mark-as-clear / send-to-board stage controls.
+- [ ] **S12-3 Question Board (medium):** Sent + Answered lanes (4-lane flow) with
+  dispatch recording, per-question apply-to-line, compiled letter (heading + intro +
+  closing) with matching copy text and .docx export, manual question creation.
+- [ ] **S12-4 Impact Map (large):** graph view + Graph/Heat toggle, docked evidence
+  panel, per-module confidence chips + low-confidence escalation, analog-jobs section.
+- [ ] **S12-5 BoE (large):** version history + diff, two-role signature flow
+  (Reviewer → Signing authority) with row-scoped batch signing, in-document signature
+  block, contents rail, O/L/P columns + paper framing, provenance appendix on screen,
+  scope & exclusions section (needs a model field), archival PDF.
+- [ ] **S12-6 Ledger (medium):** seed-set import wizard + error queue, similarity
+  percentages (needs retrieval to surface scores), team/domain filters, Delivered/Team
+  columns, BoE cross-links, 'Range that day' header.
+- [ ] **S12-7 Calibration (medium):** per-domain coverage bars, anchoring comparison
+  strips, question-impact quadrant, team/domain slicing, time-window scoping,
+  MAPE-vs-MAE decision, export figures.
+- [ ] **S12-8 Knowledge (medium):** source TEXT pane (not refs), revise/reject actions,
+  freshness warnings block, version-label agreement.
+- [ ] **S12-9 Chrome & Admin (medium):** rail identity item (needs /me), workspace
+  Range/Customer/Age columns + filters, live parse progress, canonical error voice +
+  renew-key, cost meter (needs usage accounting — same gate as the ADR-0001 token/cost
+  meters), locale formatting via Intl (pd/a-g units, dates).
+
+The full per-gap audit (design evidence + code evidence per claim) lives in the session
+that produced it; each sub-item above must re-verify against the design file when
+picked up — the design HTML is the source of truth (docs/design/README.md).
+
+---
+
 ## Continuous tracks (apply to every sprint)
 
 - **E — Evals:** Every PR that changes estimation behavior carries a golden-set report;

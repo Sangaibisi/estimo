@@ -66,6 +66,8 @@ export interface DeskItem {
     confidence: string;
     basis_note?: string | null;
     evidence: { uri: string; kind: string; label?: string | null }[];
+    assumptions: { kind: string; text: string; contingency_pd: number | null }[];
+    risks: { kind: string; text: string; contingency_pd: number | null }[];
   } | null;
   delta_likely: number | null;
 }
@@ -173,6 +175,7 @@ export const api = {
     base_url: string;
     config: Record<string, unknown>;
     secret_env: string | null;
+    secret: string | null;
     acl_keys: string[] | null;
   }) =>
     request<ConnectionEntry>("/v1/connections", {
@@ -199,7 +202,33 @@ export const api = {
   systemInfo: () => request<SystemInfo>("/v1/system"),
   gatewayCheck: () =>
     request<GatewayCheckResult>("/v1/system/gateway-check", { method: "POST" }),
+  putGateway: (payload: {
+    reset?: boolean;
+    base_url?: string;
+    api_key?: string;
+    clear_api_key?: boolean;
+    profiles?: Record<string, string>;
+    timeout_seconds?: number;
+    connect_timeout_seconds?: number;
+    max_retries?: number;
+  }) =>
+    request<GatewayView>("/v1/system/gateway", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
 };
+
+export interface GatewayView {
+  base_url: string;
+  api_key_present: boolean;
+  profiles: Record<string, string>;
+  timeout_seconds: number;
+  connect_timeout_seconds: number;
+  max_retries: number;
+  source: "panel" | "environment";
+  secrets_encrypted: boolean;
+  stored_key_readable: boolean;
+}
 
 export interface SystemInfo {
   version: string;
@@ -211,13 +240,7 @@ export interface SystemInfo {
     tenant_claim: string;
     acl_claim: string | null;
   };
-  gateway: {
-    base_url: string;
-    api_key_present: boolean;
-    profiles: Record<string, string>;
-    timeout_seconds: number;
-    max_retries: number;
-  };
+  gateway: GatewayView;
   database: { host: string | null; name: string | null; role: string | null };
   cors_origins: string[];
 }
@@ -237,6 +260,7 @@ export interface ConnectionEntry {
   config: Record<string, unknown>;
   secret_env: string | null;
   secret_present: boolean;
+  secret_stored: boolean;
   acl_keys: string[] | null;
   last_run: {
     status: string;

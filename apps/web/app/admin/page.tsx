@@ -3,8 +3,10 @@
 /** 10 · Admin — "Boring but transparent: sync status, error queues, roles."
  *
  * Connection tiles carry the design's canonical error shape: what failed, the code,
- * and the exact remedial path. Credentials never pass through this UI — a connection
- * stores only the NAME of an env var on the API container. */
+ * and the exact remedial path. Credentials entered here are sealed before storage
+ * (ADR-0008 — encrypted when ESTIMO_SECRET_KEY is set) and never serialized back;
+ * the env-var-name lane remains available. The Model gateway card EDITS runtime
+ * config: what it saves overrides the environment immediately. */
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type ConnectionEntry, type GatewayCheckResult, type SystemInfo } from "@/lib/api";
@@ -36,8 +38,35 @@ export default function AdminPage() {
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [configText, setConfigText] = useState("{}");
+  const [secretValue, setSecretValue] = useState("");
   const [secretEnv, setSecretEnv] = useState("");
   const [aclKeys, setAclKeys] = useState("");
+
+  // Model gateway form (ADR-0008): initialized from /v1/system, saved via PUT.
+  const [gwBaseUrl, setGwBaseUrl] = useState("");
+  const [gwApiKey, setGwApiKey] = useState("");
+  const [gwTimeout, setGwTimeout] = useState("");
+  const [gwConnectTimeout, setGwConnectTimeout] = useState("");
+  const [gwRetries, setGwRetries] = useState("");
+  const [gwProfiles, setGwProfiles] = useState<{ stage: string; profile: string }[]>([]);
+  const [gwSaved, setGwSaved] = useState(false);
+
+  const loadSystem = useCallback(() => {
+    api
+      .systemInfo()
+      .then((info) => {
+        setSystem(info);
+        setGwBaseUrl(info.gateway.base_url);
+        setGwTimeout(String(info.gateway.timeout_seconds));
+        setGwConnectTimeout(String(info.gateway.connect_timeout_seconds));
+        setGwRetries(String(info.gateway.max_retries));
+        setGwProfiles(
+          Object.entries(info.gateway.profiles).map(([stage, profile]) => ({ stage, profile })),
+        );
+        setGwApiKey("");
+      })
+      .catch((err) => setError(String(err)));
+  }, []);
 
   const refresh = useCallback(() => {
     api.listConnections().then(setConnections).catch((err) => setError(String(err)));
@@ -46,8 +75,8 @@ export default function AdminPage() {
   useEffect(() => {
     setLocale(detectLocale());
     refresh();
-    api.systemInfo().then(setSystem).catch((err) => setError(String(err)));
-  }, [refresh]);
+    loadSystem();
+  }, [refresh, loadSystem]);
 
   async function checkGateway() {
     setChecking(true);
@@ -58,6 +87,68 @@ export default function AdminPage() {
       setGatewayResult({ ok: false, latency_ms: 0, error: String(err) });
     } finally {
       setChecking(false);
+    }
+  }
+
+  /** Numeric field: empty means "leave it alone"; a non-number is a hard error,
+   * because silently dropping it would show "saved" while reverting the field. */
+  function numeric(raw: string, label: string): number | null {
+    if (!raw.trim()) return null;
+    const value = Number(raw.trim().replace(",", "."));
+    if (!Number.isFinite(value)) throw new Error(`${label}: not a number — "${raw}"`);
+    return value;
+  }
+
+  async function saveGateway(reset: boolean) {
+    setBusy(true);
+    setError(null);
+    setGwSaved(false);
+    try {
+      if (reset) {
+        await api.putGateway({ reset: true });
+      } else {
+        const rows = gwProfiles.map((row) => ({
+          stage: row.stage.trim(),
+          profile: row.profile.trim(),
+        }));
+        // Half-filled and duplicate rows would vanish silently in an object
+        // literal (last-wins), so they are refused rather than swallowed.
+        const halfFilled = rows.find((row) => !row.stage !== !row.profile);
+        if (halfFilled) {
+          throw new Error(
+            `profile row incomplete: "${halfFilled.stage || "?"}" → "${halfFilled.profile || "?"}"`,
+          );
+        }
+        const filled = rows.filter((row) => row.stage && row.profile);
+        const duplicate = filled.find(
+          (row, index) => filled.findIndex((other) => other.stage === row.stage) !== index,
+        );
+        if (duplicate) throw new Error(`duplicate stage: "${duplicate.stage}"`);
+
+        const timeout = numeric(gwTimeout, t(locale, "timeoutShort"));
+        const connectTimeout = numeric(gwConnectTimeout, t(locale, "timeoutShort"));
+        const retries = numeric(gwRetries, t(locale, "retriesShort"));
+
+        await api.putGateway({
+          // Only send the URL when the operator actually changed it: the value in
+          // the field came from /v1/system with userinfo STRIPPED, so echoing it
+          // back would persist a redacted (broken) URL over a working one.
+          ...(gwBaseUrl.trim() !== (system?.gateway.base_url ?? "")
+            ? { base_url: gwBaseUrl.trim() }
+            : {}),
+          ...(gwApiKey ? { api_key: gwApiKey } : {}),
+          profiles: Object.fromEntries(filled.map((row) => [row.stage, row.profile])),
+          ...(timeout !== null ? { timeout_seconds: timeout } : {}),
+          ...(connectTimeout !== null ? { connect_timeout_seconds: connectTimeout } : {}),
+          ...(retries !== null ? { max_retries: retries } : {}),
+        });
+      }
+      setGwSaved(!reset);
+      loadSystem();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -145,7 +236,15 @@ export default function AdminPage() {
                 onChange={(e) => setBaseUrl(e.target.value)}
               />
               <input
-                placeholder="ESTIMO_SECRET_… (env var)"
+                type="password"
+                autoComplete="off"
+                style={{ minWidth: 230 }}
+                placeholder={t(locale, "secretValuePlaceholder")}
+                value={secretValue}
+                onChange={(e) => setSecretValue(e.target.value)}
+              />
+              <input
+                placeholder={`${t(locale, "orEnvVar")} — ESTIMO_SECRET_…`}
                 value={secretEnv}
                 onChange={(e) => setSecretEnv(e.target.value)}
               />
@@ -172,12 +271,14 @@ export default function AdminPage() {
                       base_url: baseUrl,
                       config: JSON.parse(configText || "{}"),
                       secret_env: secretEnv || null,
+                      secret: secretValue || null,
                       acl_keys: aclKeys
                         ? aclKeys.split(",").map((key) => key.trim()).filter(Boolean)
                         : null,
                     });
                     setName("");
                     setBaseUrl("");
+                    setSecretValue("");
                     setSecretEnv("");
                     setAclKeys("");
                     setConfigText("{}");
@@ -349,43 +450,164 @@ export default function AdminPage() {
           {system ? (
             <>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <Mn>{system.gateway.base_url}</Mn>
+                {system.gateway.source === "panel" ? (
+                  <StatusChip status="ok">{t(locale, "sourcePanel")}</StatusChip>
+                ) : (
+                  <Chip>{t(locale, "sourceEnv")}</Chip>
+                )}
                 {system.gateway.api_key_present ? (
                   <StatusChip status="ok">{t(locale, "keyConfigured")}</StatusChip>
                 ) : (
                   <StatusChip status="crit">{t(locale, "keyMissing")}</StatusChip>
                 )}
-                <Chip>
-                  {t(locale, "timeoutShort")} {system.gateway.timeout_seconds}s
-                </Chip>
-                <Chip>
-                  {t(locale, "retriesShort")} {system.gateway.max_retries}
-                </Chip>
+                {!system.gateway.secrets_encrypted && (
+                  <StatusChip status="warn">{t(locale, "unencryptedWarn")}</StatusChip>
+                )}
+                {!system.gateway.stored_key_readable && (
+                  <StatusChip status="crit">{t(locale, "keyUnreadable")}</StatusChip>
+                )}
+                {gwSaved && <StatusChip status="ok">{t(locale, "savedOk")}</StatusChip>}
               </div>
-              {Object.keys(system.gateway.profiles).length === 0 ? (
-                <div style={{ marginTop: 12 }}>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "150px 1fr",
+                  rowGap: 9,
+                  columnGap: 14,
+                  alignItems: "center",
+                  marginTop: 12,
+                }}
+              >
+                <Lbl>{t(locale, "baseUrlLabel")}</Lbl>
+                <input
+                  style={{ fontFamily: "var(--font-mono)", minWidth: 320 }}
+                  value={gwBaseUrl}
+                  onChange={(e) => setGwBaseUrl(e.target.value)}
+                />
+                <Lbl>{t(locale, "apiKeyLabel")}</Lbl>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  style={{ minWidth: 320 }}
+                  placeholder={
+                    system.gateway.api_key_present
+                      ? t(locale, "apiKeySavedPlaceholder")
+                      : t(locale, "apiKeyUnsetPlaceholder")
+                  }
+                  value={gwApiKey}
+                  onChange={(e) => setGwApiKey(e.target.value)}
+                />
+                <Lbl>
+                  {t(locale, "timeoutShort")} · {t(locale, "retriesShort")}
+                </Lbl>
+                <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    style={{ width: 76 }}
+                    value={gwTimeout}
+                    onChange={(e) => setGwTimeout(e.target.value)}
+                  />
+                  <span className="muted">s ·</span>
+                  <input
+                    style={{ width: 76 }}
+                    value={gwConnectTimeout}
+                    onChange={(e) => setGwConnectTimeout(e.target.value)}
+                  />
+                  <span className="muted">s connect ·</span>
+                  <input
+                    style={{ width: 56 }}
+                    value={gwRetries}
+                    onChange={(e) => setGwRetries(e.target.value)}
+                  />
+                  <span className="muted">retry</span>
+                </span>
+              </div>
+
+              <table className="dt" style={{ marginTop: 12 }}>
+                <thead>
+                  <tr>
+                    <th>{t(locale, "stageHeader")}</th>
+                    <th>{t(locale, "profileHeader")}</th>
+                    <th style={{ width: 40 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {gwProfiles.map((row, index) => (
+                    <tr key={index}>
+                      <td>
+                        <input
+                          value={row.stage}
+                          onChange={(e) =>
+                            setGwProfiles(
+                              gwProfiles.map((r, i) =>
+                                i === index ? { ...r, stage: e.target.value } : r,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          style={{ fontFamily: "var(--font-mono)" }}
+                          value={row.profile}
+                          onChange={(e) =>
+                            setGwProfiles(
+                              gwProfiles.map((r, i) =>
+                                i === index ? { ...r, profile: e.target.value } : r,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn"
+                          aria-label="remove profile"
+                          onClick={() => setGwProfiles(gwProfiles.filter((_, i) => i !== index))}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {gwProfiles.length === 0 && (
+                <div style={{ marginTop: 10 }}>
                   <StatusChip status="crit">{t(locale, "noProfiles")}</StatusChip>
                 </div>
-              ) : (
-                <table className="dt" style={{ marginTop: 12 }}>
-                  <thead>
-                    <tr>
-                      <th>{t(locale, "stageHeader")}</th>
-                      <th>{t(locale, "profileHeader")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(system.gateway.profiles).map(([stage, profile]) => (
-                      <tr key={stage}>
-                        <td style={{ color: "var(--ink2)" }}>{stage}</td>
-                        <td>
-                          <Mn>{profile}</Mn>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setGwProfiles([...gwProfiles, { stage: "", profile: "" }])}
+                >
+                  {t(locale, "addProfile")}
+                </button>
+                <div style={{ flex: 1 }} />
+                {system.gateway.source === "panel" && (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy}
+                    onClick={() => saveGateway(true)}
+                  >
+                    {t(locale, "revertEnv")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn p"
+                  disabled={busy || !gwBaseUrl.trim()}
+                  onClick={() => saveGateway(false)}
+                >
+                  {t(locale, "saveGateway")}
+                </button>
+              </div>
+
               <div style={{ marginTop: 10, textWrap: "pretty" }}>
                 <Lbl>{t(locale, "gatewayHint")}</Lbl>
               </div>

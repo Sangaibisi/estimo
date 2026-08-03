@@ -32,7 +32,12 @@ and note the incident in the PR that fixes it.
 
 ## Deployment-security principles (for the product itself)
 
-- Secrets via environment only; `.env` is gitignored, `.env.example` documents every key.
+- Secrets enter via environment (`.env` is gitignored, `.env.example` documents every
+  key) **or via the Admin panel** (ADR-0008), where they are sealed before storage —
+  encrypted when `ESTIMO_SECRET_KEY` is set, visibly `plain:`-prefixed (with a UI
+  warning) when not. Secret values are never serialized back out of the API. Set
+  `ESTIMO_SECRET_KEY` in any real deployment: with panel-managed secrets the database
+  is part of the secret perimeter.
 - All model traffic goes through the deployment's OpenAI-compatible gateway (LiteLLM);
   pin gateway/client versions (a 2026 supply-chain incident on a popular gateway package
   is documented in the research dossier §5.4 — version pinning is not optional).

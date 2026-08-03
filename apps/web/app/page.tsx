@@ -11,40 +11,35 @@ import { detectLocale, statusLabel, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
 import { IconEstimates } from "@/components/icons";
 
-/** Stage of an estimate expressed the way the design's StageStrip reads. */
-function stageOf(estimate: EstimateSummary): { index: number; label: string } {
-  if (estimate.has_boe) return { index: 4, label: "4 Estimate" };
-  if (estimate.open_questions > 0) return { index: 2, label: "2 Questions" };
-  return { index: 3, label: "3 Impact" };
+/** Stage of an estimate, 1..5 the way the design's row strip reads. Previously
+ * has_boe mapped to 4, which made "1 Reading" and "5 BoE" unreachable and showed
+ * every BoE-stage estimate one stage behind. */
+function stageOf(estimate: EstimateSummary): number {
+  if (estimate.has_boe) return 5;
+  if (estimate.open_questions > 0) return 2;
+  if (estimate.requirements === 0) return 1;
+  if (estimate.work_items > 0) return 4;
+  return 3;
 }
 
-const STAGES = ["1 Reading", "2 Questions", "3 Impact", "4 Estimate", "5 BoE"];
+const STAGE_KEYS = ["stgRead", "stgQ", "stgImpact", "stgEst", "stgBoe"] as const;
 
-function MiniStages({ at }: { at: number }) {
-  // Row-level stage read-out: five ticks, filled up to the current stage. Shape and
-  // position carry the state — not colour alone.
+function RowStages({ at, locale }: { at: number; locale: Locale }) {
+  // The design's labeled .stg pill strip at scale(.86) — done/on states carried by
+  // the shared stage classes, not bespoke tick bars.
   return (
-    <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
-      {STAGES.map((label, index) => (
+    <div
+      style={{ display: "flex", transform: "scale(.86)", transformOrigin: "left center" }}
+    >
+      {STAGE_KEYS.map((key, index) => (
         <span
-          key={label}
-          title={label}
-          style={{
-            width: index + 1 === at ? 18 : 10,
-            height: 4,
-            borderRadius: 2,
-            background:
-              index + 1 < at
-                ? "var(--line2)"
-                : index + 1 === at
-                  ? "var(--acc)"
-                  : "var(--surf3)",
-          }}
-        />
+          key={key}
+          className={`stg ${index + 1 < at ? "done" : index + 1 === at ? "on" : ""}`.trim()}
+          style={{ cursor: "default" }}
+        >
+          {t(locale, key)}
+        </span>
       ))}
-      <span className="mn" style={{ color: "var(--mut)", marginLeft: 6 }}>
-        {STAGES[at - 1]}
-      </span>
     </div>
   );
 }
@@ -242,14 +237,18 @@ export default function WorkspacePage() {
                       </div>
                     </td>
                     <td>
-                      <MiniStages at={stage.index} />
+                      <RowStages at={stage} locale={locale} />
                     </td>
                     <td className="num">{estimate.work_items}</td>
                     <td>
                       {estimate.open_questions > 0 ? (
                         <StatusChip status="warn">{estimate.open_questions}</StatusChip>
-                      ) : (
+                      ) : stage === 1 ? (
+                        // Not read yet — there is nothing to count. A literal 0 is
+                        // reserved for "the gate passed clean" below.
                         <Mn style={{ color: "var(--mut)" }}>—</Mn>
+                      ) : (
+                        <Mn style={{ color: "var(--mut)" }}>0</Mn>
                       )}
                     </td>
                     <td>

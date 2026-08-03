@@ -62,9 +62,22 @@ interface StateShape {
   work_items: WorkItemShape[];
 }
 
+interface RegisterEntry {
+  text: string;
+  contingency_pd?: number | null;
+}
+
 interface BoeLineShape {
   work_item_id: string;
   range: { optimistic: number; likely: number; pessimistic: number };
+  assumptions?: RegisterEntry[];
+  risks?: RegisterEntry[];
+}
+
+interface BoeDocShape {
+  lines?: BoeLineShape[];
+  global_assumptions?: RegisterEntry[];
+  global_risks?: RegisterEntry[];
 }
 
 type StageKey = "reading" | "questions" | "impact" | "desk" | "boe";
@@ -85,7 +98,7 @@ export default function EstimateWorkspace({
   const [deskItems, setDeskItems] = useState<DeskItem[]>([]);
   const [critic, setCritic] = useState<string[]>([]);
   const [fullySigned, setFullySigned] = useState(false);
-  const [boeLines, setBoeLines] = useState<BoeLineShape[]>([]);
+  const [boeDoc, setBoeDoc] = useState<BoeDocShape | null>(null);
   const [actuals, setActuals] = useState<ActualEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,10 +111,7 @@ export default function EstimateWorkspace({
     setState(detail.state as unknown as StateShape);
     setCritic(detail.critic);
     setFullySigned(detail.fully_signed);
-    setBoeLines(
-      ((detail.boe as { lines?: BoeLineShape[] } | null)?.lines ??
-        []) as BoeLineShape[],
-    );
+    setBoeDoc((detail.boe as BoeDocShape | null) ?? null);
   }, [id]);
 
   useEffect(() => {
@@ -262,7 +272,7 @@ export default function EstimateWorkspace({
                 <th style={{ width: 92 }}>{t(locale, "idHeader")}</th>
                 <th>{t(locale, "textHeader")}</th>
                 <th style={{ width: 210 }}>{t(locale, "ambiguity")}</th>
-                <th style={{ width: 120 }}>{t(locale, "anchorsShort")}</th>
+                <th style={{ width: 250 }}>{t(locale, "anchorsShort")}</th>
               </tr>
             </thead>
             <tbody>
@@ -303,9 +313,51 @@ export default function EstimateWorkspace({
                     </td>
                     <td>
                       {(requirement.anchors ?? []).length > 0 ? (
-                        <Chip tone="warn" title={t(locale, "anchors")}>
-                          ⚓ {(requirement.anchors ?? []).length}
-                        </Chip>
+                        // AnchorWarning: the design's quarantine pill — the SNIPPET
+                        // itself behind a dashed crit border, so the human sees
+                        // exactly what the model will not. No emoji (identity rule).
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {(requirement.anchors ?? []).map((anchor, index) => (
+                            <span
+                              key={index}
+                              title={t(locale, "anchorTooltip")}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                border: "1px dashed var(--crit)",
+                                background: "var(--crit-bg)",
+                                borderRadius: 4,
+                                padding: "2px 7px",
+                                fontSize: 11.5,
+                                color: "var(--ink2)",
+                                maxWidth: 230,
+                              }}
+                            >
+                              <span
+                                aria-hidden
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  flex: "none",
+                                  background: "var(--crit)",
+                                }}
+                              />
+                              <span
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {anchor.snippet}
+                              </span>
+                              <Mn style={{ color: "var(--crit)", flex: "none" }}>
+                                {t(locale, "quarantined")}
+                              </Mn>
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <Mn style={{ color: "var(--mut)" }}>—</Mn>
                       )}
@@ -661,7 +713,9 @@ export default function EstimateWorkspace({
                   <th style={{ width: 110 }}>{t(locale, "impactShort")}</th>
                   <th style={{ width: 250 }}>{t(locale, "yourRange")}</th>
                   <th style={{ width: 220 }}>{t(locale, "draft")}</th>
+                  <th style={{ width: 118 }}>{t(locale, "confidenceHeader")}</th>
                   <th style={{ width: 140 }}>{t(locale, "delta")}</th>
+                  <th style={{ width: 64 }}>{t(locale, "arHeader")}</th>
                   <th>{t(locale, "evidence")}</th>
                 </tr>
               </thead>
@@ -669,7 +723,7 @@ export default function EstimateWorkspace({
                 {deskItems.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       style={{ color: "var(--mut)", fontSize: 12.5 }}
                     >
                       {t(locale, "deskClosedHint")}
@@ -752,7 +806,7 @@ export default function EstimateWorkspace({
             summary={summary}
             fullySigned={fullySigned}
             critic={critic}
-            boeLines={boeLines}
+            boeDoc={boeDoc}
             workItems={state.work_items}
             actuals={actuals}
             downloadUrl={api.boeDocxUrl(id)}
@@ -876,6 +930,7 @@ function DeskRow({
   const [o, setO] = useState("");
   const [l, setL] = useState("");
   const [p, setP] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const parseBand = (raw: string): number | null => {
     const value = Number(raw.trim().replace(",", "."));
     return Number.isFinite(value) && value >= 0 ? value : null;
@@ -901,9 +956,29 @@ function DeskRow({
         }
       >
         <td style={{ paddingLeft: 14 }}>
-          <Mn style={{ color: item.independent ? "var(--ok)" : "var(--acc)" }}>
-            {item.independent ? "✓" : "▸"}
-          </Mn>
+          {item.ai ? (
+            // Revealed rows expand into the assumptions/risks panel (design's ▾/▸).
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+              aria-label={`${t(locale, "assumptionsWord")} / ${t(locale, "risksWord")}`}
+              style={{
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                padding: 0,
+                color: "var(--acc)",
+                font: "inherit",
+              }}
+            >
+              <Mn style={{ color: "var(--acc)" }}>{expanded ? "▾" : "▸"}</Mn>
+            </button>
+          ) : (
+            <Mn style={{ color: item.independent ? "var(--ok)" : "var(--acc)" }}>
+              {item.independent ? "✓" : "▸"}
+            </Mn>
+          )}
         </td>
         <td>
           <div style={{ fontSize: 13, color: "var(--ink)" }}>
@@ -981,6 +1056,23 @@ function DeskRow({
           )}
         </td>
         <td>
+          {item.ai ? (
+            <StatusChip
+              status={
+                item.ai.confidence === "high"
+                  ? "ok"
+                  : item.ai.confidence === "low"
+                    ? "crit"
+                    : "warn"
+              }
+            >
+              {item.ai.confidence}
+            </StatusChip>
+          ) : (
+            <Mn style={{ color: "var(--mut)" }}>—</Mn>
+          )}
+        </td>
+        <td>
           {item.delta_likely !== null ? (
             <Num
               style={{
@@ -995,6 +1087,15 @@ function DeskRow({
               {item.delta_likely > 0 ? "+" : ""}
               {item.delta_likely} pd
             </Num>
+          ) : (
+            <Mn style={{ color: "var(--mut)" }}>—</Mn>
+          )}
+        </td>
+        <td>
+          {item.ai ? (
+            <Mn style={{ color: "var(--ink2)" }}>
+              {item.ai.assumptions.length} / {item.ai.risks.length}
+            </Mn>
           ) : (
             <Mn style={{ color: "var(--mut)" }}>—</Mn>
           )}
@@ -1030,11 +1131,64 @@ function DeskRow({
           )}
         </td>
       </tr>
+      {expanded && item.ai && (
+        <tr style={{ background: "var(--surf2)" }}>
+          <td colSpan={9} style={{ padding: "12px 18px 14px 44px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div>
+                <Lbl>
+                  {t(locale, "assumptionsWord")} · {item.ai.assumptions.length}
+                </Lbl>
+                <ul style={{ margin: "7px 0 0", paddingLeft: 16, fontSize: 12.5, color: "var(--ink2)" }}>
+                  {item.ai.assumptions.map((entry, index) => (
+                    <li key={index} style={{ marginBottom: 4, textWrap: "pretty" }}>
+                      {entry.text}
+                    </li>
+                  ))}
+                  {item.ai.assumptions.length === 0 && (
+                    <li style={{ listStyle: "none", marginLeft: -16, color: "var(--mut)" }}>—</li>
+                  )}
+                </ul>
+              </div>
+              <div>
+                <Lbl>
+                  {t(locale, "risksWord")} · {item.ai.risks.length}
+                </Lbl>
+                <ul style={{ margin: "7px 0 0", paddingLeft: 16, fontSize: 12.5, color: "var(--ink2)" }}>
+                  {item.ai.risks.map((entry, index) => (
+                    <li key={index} style={{ marginBottom: 4, textWrap: "pretty" }}>
+                      {entry.text}
+                      {entry.contingency_pd !== null && (
+                        <Chip style={{ marginLeft: 6, color: "var(--warn)" }}>
+                          +{entry.contingency_pd} pd
+                        </Chip>
+                      )}
+                    </li>
+                  ))}
+                  {item.ai.risks.length === 0 && (
+                    <li style={{ listStyle: "none", marginLeft: -16, color: "var(--mut)" }}>—</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+            {item.work_item.requirement_ids.length > 0 && (
+              <div style={{ display: "flex", gap: 6, marginTop: 10, alignItems: "center" }}>
+                <Lbl>REQ</Lbl>
+                {item.work_item.requirement_ids.map((req) => (
+                  <Mn key={req} style={{ color: "var(--acc)" }}>
+                    {req}
+                  </Mn>
+                ))}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
       {/* The panel is a second row spanning the table, exactly as the design draws it:
           it belongs to the item above, not to a column. */}
       {item.delphi.state === "open" && (
         <tr style={{ background: "var(--surf2)" }}>
-          <td colSpan={7} style={{ padding: "14px 18px 16px 44px" }}>
+          <td colSpan={9} style={{ padding: "14px 18px 16px 44px" }}>
             <DelphiOverlay
               bands={item.delphi.bands}
               consensus={item.delphi.consensus}
@@ -1092,7 +1246,7 @@ function BoePreview({
   summary,
   fullySigned,
   critic,
-  boeLines,
+  boeDoc,
   workItems,
   actuals,
   downloadUrl,
@@ -1103,7 +1257,7 @@ function BoePreview({
   summary: EstimateSummary;
   fullySigned: boolean;
   critic: string[];
-  boeLines: BoeLineShape[];
+  boeDoc: BoeDocShape | null;
   workItems: WorkItemShape[];
   actuals: ActualEntry[];
   downloadUrl: string;
@@ -1129,6 +1283,18 @@ function BoePreview({
     );
   }
 
+  const boeLines = boeDoc?.lines ?? [];
+  // Register sections merge document-level entries with per-line ones, numbered
+  // A-01… / R-01… the way the design's document reads.
+  const allAssumptions = [
+    ...(boeDoc?.global_assumptions ?? []),
+    ...boeLines.flatMap((line) => line.assumptions ?? []),
+  ];
+  const allRisks = [
+    ...(boeDoc?.global_risks ?? []),
+    ...boeLines.flatMap((line) => line.risks ?? []),
+  ];
+
   const total = boeLines.reduce(
     (acc, line) => ({
       optimistic: acc.optimistic + line.range.optimistic,
@@ -1144,9 +1310,26 @@ function BoePreview({
         className="doc"
         style={{ flex: 1, minWidth: 0, padding: "16px 20px" }}
       >
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>
-          {t(locale, "boeTitle")} — {summary.brd_ref}
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
+        >
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>
+            {t(locale, "boeTitle")} — {summary.brd_ref}
+          </span>
+          {!fullySigned && (
+            <>
+              <Chip style={{ color: "var(--warn)" }}>{t(locale, "draftWord")}</Chip>
+              <StatusChip status="warn">{t(locale, "pendingSignature")}</StatusChip>
+            </>
+          )}
         </div>
+        {/* The design shows the draft document before signing; the API withholds it
+            (GET /v1/estimates/{id} returns boe:null until fully_signed) because the
+            document carries every line's band and reading it would defeat the
+            independent-first gate on the desk. Rendering the sections anyway would
+            print an empty document totalling 0 pd — so the honest state stays, and
+            closing the gap for real is ROADMAP S12-5 (it needs a per-estimator
+            reveal gate on the document, not a frontend change). */}
         {!fullySigned ? (
           <p
             style={{
@@ -1292,6 +1475,70 @@ function BoePreview({
                 {t(locale, "likelyShort")} {total.likely} pd
               </Chip>
             </div>
+
+            {/* 3 · Assumption register — on screen, same content the .docx renders. */}
+            {allAssumptions.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+                  {t(locale, "assumptionRegister")}
+                </div>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
+                  {allAssumptions.map((entry, index) => (
+                    <li
+                      key={index}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        fontSize: 13,
+                        color: "var(--ink2)",
+                        marginBottom: 5,
+                        textWrap: "pretty",
+                      }}
+                    >
+                      <Mn style={{ color: "var(--mut)", flex: "none" }}>
+                        A-{String(index + 1).padStart(2, "0")}
+                      </Mn>
+                      {entry.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 4 · Risks & contingency */}
+            {allRisks.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+                  {t(locale, "risksContingency")}
+                </div>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
+                  {allRisks.map((entry, index) => (
+                    <li
+                      key={index}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "baseline",
+                        fontSize: 13,
+                        color: "var(--ink2)",
+                        marginBottom: 5,
+                        textWrap: "pretty",
+                      }}
+                    >
+                      <Mn style={{ color: "var(--mut)", flex: "none" }}>
+                        R-{String(index + 1).padStart(2, "0")}
+                      </Mn>
+                      <span style={{ flex: 1 }}>{entry.text}</span>
+                      {entry.contingency_pd != null && entry.contingency_pd > 0 && (
+                        <Chip style={{ color: "var(--warn)", flex: "none" }}>
+                          +{entry.contingency_pd} pd · {t(locale, "contingencyNote")}
+                        </Chip>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -3,7 +3,8 @@
 /** App chrome: the sticky top bar and the 184px left rail from the design.
  *
  * The design is explicit that this is a desktop workstation UI (min-width 1280px,
- * no mobile breakpoint) and that theme and density are root data attributes. The
+ * no mobile breakpoint) and that theme is a root data attribute (density is pinned
+ * to "dense" in the root layout — the toggle was dropped as operator noise). The
  * identity layer (docs/design/README.md) replaced the original CSS-primitive rail
  * squares with the drawn SVG icon set — still no glyph font, no emoji. */
 
@@ -24,7 +25,6 @@ import {
 } from "@/components/icons";
 
 type Theme = "light" | "dark";
-type Density = "dense" | "comfortable";
 
 const RAIL: {
   href: string;
@@ -42,22 +42,17 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [locale, setLocaleState] = useState<Locale>("en");
   const [theme, setTheme] = useState<Theme>("light");
-  const [density, setDensity] = useState<Density>("dense");
 
   useEffect(() => {
     setLocaleState(detectLocale());
     const storedTheme = window.localStorage.getItem("estimo-theme");
-    const storedDensity = window.localStorage.getItem("estimo-density");
     const initialTheme: Theme =
       storedTheme === "dark" || storedTheme === "light"
         ? storedTheme
         : window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"
           : "light";
-    const initialDensity: Density =
-      storedDensity === "comfortable" || storedDensity === "dense" ? storedDensity : "dense";
     setTheme(initialTheme);
-    setDensity(initialDensity);
   }, []);
 
   useEffect(() => {
@@ -71,11 +66,6 @@ export function Shell({ children }: { children: ReactNode }) {
     // wrong glyph ("PROFILI" for "PROFİLİ").
     document.documentElement.lang = locale;
   }, [locale]);
-
-  useEffect(() => {
-    document.documentElement.dataset.density = density;
-    window.localStorage.setItem("estimo-density", density);
-  }, [density]);
 
   const switchLocale = useCallback((next: Locale) => {
     setLocale(next);
@@ -121,13 +111,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <option value="en">EN</option>
           <option value="tr">TR</option>
         </select>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setDensity(density === "dense" ? "comfortable" : "dense")}
-        >
-          {density === "dense" ? t(locale, "densityComfortable") : t(locale, "densityDense")}
-        </button>
         <button
           type="button"
           className="btn"
