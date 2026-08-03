@@ -208,6 +208,29 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Fixed
+- **Adversarial review of the S11 batch: 36 findings raised, 7 survived refutation, two
+  of them regressions this same batch introduced.**
+- `restricting_audiences([])` returned `{public}`, conflating "every source is public"
+  with "there are no sources". Module-wiki `source_ref`s embed the commit SHA, so any
+  push to a synced repo prunes the previous sync's chunks — a canonical draft awaiting
+  approval could therefore lose every source while its body still held their restricted
+  text, and approving it published that body to `public` at the 0.95 authority tier.
+  Before the ACL commit the same call raised; the commit written to close a widening
+  opened a caller-independent one. Unknown now resolves to refusal, never to public, and
+  `approve` additionally refuses when any recorded `source_ref` no longer resolves — the
+  body outlives its sources, so the survivors' audience is not a safe answer.
+- `embed_pending` called `session.rollback()` on a session it did not own. In `run_sync`
+  that expired the caller's ORM objects and silently reverted `SyncRun.status` from
+  "succeeded" back to its last committed value, "running" — persisting a finished crawl
+  as running, where the one-running-sync partial index blocked the connection until the
+  hourly sweep. The most likely trigger was mundane: a deployment with a chat gateway but
+  no `embedding` profile raises on every call. The rollback is gone (nothing had been
+  written since the previous batch committed) and the embed pass now runs only after the
+  run's terminal state is durable.
+- The Jira connector rewrote a ledger row's title and description without invalidating
+  its vector, so the dense leg kept retrieving the row under text it no longer contained.
+- `attribution.product_rows` counted `jira://` rows as rows the product wrote, inflating
+  the unattributed denominator with rows nobody was ever asked to attribute.
 - `upsert_document` invalidated a row's embedding on **every** write. The Confluence
   lane re-ingests a 26-hour overlap window of unchanged pages on each incremental sync,
   so that would have wiped every vector in the window on each run and re-billed the

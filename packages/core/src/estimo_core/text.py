@@ -19,13 +19,22 @@ PUBLIC_ACL = "public"
 def restricting_audiences(key_sets: list[set[str]]) -> set[str] | None:
     """The audience that can read EVERY one of these sources.
 
-    Returns None when the sources share no common audience (genuinely unpublishable
-    together). A source whose keys include PUBLIC_ACL is readable by everyone and so
-    imposes no constraint — treating it as a constraint is what made the common
-    "one public source + one restricted source" case look unpublishable and invited
-    an arbitrary override.
+    Returns None when no audience can be computed — the caller must refuse rather
+    than guess. A source whose keys include PUBLIC_ACL is readable by everyone and so
+    imposes no constraint; treating it as one is what made the common "one public
+    source + one restricted source" case look unpublishable and invited an arbitrary
+    override.
+
+    "Every source is public" and "there are no sources" must never collapse into the
+    same answer. They did, and the result was a security hole: a canonical draft whose
+    source chunks had since been deleted computed an audience of PUBLIC and republished
+    its restricted body to everyone. An empty source list means the audience is
+    UNKNOWN, and unknown resolves to refusal, never to public. The same applies to a
+    source carrying no ACL keys at all.
     """
-    restricting = [keys for keys in key_sets if keys and PUBLIC_ACL not in keys]
+    if not key_sets or any(not keys for keys in key_sets):
+        return None
+    restricting = [keys for keys in key_sets if PUBLIC_ACL not in keys]
     if not restricting:
         return {PUBLIC_ACL}
     common: set[str] = set.intersection(*restricting)

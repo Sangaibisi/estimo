@@ -136,9 +136,15 @@ async def embed_pending(
             try:
                 result = await client.embed(texts)
             except GatewayError:
-                # One bad batch must not abandon the rest of the backfill, and must not
-                # roll back batches already committed.
-                await session.rollback()
+                # One bad batch must not abandon the rest of the backfill.
+                #
+                # Deliberately NO rollback: the failure happened in an HTTP call, and
+                # nothing has been written since the previous batch committed, so there
+                # is nothing to undo. Rolling back here reached into a session this
+                # function does not own and expired the caller's ORM objects — which
+                # silently reverted `SyncRun.status` from "succeeded" back to its last
+                # committed value, "running", leaving a finished crawl to occupy the
+                # one-running-sync index until the hourly sweep freed it.
                 failed += 1
                 logger.warning(
                     "embedding batch failed (%s, %d rows); continuing",

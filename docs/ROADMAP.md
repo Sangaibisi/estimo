@@ -20,7 +20,7 @@ through the question gate, independent-first desk and line-by-line signature to 
 exported `.docx`. Two kinds of work remain, and they are different in kind.
 
 *Engineering, deferred rather than done* — seven items S3–S10 scoped but did not deliver,
-now collected in **[S11](#s11--carried-forward--status--not-started)** instead of hiding
+now collected in **[S11](#s11--carried-forward--status--in-progress)** instead of hiding
 inside a ticked box: the rerank slot, contextual chunk headers, Delphi aggregation,
 team/domain curves, the OAuth repo picker, the docs site, per-user canonical ACL filtering,
 and — found while scoping the others — the fact that nothing wrote an embedding, so

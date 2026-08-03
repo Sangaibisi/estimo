@@ -8,7 +8,7 @@ import pytest
 from estimo_connectors import Connection, SyncRun, run_sync
 from estimo_connectors.sync import _last_checkpoint, _workdir_name, sweep_interrupted_runs
 from estimo_knowledge import KnowledgeChunk
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.db
@@ -240,3 +240,92 @@ async def test_canonical_approve_refuses_to_widen_past_the_source_audience(
     )
     with pytest.raises(ValueError, match="no common ACL audience"):
         await approve(session, mixed, approver="D. Aksoy")
+
+
+async def test_approving_a_page_whose_sources_were_pruned_is_refused(
+    clean: AsyncSession,
+) -> None:
+    """The body outlives its sources. Module-wiki source_refs embed the commit SHA, so
+    any push prunes the previous sync's chunks — and a draft awaiting approval then has
+    a body full of restricted text with no sources left to derive an audience from.
+    Publishing it computed PUBLIC, which is the widening the ACL work exists to stop."""
+    session = clean
+    from estimo_connectors import approve, generate_candidate
+    from estimo_knowledge import KnowledgeChunk, upsert_document
+
+    await upsert_document(
+        session,
+        source_type="code-wiki",
+        source_ref="repo://meridyen@sha1/billing",
+        title="Billing",
+        text="Taksitli fatura kırılımı gizli marj tablosu.",
+        acl_keys=["team:meridyen"],
+    )
+    await session.commit()
+    page = await generate_candidate(
+        session, topic="taksitli fatura kırılımı", acl_keys=["team:meridyen"]
+    )
+    assert page.source_refs, "the draft must record what it was distilled from"
+
+    # A commit lands; the git sync prunes every chunk from the previous SHA.
+    await session.execute(delete(KnowledgeChunk).where(KnowledgeChunk.source_type == "code-wiki"))
+    await session.commit()
+
+    with pytest.raises(ValueError, match="no longer exist"):
+        await approve(session, page, approver="D. Aksoy")
+
+    published = await session.scalar(
+        select(KnowledgeChunk).where(KnowledgeChunk.source_type == "canonical")
+    )
+    assert published is None, "a page with vanished sources must not be published at all"
+
+
+async def test_a_failing_embed_pass_leaves_the_run_succeeded(clean: AsyncSession) -> None:
+    """The embed pass runs after the run's terminal state is durable. While the status
+    lived only in memory, a rollback underneath reverted it to 'running' and the
+    one-running-sync index wedged the connection until the hourly sweep."""
+    session = clean
+    from estimo_connectors.db import Connection
+    from estimo_connectors.sync import run_sync
+
+    class ExplodingGateway:
+        async def embed(self, texts: list[str], *, stage: str = "embedding") -> object:
+            from estimo_gateway import GatewayError
+
+            raise GatewayError("no embedding profile configured")
+
+    from estimo_knowledge import LedgerEntryRow
+
+    session.add(
+        LedgerEntryRow(
+            brd_ref="AUR-E1",
+            item_title="Embed edilecek kalem",
+            item_description="metin",
+        )
+    )
+    connection = Connection(
+        kind="jira",
+        name="jira-embed-fail",
+        base_url="https://example.invalid",
+        config={"jql": "project = AUR", "points_to_pd": 1.0},
+    )
+    session.add(connection)
+    await session.commit()
+
+    async def _fake_jira(*args: object, **kwargs: object) -> dict[str, object]:
+        return {"issues": 0, "imported": 0}
+
+    import estimo_connectors.sync as sync_module
+
+    original = sync_module._sync_jira
+    sync_module._sync_jira = _fake_jira
+    try:
+        run = await run_sync(session, connection, client=ExplodingGateway())  # type: ignore[arg-type]
+    finally:
+        sync_module._sync_jira = original
+
+    assert run.status == "succeeded", "a gateway outage must not un-finish a completed crawl"
+    await session.refresh(run)
+    assert run.status == "succeeded", "and it must be persisted that way"
+    assert run.finished_at is not None
+    assert (run.stats or {}).get("embed_failed_batches") == 1, "the failure must be reported"

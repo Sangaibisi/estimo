@@ -133,6 +133,19 @@ async def approve(
         return page
 
     sources = await _source_chunks(session, page)
+    # The body outlives its sources. Module-wiki source_refs embed the commit SHA, so
+    # ANY push to a synced repo prunes every chunk from the previous sync — a draft
+    # awaiting approval can therefore lose sources between drafting and approving,
+    # while its body still contains their text. Publishing to whatever audience the
+    # SURVIVORS share would widen access to the text of the source that vanished.
+    expected_refs = {ref.split(":", 1)[1] for ref in (page.source_refs or []) if ":" in ref}
+    missing = expected_refs - {chunk.source_ref for chunk in sources}
+    if missing:
+        raise ValueError(
+            f"{len(missing)} source chunk(s) this page was distilled from no longer "
+            "exist, so the audience that may read the page cannot be determined — "
+            "regenerate the draft before approving"
+        )
     computed = restricting_audiences([set(chunk.acl_keys or []) for chunk in sources])
     if computed is None:
         raise ValueError(

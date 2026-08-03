@@ -104,17 +104,6 @@ async def run_sync(
         else:
             raise ValueError(f"unsupported connection kind: {connection.kind}")
         run.status = "succeeded"
-        # Freshly ingested rows carry no vector, so without this the dense leg only
-        # sees whatever a separate backfill happened to catch. Deliberately AFTER the
-        # sync is marked succeeded and reported separately: embedding is a best-effort
-        # enrichment, and a gateway outage must not turn a completed crawl — the
-        # expensive, rate-limited part — into a failed run that re-crawls tomorrow.
-        embed_report = await embed_pending(session, client)
-        stats = {
-            **stats,
-            "embedded": embed_report.embedded,
-            "embed_failed_batches": embed_report.failed_batches,
-        }
         run.stats = stats
     except Exception as exc:
         logger.exception("sync failed for %s", connection.name)
@@ -126,6 +115,20 @@ async def run_sync(
         session.add(run)
     run.finished_at = dt.datetime.now(dt.UTC)
     await session.commit()
+
+    # Embedding is a best-effort enrichment and runs only once the run's terminal
+    # state is DURABLE. A gateway outage must not cost the expensive, rate-limited
+    # part — the crawl — and must not be able to disturb the run row: while the
+    # status lived only in memory, any session-level rollback underneath reverted it
+    # to "running" and wedged the connection behind the one-running-sync index.
+    if run.status == "succeeded" and client is not None:
+        report = await embed_pending(session, client)
+        run.stats = {
+            **(run.stats or {}),
+            "embedded": report.embedded,
+            "embed_failed_batches": report.failed_batches,
+        }
+        await session.commit()
     return run
 
 
@@ -278,6 +281,14 @@ async def _sync_jira(session: AsyncSession, connection: Connection, run: SyncRun
             row = LedgerEntryRow(origin_ref=ref)
             session.add(row)
         row.brd_ref = issue.parent_key or issue.key
+        # A retitled or re-described issue must lose its vector, or the dense leg keeps
+        # retrieving it under text it no longer contains — confidently, because a
+        # vector carries no visible staleness. Same rule the chunk upsert applies; the
+        # embedding writer picks these rows up on its next pass.
+        if (row.item_title, row.item_description) != (issue.summary, issue.description):
+            row.embedding = None
+            row.embedding_model = None
+            row.embedding_dim = None
         row.item_title = issue.summary
         row.item_description = issue.description
         row.estimate_single = issue.story_points * float(factor)

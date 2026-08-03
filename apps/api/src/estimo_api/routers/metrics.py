@@ -191,7 +191,12 @@ async def _attribution(session: AsyncSession) -> dict[str, Any]:
     rows = (
         await session.execute(
             select(LedgerEntryRow.team, LedgerEntryRow.domain_tags).where(
-                LedgerEntryRow.origin_ref.is_not(None)
+                # Rows Estimo itself wrote, which are the only ones a user could have
+                # attributed. `origin_ref IS NOT NULL` also matches `jira://…` rows the
+                # connector imports, and those inflate the denominator with rows nobody
+                # was ever asked to attribute — making the gap look like user apathy
+                # rather than an untouched import.
+                LedgerEntryRow.origin_ref.like("estimate://%")
             )
         )
     ).all()
