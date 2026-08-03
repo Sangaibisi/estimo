@@ -9,7 +9,7 @@ return nothing and cross-tenant writes are refused.
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import make_url, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -31,10 +31,26 @@ async def app_sessionmaker(database_url: str):  # type: ignore[no-untyped-def]
         await conn.execute(text(f"ALTER ROLE estimo_app LOGIN PASSWORD '{APP_PASSWORD}'"))
     await owner.dispose()
 
-    # Swap the credentials in the URL for the app role. asyncpg needs a TCP host
-    # (the app role authenticates via scram, unlike the trust-socket owner).
-    app_url = database_url.replace("estimo:change-me", f"estimo_app:{APP_PASSWORD}")
+    # Rewrite the URL's credentials structurally. A string replace would silently
+    # no-op when the environment's password differs (CI vs local), leaving the test
+    # connected as the OWNER — which BYPASSES RLS and would make this suite assert
+    # nothing while looking green.
+    app_url = make_url(database_url).set(username="estimo_app", password=APP_PASSWORD)
     engine = create_async_engine(app_url)
+
+    # Prove we are actually testing the RLS path before any assertion runs.
+    async with engine.connect() as conn:
+        role, is_super, bypass = (
+            await conn.execute(
+                text(
+                    "SELECT current_user, rolsuper, rolbypassrls "
+                    "FROM pg_roles WHERE rolname = current_user"
+                )
+            )
+        ).one()
+    assert role == "estimo_app", f"connected as {role!r}, not the RLS-bound app role"
+    assert not is_super and not bypass, "app role would bypass RLS; the test is meaningless"
+
     yield async_sessionmaker(engine, expire_on_commit=False)
     await engine.dispose()
 

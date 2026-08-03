@@ -13,14 +13,23 @@ file answers "what, in which order, and is it done".
 - Items are never silently deleted or altered; scope changes are justified in the PR description.
 - The next sprint does not move to 🟡 until the current sprint's exit gate is met.
 
+## Status (2026-08-03)
+
+**Every sprint S0–S10 is engineering-complete and CI-green.** What remains is
+maintainer-owned and cannot be produced from synthetic data or without customer
+credentials: the F1 blinded evaluation's human/hybrid arms (S4), the dogfood pilot and
+its F2→F3 decision report (S8-5), a real Confluence/Bitbucket tenant sync (S9), and the
+second external installation + security review (S10 exit gate). Each is marked 🧑 in its
+sprint.
+
 ## Phase map
 
 | Phase | Sprints | Goal | Version target |
 |---|---|---|---|
-| **F0 — Foundation** | S0 | Repo + data foundation: synthetic fixtures, ledger schema, seed set inventory | v0.1 ✅ (documentation) |
-| **F1 — PoC** | S1–S4 | BRD → decomposition + questions + draft with analogy evidence; blinded evaluation on the golden set | v0.4 |
-| **F2 — Dogfood Pilot** | S5–S8 | Code awareness + effort bands + review UI + calibration loop; use in the real workflow | v1.0 |
-| **F3 — Productization** | S9–S10 | Connectors, multi-tenant, BYOC, Atlassian surface, MCP server | v1.x |
+| **F0 — Foundation** | S0 | Repo + data foundation: synthetic fixtures, ledger schema, seed set inventory | v0.1 ✅ |
+| **F1 — PoC** | S1–S4 | BRD → decomposition + questions + draft with analogy evidence; blinded evaluation on the golden set | v0.4 ✅ (🧑 human/hybrid eval arms open) |
+| **F2 — Dogfood Pilot** | S5–S8 | Code awareness + effort bands + review UI + calibration loop; use in the real workflow | v1.0 ✅ engineering (🧑 pilot run open) |
+| **F3 — Productization** | S9–S10 | Connectors, multi-tenant, BYOC, Atlassian surface, MCP server | v1.x ✅ engineering (🧑 external onboarding + security review open) |
 
 **Blinded evaluation gate (F1→F2):** AI-only / human-only / hybrid comparison on the
 golden set; pass if the hybrid flow saves time over human-only without regressing on
