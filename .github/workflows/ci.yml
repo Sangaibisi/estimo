@@ -11,7 +11,6 @@ permissions:
 
 env:
   UV_VERSION: "0.12.x"
-  IMAGE: ghcr.io/sangaibisi/estimo-api
 
 jobs:
   lint:
@@ -68,19 +67,45 @@ jobs:
       - run: uv sync --locked --all-packages
       - run: uv run pytest
 
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
   # ---- Image publish: gated on the quality jobs above (push to main / v* tags only) ----
 
   publish-build:
     if: github.event_name == 'push'
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, web]
     strategy:
       fail-fast: false
       matrix:
+        component: [api, web]
+        platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+          - component: api
+            image: ghcr.io/sangaibisi/estimo-api
+            context: .
+            dockerfile: apps/api/Dockerfile
+          - component: web
+            image: ghcr.io/sangaibisi/estimo-web
+            context: apps/web
+            dockerfile: apps/web/Dockerfile
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -95,16 +120,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Sanitize platform for cache scope
         id: plat
-        run: echo "scope=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+        run: echo "scope=${{ matrix.component }}-$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
-          context: .
-          file: apps/api/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           # Per-arch pushes carry NO tags; only the merged manifest is tagged.
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
           provenance: mode=max
           sbom: true
           cache-from: type=gha,scope=${{ steps.plat.outputs.scope }}
@@ -125,6 +150,14 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     needs: [publish-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: api
+            image: ghcr.io/sangaibisi/estimo-api
+          - component: web
+            image: ghcr.io/sangaibisi/estimo-web
     permissions:
       contents: read
       packages: write
@@ -134,7 +167,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/digests
-          pattern: digests-*
+          pattern: digests-${{ matrix.component }}-*
           merge-multiple: true
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -145,7 +178,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ matrix.image }}
           tags: |
             type=sha
             type=ref,event=branch
@@ -156,14 +189,14 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+            $(printf '${{ matrix.image }}@sha256:%s ' *)
       - name: Resolve merged digest
         id: digest
         run: |
-          digest=$(docker buildx imagetools inspect "${{ env.IMAGE }}:$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON" | cut -d: -f2)" --format '{{json .Manifest}}' | jq -r .digest)
+          digest=$(docker buildx imagetools inspect "${{ matrix.image }}:$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON" | cut -d: -f2)" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-name: ${{ env.IMAGE }}
+          subject-name: ${{ matrix.image }}
           subject-digest: ${{ steps.digest.outputs.digest }}
           push-to-registry: true

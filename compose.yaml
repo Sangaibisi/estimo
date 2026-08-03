@@ -53,6 +53,21 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  web:
+    image: estimo-web:local
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    environment:
+      # Origin the BROWSER uses to reach the API — runtime-injected, never baked
+      # into the image. Override when the API is exposed on a different host.
+      ESTIMO_API_URL: ${ESTIMO_WEB_API_URL:-http://localhost:8000}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
   mock-llm:
     image: estimo-api:local
     build: *api-build

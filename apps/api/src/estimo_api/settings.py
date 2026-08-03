@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     gateway: GatewayConfig
     log_level: str = "INFO"
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
     @field_validator("database_url")
     @classmethod

@@ -1,0 +1,83 @@
+:root {
+  /* Estimo design tokens — source of truth: docs/design/estimo-ui.dc.html */
+  --bg: #f4f4f1;
+  --surf: #ffffff;
+  --ink: #15181c;
+  --mut: #6b717a;
+  --line: #e2e2dc;
+  --acc: #1f4b8e;
+  --acc-bg: #eaf0f9;
+  --acc-ink: #ffffff;
+  --acc-line: #b9cce6;
+  --ok: #2c6a4b;
+  --ok-bg: #e9f2ec;
+  --crit: #9c3a26;
+  --crit-bg: #f8ebe7;
+  --ev-code: #463f8f;
+  --ev-wiki: #1a6570;
+  --ev-analog: #7a4076;
+  --ev-ans: #3a6428;
+  --r: 6px;
+  --sh: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --surf: #16191e;
+    --ink: #e9eaec;
+    --mut: #8d949d;
+    --line: #272c34;
+    --acc: #7ba5e8;
+    --acc-bg: #17253a;
+    --acc-ink: #0e1013;
+    --acc-line: #31435f;
+    --ok: #63b189;
+    --ok-bg: #14251d;
+    --crit: #de8069;
+    --crit-bg: #2c1a15;
+    --ev-code: #9e97e8;
+    --ev-wiki: #5cb6c2;
+    --ev-analog: #c48abf;
+    --ev-ans: #8fbf72;
+    --sh: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+h1, h2, h3 { letter-spacing: -0.01em; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+th { color: var(--mut); font-weight: 600; font-size: 12px; text-transform: none; }
+button {
+  font: inherit;
+  border: 1px solid var(--acc-line);
+  background: var(--acc-bg);
+  color: var(--acc);
+  border-radius: var(--r);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button.primary { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+input, select {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 6px 8px;
+  background: var(--surf);
+  color: var(--ink);
+}
+.card { background: var(--surf); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh); padding: 16px; }
+.chip { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 12px; border: 1px solid var(--line); }
+.muted { color: var(--mut); }
