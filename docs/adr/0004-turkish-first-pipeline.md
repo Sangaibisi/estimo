@@ -31,6 +31,16 @@ with TR locale formatting (1.234,56).
 - **Fixtures are Turkish** where they simulate customer input — synthetic Turkish BRDs
   are test data, consistent with the English-docs policy.
 
+**Retrieval decision (2026-08-03, S3):** the lexical leg is locked as PostgreSQL's
+built-in `turkish` snowball FTS (`to_tsvector`/`ts_rank_cd`, verified against the
+pgvector image) with **query-side Turkish suffix-stripping + prefix matching**
+(`taksit:*`) — measured on the golden retrieval set, raw snowball misses
+derivational/possessive query forms (`taksitli`, `kampanyası`), and prefix-OR queries
+restore recall while RRF fusion keeps precision. Dense-leg embedder and reranker
+selection remains benchmark-pending: the harness and Turkish golden set live in
+`evals/golden/retrieval-tr/`; the shoot-out runs at the first deployment with live
+embedding endpoints (mock vectors cannot rank semantics).
+
 ## Consequences
 
 - The S3 spike must produce the Turkish benchmark before locking the embedder/reranker.

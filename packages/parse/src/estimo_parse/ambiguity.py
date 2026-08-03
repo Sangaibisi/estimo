@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import re
 
-from estimo_core import Requirement
+from estimo_core import Requirement, tr_lower
 from estimo_gateway import GatewayClient
 
 GATE_THRESHOLD = 0.5
@@ -35,15 +35,9 @@ _CONDITION_RE = re.compile(r"(durumunda|halinde|olması hâlinde)", re.IGNORECAS
 _MEASURABLE_RE = re.compile(r"\d|yüzde|oran|adet|saniye|dakika|saat|gün|ay\b", re.IGNORECASE)
 
 
-def _tr_lower(text: str) -> str:
-    """Turkish-aware lowering: İ→i and I→ı BEFORE str.lower(), which would otherwise
-    produce i̇ (combining dot) and break substring matches on caps/İ-initial text."""
-    return text.replace("İ", "i").replace("I", "ı").lower()
-
-
 def rule_score(req: Requirement) -> tuple[float, tuple[str, ...]]:
     """Deterministic score in [0, 1] with machine-readable issue slugs."""
-    text = _tr_lower(req.text)
+    text = tr_lower(req.text)
     score = 0.0
     issues: list[str] = []
 

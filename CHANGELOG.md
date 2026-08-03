@@ -9,6 +9,16 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S3 knowledge layer** (`packages/knowledge`): estimate-ledger Postgres schema
+  (migration 0002) with Turkish-FTS generated tsvectors and dimension-flexible
+  embeddings (model id + dim recorded per row); seed-set importer
+  (`estimo-ledger-import`) implementing the LEDGER-SCHEMA contract — CSV/XLSX header
+  aliases, Turkish dates/decimals, bad-row report, unknown-module review queue; hybrid
+  retrieval (Turkish lexical with suffix-strip prefix matching + optional dense leg via
+  the gateway, RRF fusion, ACL pre-filter on chunks); analogy cards carrying the
+  outside view (estimate then vs actual, deviation). Turkish retrieval golden set
+  (`evals/golden/retrieval-tr/`) asserted in CI; embedder/reranker shoot-out deferred
+  to the first live gateway (ADR-0004 updated with the lexical-leg decision).
 - **S2 BRD parsing** (`packages/parse`): Turkish `.docx` BRDs → stable-ID requirement
   tables via Docling's DOCX backend (slim install, no ML models — ADR-0005 scope
   discipline). Extraction ladder: explicit codes → requirement tables (acceptance

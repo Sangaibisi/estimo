@@ -6,10 +6,11 @@ import asyncio
 import os
 
 from alembic import context
+from estimo_knowledge.db import Base as KnowledgeBase
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from estimo_api.models import Base
+from estimo_api.models import Base as ApiBase
 
 config = context.config
 
@@ -17,7 +18,7 @@ database_url = os.environ.get("ESTIMO_DATABASE_URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
 
-target_metadata = Base.metadata
+target_metadata = [ApiBase.metadata, KnowledgeBase.metadata]
 
 
 def run_migrations_offline() -> None:

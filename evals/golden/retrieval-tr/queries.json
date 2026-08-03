@@ -1,0 +1,30 @@
+{
+  "description": "Turkish retrieval golden set over fixtures/seed/sample-seed.csv. Each query lists item titles (substring match) that must appear in the top-k lexical results. Extended with embedder comparisons at first real deployment (S3-2 note in ROADMAP).",
+  "top_k": 5,
+  "queries": [
+    {
+      "query": "taksitli cihaz kampanyası",
+      "expect_titles": ["Kampanya motoru taksit planı desteği", "Faturada taksit kalemi gösterimi"]
+    },
+    {
+      "query": "fatura birleştirme",
+      "expect_titles": ["Konsolide fatura üretimi"]
+    },
+    {
+      "query": "bayi sipariş bildirimi",
+      "expect_titles": ["Bayi sipariş durumu bildirimi"]
+    },
+    {
+      "query": "kalan bakiye iadesi",
+      "expect_titles": ["Ön ödemeli bakiye iadesi"]
+    },
+    {
+      "query": "kimlik doğrulama entegrasyonu",
+      "expect_titles": ["Uzaktan kimlik doğrulama entegrasyonu"]
+    },
+    {
+      "query": "katalog paket bağımlılıkları",
+      "expect_titles": ["Katalogda paket bağımlılık kuralları"]
+    }
+  ]
+}

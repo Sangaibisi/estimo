@@ -22,6 +22,7 @@ from estimo_core.models import (
     ThreePoint,
     WorkItem,
 )
+from estimo_core.text import tr_lower
 
 __all__ = [
     "AnchorFlag",
@@ -38,4 +39,5 @@ __all__ = [
     "Signature",
     "ThreePoint",
     "WorkItem",
+    "tr_lower",
 ]

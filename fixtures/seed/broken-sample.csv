@@ -1,0 +1,6 @@
+brd_ref,item_title,est_likely,actual_effort,actual_source,scope_changed
+AUR-X-1,,5,,,false
+AUR-X-2,Efor içermeyen kalem,,,,false
+AUR-X-3,Gerçekleşme kaynağı eksik,6,8,,false
+AUR-X-4,Kapsam alanı bozuk,4,,,belki
+AUR-X-5,Geçerli kontrol kalemi,3,4,timesheet,false

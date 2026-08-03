@@ -88,17 +88,17 @@ planted anchor in the fixtures; parse eval in CI.
 
 ---
 
-## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🟡 In progress`
+## S3 — Estimate Ledger & Turkish Retrieval · `Status: 🟡 In progress` (all items done; exit gate awaits green CI; embedder shoot-out deferred to first live gateway — see S3-2)
 
 **Goal:** The import pipeline that takes in the seed set + hybrid search proven on Turkish.
 
 **Architecture slice:** `packages/knowledge` (ledger + search shelves).
 
-- [ ] S3-1 Postgres implementation of the ledger schema + import CLI (xlsx/csv mapping per the S0-4 table; bad-row report)
-- [ ] S3-2 **Turkish retrieval spike**: benchmark BM25 with a TR analyzer + 2–3 multilingual embedders + reranker candidates on the synthetic TR golden retrieval set → the outcome is locked in via an ADR-0004 update
-- [ ] S3-3 Hybrid search service: BM25 + dense + reranker + contextual chunk headers; ACL/freshness metadata fields ready in the schema
-- [ ] S3-4 Analogy query: work item → closest past items (similarity + effort given at the time + actuals + deviation); "analogy card" API contract
-- [ ] S3-5 Retrieval eval (Ragas-style): recall/precision dashboard in CI
+- [x] S3-1 Postgres implementation of the ledger schema + import CLI (xlsx/csv mapping per the S0-4 table; bad-row report)
+- [x] S3-2 **Turkish retrieval spike**: benchmark BM25 with a TR analyzer + 2–3 multilingual embedders + reranker candidates on the synthetic TR golden retrieval set → the outcome is locked in via an ADR-0004 update — **done for the lexical leg** (PostgreSQL `turkish` FTS + query-side suffix-strip prefix matching, chosen empirically: raw snowball missed derivational/possessive forms; locked in ADR-0004). The **embedder/reranker shoot-out needs live embedding endpoints** — the harness + golden set are in the repo (`evals/golden/retrieval-tr/`), the comparison runs at first real gateway deployment; mock vectors cannot rank semantics
+- [x] S3-3 Hybrid search service: BM25 + dense + reranker + contextual chunk headers; ACL/freshness metadata fields ready in the schema
+- [x] S3-4 Analogy query: work item → closest past items (similarity + effort given at the time + actuals + deviation); "analogy card" API contract
+- [x] S3-5 Retrieval eval (Ragas-style): recall/precision dashboard in CI
 
 **Exit gate:** Seed-set import runs end to end with a sample file; the TR retrieval choice
 is justified by measurement; the analogy card API returns meaningful results on the
