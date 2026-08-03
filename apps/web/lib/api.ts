@@ -50,6 +50,17 @@ export interface DeskItem {
   };
   independent: ThreePoint | null;
   signed: boolean;
+  delphi: {
+    // "you_first" and "below_threshold" carry no band-shaped value at all — with two
+    // panelists a median plus your own band reconstructs the other person's exactly.
+    state: "you_first" | "below_threshold" | "open";
+    estimators: number;
+    threshold: number;
+    bands: ThreePoint[];
+    consensus: ThreePoint | null;
+    spread_likely: number | null;
+    overlap: "intersect" | "disjoint" | null;
+  };
   ai: {
     range: ThreePoint;
     confidence: string;
@@ -87,7 +98,10 @@ export const api = {
   upload: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<EstimateSummary>("/v1/estimates", { method: "POST", body: form });
+    return request<EstimateSummary>("/v1/estimates", {
+      method: "POST",
+      body: form,
+    });
   },
   applyAnswers: (id: string, answers: Record<string, string>) =>
     request<EstimateSummary>(`/v1/estimates/${id}/answers`, {
@@ -111,7 +125,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  sign: (id: string, payload: { work_item_id: string; name: string; role: string }) =>
+  sign: (
+    id: string,
+    payload: { work_item_id: string; name: string; role: string },
+  ) =>
     request<{ status: string }>(`/v1/estimates/${id}/sign`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -131,11 +148,15 @@ export const api = {
       scope_changed: boolean;
     },
   ) =>
-    request<{ status: string; deviation: number | null }>(`/v1/estimates/${id}/actuals`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  listActuals: (id: string) => request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
+    request<{ status: string; deviation: number | null }>(
+      `/v1/estimates/${id}/actuals`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
+  listActuals: (id: string) =>
+    request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
   metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
   ledger: (q: string) =>
     request<{
@@ -160,7 +181,9 @@ export const api = {
   deleteConnection: (id: string) =>
     request<void>(`/v1/connections/${id}`, { method: "DELETE" }),
   triggerSync: (id: string) =>
-    request<{ status: string }>(`/v1/connections/${id}/sync`, { method: "POST" }),
+    request<{ status: string }>(`/v1/connections/${id}/sync`, {
+      method: "POST",
+    }),
   listCanonical: () => request<CanonicalEntry[]>("/v1/canonical"),
   createCanonical: (topic: string) =>
     request<{ id: string; status: string }>("/v1/canonical", {

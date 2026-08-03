@@ -27,6 +27,7 @@ import {
   Num,
   RangeBar,
   StageStrip,
+  DelphiOverlay,
   StatusChip,
 } from "@/components/ui";
 
@@ -67,7 +68,11 @@ interface BoeLineShape {
 
 type StageKey = "reading" | "questions" | "impact" | "desk" | "boe";
 
-export default function EstimateWorkspace({ params }: { params: Promise<{ id: string }> }) {
+export default function EstimateWorkspace({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const [locale, setLocaleState] = useState<Locale>("en");
   const [summary, setSummary] = useState<EstimateSummary | null>(null);
@@ -92,7 +97,10 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
     setState(detail.state as unknown as StateShape);
     setCritic(detail.critic);
     setFullySigned(detail.fully_signed);
-    setBoeLines(((detail.boe as { lines?: BoeLineShape[] } | null)?.lines ?? []) as BoeLineShape[]);
+    setBoeLines(
+      ((detail.boe as { lines?: BoeLineShape[] } | null)?.lines ??
+        []) as BoeLineShape[],
+    );
   }, [id]);
 
   useEffect(() => {
@@ -106,7 +114,10 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (stage === "boe" && fullySigned) {
-      api.listActuals(id).then(setActuals).catch(() => undefined);
+      api
+        .listActuals(id)
+        .then(setActuals)
+        .catch(() => undefined);
     }
   }, [stage, fullySigned, id]);
 
@@ -127,8 +138,12 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
   }
 
   const blocked = new Set(state.blocked_ids);
-  const openQuestions = state.questions.filter((question) => !(question.id in state.answers));
-  const answeredQuestions = state.questions.filter((question) => question.id in state.answers);
+  const openQuestions = state.questions.filter(
+    (question) => !(question.id in state.answers),
+  );
+  const answeredQuestions = state.questions.filter(
+    (question) => question.id in state.answers,
+  );
   const filledAnswers = Object.fromEntries(
     Object.entries(answers).filter(([, value]) => value.trim()),
   );
@@ -151,11 +166,17 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
   const done = (key: StageKey) => order.indexOf(key) < order.indexOf(reached);
 
   const entered = deskItems.filter((item) => item.independent).length;
+  // One shared scale across the whole desk, INCLUDING the Delphi panel's bands. The
+  // overlay is drawn directly beneath its row so the two can be compared by eye; a
+  // scale that omitted the panel would clamp any band wider than the reader's own and
+  // render two different bands as the same bar — a silent visual lie, and precisely
+  // what the design's "the width of the disagreement is the finding" depends on.
   const maxBand = Math.max(
     1,
     ...deskItems.flatMap((item) => [
       item.ai?.range.pessimistic ?? 0,
       item.independent?.pessimistic ?? 0,
+      ...item.delphi.bands.map((band) => band.pessimistic),
     ]),
   );
   const subtotal = deskItems.reduce(
@@ -174,14 +195,30 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
 
   return (
     <section className="scr">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
         <Link href="/" className="lbl">
           ← {t(locale, "estimates")}
         </Link>
-        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 19,
+            fontWeight: 600,
+            letterSpacing: "-0.01em",
+          }}
+        >
           {summary.brd_ref}
         </h2>
-        <span style={{ fontSize: 13, color: "var(--mut)" }}>{summary.title}</span>
+        <span style={{ fontSize: 13, color: "var(--mut)" }}>
+          {summary.title}
+        </span>
       </div>
 
       <div className="card" style={{ overflow: "hidden", marginBottom: 18 }}>
@@ -251,18 +288,29 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                 return (
                   <tr key={requirement.id}>
                     <td>
-                      <Mn style={{ color: isBlocked ? "var(--crit)" : "var(--ink2)" }}>
+                      <Mn
+                        style={{
+                          color: isBlocked ? "var(--crit)" : "var(--ink2)",
+                        }}
+                      >
                         {requirement.id}
                       </Mn>
                     </td>
                     <td style={{ color: "var(--ink2)" }}>{requirement.text}</td>
                     <td>
                       {issues.length === 0 ? (
-                        <StatusChip status="ok">{t(locale, "clear")}</StatusChip>
+                        <StatusChip status="ok">
+                          {t(locale, "clear")}
+                        </StatusChip>
                       ) : (
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div
+                          style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+                        >
                           {issues.slice(0, 2).map((issue) => (
-                            <StatusChip key={issue} status={isBlocked ? "crit" : "warn"}>
+                            <StatusChip
+                              key={issue}
+                              status={isBlocked ? "crit" : "warn"}
+                            >
                               {issue.split(":")[0]}
                             </StatusChip>
                           ))}
@@ -271,10 +319,7 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                     </td>
                     <td>
                       {(requirement.anchors ?? []).length > 0 ? (
-                        <Chip
-                          tone="warn"
-                          title={t(locale, "anchors")}
-                        >
+                        <Chip tone="warn" title={t(locale, "anchors")}>
                           ⚓ {(requirement.anchors ?? []).length}
                         </Chip>
                       ) : (
@@ -315,16 +360,26 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                   }}
                 >
                   <Lbl>{t(locale, "laneOpen")}</Lbl>
-                  <Mn style={{ color: "var(--mut)" }}>{openQuestions.length}</Mn>
+                  <Mn style={{ color: "var(--mut)" }}>
+                    {openQuestions.length}
+                  </Mn>
                 </div>
                 {openQuestions.length === 0 && (
-                  <p style={{ fontSize: 12.5, color: "var(--ink2)", margin: 0 }}>
+                  <p
+                    style={{ fontSize: 12.5, color: "var(--ink2)", margin: 0 }}
+                  >
                     {t(locale, "emptyQuestions")}
                   </p>
                 )}
                 {openQuestions.map((question) => (
-                  <div key={question.id} className="card" style={{ padding: 11, marginBottom: 9 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    key={question.id}
+                    className="card"
+                    style={{ padding: 11, marginBottom: 9 }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
                       <input
                         type="checkbox"
                         checked={selected.has(question.id)}
@@ -336,12 +391,27 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                         }}
                         style={{ padding: 0 }}
                       />
-                      <Mn style={{ color: "var(--acc)" }}>{question.requirement_id}</Mn>
+                      <Mn style={{ color: "var(--acc)" }}>
+                        {question.requirement_id}
+                      </Mn>
                     </div>
-                    <div style={{ fontSize: 12.5, marginTop: 6, color: "var(--ink)" }}>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        marginTop: 6,
+                        color: "var(--ink)",
+                      }}
+                    >
                       {question.question}
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        flexWrap: "wrap",
+                        marginTop: 7,
+                      }}
+                    >
                       {question.reason
                         .split(",")
                         .slice(0, 2)
@@ -356,7 +426,10 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                       placeholder={t(locale, "answerPlaceholder")}
                       value={answers[question.id] ?? ""}
                       onChange={(event) =>
-                        setAnswers({ ...answers, [question.id]: event.target.value })
+                        setAnswers({
+                          ...answers,
+                          [question.id]: event.target.value,
+                        })
                       }
                     />
                   </div>
@@ -373,16 +446,30 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                   }}
                 >
                   <Lbl>{t(locale, "laneApplied")}</Lbl>
-                  <Mn style={{ color: "var(--mut)" }}>{answeredQuestions.length}</Mn>
+                  <Mn style={{ color: "var(--mut)" }}>
+                    {answeredQuestions.length}
+                  </Mn>
                 </div>
                 {answeredQuestions.map((question) => (
                   <div
                     key={question.id}
                     className="card"
-                    style={{ padding: 11, marginBottom: 9, background: "var(--surf2)" }}
+                    style={{
+                      padding: 11,
+                      marginBottom: 9,
+                      background: "var(--surf2)",
+                    }}
                   >
-                    <Mn style={{ color: "var(--mut)" }}>{question.requirement_id}</Mn>
-                    <div style={{ fontSize: 12.5, marginTop: 5, color: "var(--ink2)" }}>
+                    <Mn style={{ color: "var(--mut)" }}>
+                      {question.requirement_id}
+                    </Mn>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        marginTop: 5,
+                        color: "var(--ink2)",
+                      }}
+                    >
                       {question.question}
                     </div>
                     <div
@@ -412,7 +499,11 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
               }}
             >
               <div
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
               >
                 <Lbl>{t(locale, "customerSet")}</Lbl>
                 <Chip>
@@ -438,7 +529,13 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                   color: "var(--ink2)",
                 }}
               >
-                <div style={{ color: "var(--ink)", fontWeight: 600, marginBottom: 7 }}>
+                <div
+                  style={{
+                    color: "var(--ink)",
+                    fontWeight: 600,
+                    marginBottom: 7,
+                  }}
+                >
                   {summary.brd_ref} — {t(locale, "openPoints")}
                 </div>
                 {state.questions
@@ -449,7 +546,9 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                     </p>
                   ))}
                 {selected.size === 0 && (
-                  <p style={{ margin: 0, color: "var(--mut)" }}>{t(locale, "selectToCompose")}</p>
+                  <p style={{ margin: 0, color: "var(--mut)" }}>
+                    {t(locale, "selectToCompose")}
+                  </p>
                 )}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
@@ -509,7 +608,9 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--acc)" }}>
+                <div
+                  style={{ fontSize: 14, fontWeight: 600, color: "var(--acc)" }}
+                >
                   {t(locale, "independentHeadline")}
                 </div>
                 <div
@@ -523,7 +624,14 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                   {t(locale, "independentBody")}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flex: "none" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  flex: "none",
+                }}
+              >
                 <Mn style={{ color: "var(--ink2)" }}>
                   {entered} / {deskItems.length} {t(locale, "entered")}
                 </Mn>
@@ -576,7 +684,10 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
               <tbody>
                 {deskItems.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ color: "var(--mut)", fontSize: 12.5 }}>
+                    <td
+                      colSpan={7}
+                      style={{ color: "var(--mut)", fontSize: 12.5 }}
+                    >
                       {t(locale, "deskClosedHint")}
                     </td>
                   </tr>
@@ -626,9 +737,12 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
                   background: "var(--surf2)",
                 }}
               >
-                <div style={{ display: "flex", gap: 20, alignItems: "baseline" }}>
+                <div
+                  style={{ display: "flex", gap: 20, alignItems: "baseline" }}
+                >
                   <Lbl>
-                    {t(locale, "subtotal")} · {entered} {t(locale, "items").toLowerCase()}
+                    {t(locale, "subtotal")} · {entered}{" "}
+                    {t(locale, "items").toLowerCase()}
                   </Lbl>
                   <Num style={{ fontSize: 17, fontWeight: 600 }}>
                     {subtotal.optimistic} — {subtotal.pessimistic} pd
@@ -674,23 +788,50 @@ export default function EstimateWorkspace({ params }: { params: Promise<{ id: st
 
 /* ---------------- Impact Map ---------------- */
 
-function ImpactMap({ locale, workItems }: { locale: Locale; workItems: WorkItemShape[] }) {
+function ImpactMap({
+  locale,
+  workItems,
+}: {
+  locale: Locale;
+  workItems: WorkItemShape[];
+}) {
   const modules = new Map<string, WorkItemShape[]>();
   for (const item of workItems) {
-    for (const module of item.module_tags.length ? item.module_tags : ["(unmapped)"]) {
+    for (const module of item.module_tags.length
+      ? item.module_tags
+      : ["(unmapped)"]) {
       modules.set(module, [...(modules.get(module) ?? []), item]);
     }
   }
-  const ordered = [...modules.entries()].sort((a, b) => b[1].length - a[1].length);
+  const ordered = [...modules.entries()].sort(
+    (a, b) => b[1].length - a[1].length,
+  );
   const max = Math.max(1, ...ordered.map(([, items]) => items.length));
 
   return (
     <div style={{ padding: "14px 18px" }}>
       <Lbl>{t(locale, "impactSubtitle")}</Lbl>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          marginTop: 12,
+        }}
+      >
         {ordered.map(([module, items]) => (
-          <div key={module} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 170, flex: "none", fontSize: 13, color: "var(--ink)" }}>
+          <div
+            key={module}
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <div
+              style={{
+                width: 170,
+                flex: "none",
+                fontSize: 13,
+                color: "var(--ink)",
+              }}
+            >
               {module}
             </div>
             <div
@@ -741,7 +882,11 @@ function DeskRow({
   item: DeskItem;
   maxBand: number;
   busy: boolean;
-  onRecord: (band: { optimistic: number; likely: number; pessimistic: number }) => void;
+  onRecord: (band: {
+    optimistic: number;
+    likely: number;
+    pessimistic: number;
+  }) => void;
   onSign: () => void;
 }) {
   const [o, setO] = useState("");
@@ -753,106 +898,206 @@ function DeskRow({
   };
   const band = { o: parseBand(o), l: parseBand(l), p: parseBand(p) };
   const valid =
-    band.o !== null && band.l !== null && band.p !== null && band.o <= band.l && band.l <= band.p;
+    band.o !== null &&
+    band.l !== null &&
+    band.p !== null &&
+    band.o <= band.l &&
+    band.l <= band.p;
 
   return (
-    <tr
-      style={
-        item.independent
-          ? undefined
-          : { background: "var(--surf2)", boxShadow: "inset 2px 0 0 var(--acc)" }
-      }
-    >
-      <td style={{ paddingLeft: 14 }}>
-        <Mn style={{ color: item.independent ? "var(--ok)" : "var(--acc)" }}>
-          {item.independent ? "✓" : "▸"}
-        </Mn>
-      </td>
-      <td>
-        <div style={{ fontSize: 13, color: "var(--ink)" }}>{item.work_item.title}</div>
-        <Mn style={{ color: "var(--mut)" }}>{item.work_item.id}</Mn>
-      </td>
-      <td>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {item.work_item.module_tags.slice(0, 2).map((module) => (
-            <Chip key={module}>{module}</Chip>
-          ))}
-        </div>
-      </td>
-      <td>
-        {item.independent ? (
-          <RangeBar band={item.independent} max={maxBand} accent="var(--ok)" />
-        ) : (
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <input style={{ width: 52 }} placeholder="O" value={o} onChange={(e) => setO(e.target.value)} />
-            <input style={{ width: 52 }} placeholder="L" value={l} onChange={(e) => setL(e.target.value)} />
-            <input style={{ width: 52 }} placeholder="P" value={p} onChange={(e) => setP(e.target.value)} />
-            <button
-              type="button"
-              className="btn"
-              disabled={busy || !valid}
-              onClick={() => {
-                if (!valid) return;
-                onRecord({
-                  optimistic: band.o as number,
-                  likely: band.l as number,
-                  pessimistic: band.p as number,
-                });
+    <>
+      <tr
+        style={
+          item.independent
+            ? undefined
+            : {
+                background: "var(--surf2)",
+                boxShadow: "inset 2px 0 0 var(--acc)",
+              }
+        }
+      >
+        <td style={{ paddingLeft: 14 }}>
+          <Mn style={{ color: item.independent ? "var(--ok)" : "var(--acc)" }}>
+            {item.independent ? "✓" : "▸"}
+          </Mn>
+        </td>
+        <td>
+          <div style={{ fontSize: 13, color: "var(--ink)" }}>
+            {item.work_item.title}
+          </div>
+          <Mn style={{ color: "var(--mut)" }}>{item.work_item.id}</Mn>
+        </td>
+        <td>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {item.work_item.module_tags.slice(0, 2).map((module) => (
+              <Chip key={module}>{module}</Chip>
+            ))}
+          </div>
+        </td>
+        <td>
+          {item.independent ? (
+            <RangeBar
+              band={item.independent}
+              max={maxBand}
+              accent="var(--ok)"
+            />
+          ) : (
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                style={{ width: 52 }}
+                placeholder="O"
+                value={o}
+                onChange={(e) => setO(e.target.value)}
+              />
+              <input
+                style={{ width: 52 }}
+                placeholder="L"
+                value={l}
+                onChange={(e) => setL(e.target.value)}
+              />
+              <input
+                style={{ width: 52 }}
+                placeholder="P"
+                value={p}
+                onChange={(e) => setP(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={busy || !valid}
+                onClick={() => {
+                  if (!valid) return;
+                  onRecord({
+                    optimistic: band.o as number,
+                    likely: band.l as number,
+                    pessimistic: band.p as number,
+                  });
+                }}
+              >
+                {t(locale, "record")}
+              </button>
+            </div>
+          )}
+        </td>
+        <td>
+          {item.ai ? (
+            <RangeBar band={item.ai.range} max={maxBand} />
+          ) : (
+            // Honest closed state — the design forbids a blurred reveal.
+            <Chip style={{ color: "var(--mut)" }}>{t(locale, "closed")}</Chip>
+          )}
+          {item.delphi.state === "below_threshold" && (
+            // Says how far the panel is from opening WITHOUT any band-shaped number:
+            // with two panelists a median plus your own band reconstructs the other's.
+            <Chip style={{ color: "var(--mut)", marginLeft: 6 }}>
+              {t(locale, "delphiBelow")
+                .replace("{have}", String(item.delphi.estimators))
+                .replace("{need}", String(item.delphi.threshold))}
+            </Chip>
+          )}
+        </td>
+        <td>
+          {item.delta_likely !== null ? (
+            <Num
+              style={{
+                color:
+                  Math.abs(item.delta_likely) < 0.5
+                    ? "var(--mut)"
+                    : item.delta_likely > 0
+                      ? "var(--warn)"
+                      : "var(--acc)",
               }}
             >
-              {t(locale, "record")}
-            </button>
-          </div>
-        )}
-      </td>
-      <td>
-        {item.ai ? (
-          <RangeBar band={item.ai.range} max={maxBand} />
-        ) : (
-          // Honest closed state — the design forbids a blurred reveal.
-          <Chip style={{ color: "var(--mut)" }}>{t(locale, "closed")}</Chip>
-        )}
-      </td>
-      <td>
-        {item.delta_likely !== null ? (
-          <Num
-            style={{
-              color:
-                Math.abs(item.delta_likely) < 0.5
-                  ? "var(--mut)"
-                  : item.delta_likely > 0
-                    ? "var(--warn)"
-                    : "var(--acc)",
-            }}
-          >
-            {item.delta_likely > 0 ? "+" : ""}
-            {item.delta_likely} pd
-          </Num>
-        ) : (
-          <Mn style={{ color: "var(--mut)" }}>—</Mn>
-        )}
-      </td>
-      <td>
-        {item.ai ? (
-          <div>
+              {item.delta_likely > 0 ? "+" : ""}
+              {item.delta_likely} pd
+            </Num>
+          ) : (
+            <Mn style={{ color: "var(--mut)" }}>—</Mn>
+          )}
+        </td>
+        <td>
+          {item.ai ? (
             <div>
-              {item.ai.evidence.slice(0, 3).map((ref) => (
-                <EvidenceChip key={ref.uri} kind={ref.kind} label={ref.label} uri={ref.uri} />
-              ))}
+              <div>
+                {item.ai.evidence.slice(0, 3).map((ref) => (
+                  <EvidenceChip
+                    key={ref.uri}
+                    kind={ref.kind}
+                    label={ref.label}
+                    uri={ref.uri}
+                  />
+                ))}
+              </div>
+              {item.signed ? (
+                <StatusChip status="ok">{t(locale, "signed")}</StatusChip>
+              ) : (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={onSign}
+                >
+                  {t(locale, "sign")}
+                </button>
+              )}
             </div>
-            {item.signed ? (
-              <StatusChip status="ok">{t(locale, "signed")}</StatusChip>
-            ) : (
-              <button type="button" className="btn" disabled={busy} onClick={onSign}>
-                {t(locale, "sign")}
-              </button>
-            )}
-          </div>
-        ) : (
-          <Mn style={{ color: "var(--mut)" }}>—</Mn>
-        )}
-      </td>
-    </tr>
+          ) : (
+            <Mn style={{ color: "var(--mut)" }}>—</Mn>
+          )}
+        </td>
+      </tr>
+      {/* The panel is a second row spanning the table, exactly as the design draws it:
+          it belongs to the item above, not to a column. */}
+      {item.delphi.state === "open" && (
+        <tr style={{ background: "var(--surf2)" }}>
+          <td colSpan={7} style={{ padding: "14px 18px 16px 44px" }}>
+            <DelphiOverlay
+              bands={item.delphi.bands}
+              consensus={item.delphi.consensus}
+              max={maxBand}
+              label={t(locale, "delphiLabel")}
+              caption={t(locale, "delphiCaption")}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 10,
+                paddingLeft: 142,
+              }}
+            >
+              {item.delphi.consensus && (
+                <Chip
+                  style={{
+                    color: "var(--acc)",
+                    borderColor: "var(--acc-line)",
+                  }}
+                >
+                  {t(locale, "delphiConsensus")}{" "}
+                  {item.delphi.consensus.optimistic}–
+                  {item.delphi.consensus.pessimistic}
+                </Chip>
+              )}
+              <Chip>
+                {t(locale, "delphiSpread")} {item.delphi.spread_likely}
+              </Chip>
+              {/* Shape carries the state, not colour alone: intersecting ranges are a
+                  circle, a disjoint panel is a diamond that wants a conversation. */}
+              <StatusChip
+                status={item.delphi.overlap === "intersect" ? "ok" : "warn"}
+              >
+                {t(
+                  locale,
+                  item.delphi.overlap === "intersect"
+                    ? "delphiIntersect"
+                    : "delphiDisjoint",
+                )}
+              </StatusChip>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -909,12 +1154,22 @@ function BoePreview({
 
   return (
     <div style={{ display: "flex" }}>
-      <div className="doc" style={{ flex: 1, minWidth: 0, padding: "16px 20px" }}>
+      <div
+        className="doc"
+        style={{ flex: 1, minWidth: 0, padding: "16px 20px" }}
+      >
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>
           {t(locale, "boeTitle")} — {summary.brd_ref}
         </div>
         {!fullySigned ? (
-          <p style={{ fontSize: 13, color: "var(--ink2)", marginTop: 10, textWrap: "pretty" }}>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--ink2)",
+              marginTop: 10,
+              textWrap: "pretty",
+            }}
+          >
             {t(locale, "signAllFirst")}
           </p>
         ) : (
@@ -929,28 +1184,42 @@ function BoePreview({
               </thead>
               <tbody>
                 {boeLines.map((line) => {
-                  const recorded = actuals.find((a) => a.work_item_id === line.work_item_id);
+                  const recorded = actuals.find(
+                    (a) => a.work_item_id === line.work_item_id,
+                  );
                   return (
                     <tr key={line.work_item_id}>
                       <td style={{ fontFamily: "var(--font-sans)" }}>
                         {titleOf(line.work_item_id)}
                         <div>
-                          <Mn style={{ color: "var(--mut)" }}>{line.work_item_id}</Mn>
+                          <Mn style={{ color: "var(--mut)" }}>
+                            {line.work_item_id}
+                          </Mn>
                         </div>
                       </td>
                       <td className="num">
-                        {line.range.optimistic} / {line.range.likely} / {line.range.pessimistic} pd
+                        {line.range.optimistic} / {line.range.likely} /{" "}
+                        {line.range.pessimistic} pd
                       </td>
                       <td style={{ fontFamily: "var(--font-sans)" }}>
                         {recorded ? (
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 6,
+                              alignItems: "center",
+                            }}
+                          >
                             <Num>{recorded.actual_effort} pd</Num>
                             {recorded.scope_changed ? (
-                              <StatusChip status="crit">{t(locale, "scopeChanged")}</StatusChip>
+                              <StatusChip status="crit">
+                                {t(locale, "scopeChanged")}
+                              </StatusChip>
                             ) : recorded.deviation !== null ? (
                               <Chip
                                 tone={
-                                  recorded.deviation > 1.5 || recorded.deviation < 0.66
+                                  recorded.deviation > 1.5 ||
+                                  recorded.deviation < 0.66
                                     ? "crit"
                                     : "neutral"
                                 }
@@ -975,9 +1244,15 @@ function BoePreview({
                             <button
                               type="button"
                               className="btn"
-                              disabled={busy || parseEffort(effort[line.work_item_id] ?? "") === null}
+                              disabled={
+                                busy ||
+                                parseEffort(effort[line.work_item_id] ?? "") ===
+                                  null
+                              }
                               onClick={() => {
-                                const value = parseEffort(effort[line.work_item_id] ?? "");
+                                const value = parseEffort(
+                                  effort[line.work_item_id] ?? "",
+                                );
                                 if (value === null) return;
                                 onRecordActual({
                                   work_item_id: line.work_item_id,
@@ -1041,9 +1316,19 @@ function BoePreview({
         {critic.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <Lbl>{t(locale, "critic")}</Lbl>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+                marginTop: 8,
+              }}
+            >
               {critic.map((finding) => (
-                <div key={finding} style={{ display: "flex", gap: 9, fontSize: 12.5 }}>
+                <div
+                  key={finding}
+                  style={{ display: "flex", gap: 9, fontSize: 12.5 }}
+                >
                   <span style={{ color: "var(--crit)", flex: "none" }}>✕</span>
                   <span style={{ color: "var(--ink2)" }}>{finding}</span>
                 </div>

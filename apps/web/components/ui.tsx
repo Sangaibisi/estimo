@@ -9,7 +9,13 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
-export function Lbl({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Lbl({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <span className="lbl" style={style}>
       {children}
@@ -17,7 +23,13 @@ export function Lbl({ children, style }: { children: ReactNode; style?: CSSPrope
   );
 }
 
-export function Num({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Num({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <span className="num" style={style}>
       {children}
@@ -25,7 +37,13 @@ export function Num({ children, style }: { children: ReactNode; style?: CSSPrope
   );
 }
 
-export function Mn({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Mn({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <span className="mn" style={style}>
       {children}
@@ -53,7 +71,11 @@ export function Chip({
     crit: { color: "var(--crit)", borderColor: "var(--crit)" },
   };
   return (
-    <span className="chip" title={title} style={{ ...tint[tone ?? "neutral"], ...style }}>
+    <span
+      className="chip"
+      title={title}
+      style={{ ...tint[tone ?? "neutral"], ...style }}
+    >
       {children}
     </span>
   );
@@ -88,7 +110,13 @@ export function StatusChip({
     >
       <span
         aria-hidden
-        style={{ width: 7, height: 7, flex: "none", background: `var(--${status})`, ...dot }}
+        style={{
+          width: 7,
+          height: 7,
+          flex: "none",
+          background: `var(--${status})`,
+          ...dot,
+        }}
       />
       {children}
     </span>
@@ -118,10 +146,20 @@ export function EvidenceChip({
 }) {
   const colour = EVIDENCE_TOKEN[kind] ?? "var(--mut)";
   return (
-    <span className="chip" title={uri} style={{ color: colour, marginRight: 6, marginBottom: 4 }}>
+    <span
+      className="chip"
+      title={uri}
+      style={{ color: colour, marginRight: 6, marginBottom: 4 }}
+    >
       <span
         aria-hidden
-        style={{ width: 8, height: 8, borderRadius: 2, background: colour, flex: "none" }}
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 2,
+          background: colour,
+          flex: "none",
+        }}
       />
       {kind}
       {label ? ` · ${label.slice(0, 38)}` : ""}
@@ -141,7 +179,8 @@ export function RangeBar({
   accent?: string;
   legend?: boolean;
 }) {
-  const scale = (value: number) => `${Math.min(100, Math.max(0, (value / max) * 100))}%`;
+  const scale = (value: number) =>
+    `${Math.min(100, Math.max(0, (value / max) * 100))}%`;
   return (
     <div>
       <div
@@ -188,7 +227,9 @@ export function RangeBar({
           }}
         >
           <span>O {band.optimistic}</span>
-          <span style={{ color: accent, fontWeight: 500 }}>L {band.likely}</span>
+          <span style={{ color: accent, fontWeight: 500 }}>
+            L {band.likely}
+          </span>
           <span>P {band.pessimistic}</span>
         </div>
       )}
@@ -216,7 +257,8 @@ export function StageStrip({
   return (
     <div style={{ display: "flex" }}>
       {stages.map((stage) => {
-        const state = stage.key === current ? "on" : done(stage.key) ? "done" : "";
+        const state =
+          stage.key === current ? "on" : done(stage.key) ? "done" : "";
         return (
           <button
             key={stage.key}
@@ -274,11 +316,109 @@ export function BandHeader({
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
         {subtitle && (
-          <div style={{ fontSize: 12.5, color: "var(--mut)", marginTop: 2 }}>{subtitle}</div>
+          <div style={{ fontSize: 12.5, color: "var(--mut)", marginTop: 2 }}>
+            {subtitle}
+          </div>
         )}
       </div>
       {center}
-      {right && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{right}</div>}
+      {right && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {right}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Delphi overlay: every panelist's band as an anonymous horizontal line, over the
+ *  highlighted consensus range.
+ *
+ *  The design's brief for this row is "the width of the disagreement is the finding",
+ *  so the lines are deliberately identical — no colour, no label, no ordering that
+ *  could map a line back to a person. The server sorts them by value and re-sorts per
+ *  item, so no line index is stable across rows either.
+ *
+ *  The design's caption also promised "names appear only when the moderator reveals
+ *  them". There is no moderator role and no reveal audit trail, so that sentence is
+ *  not shipped: promising a capability that does not exist is the same overclaiming
+ *  the closed states are here to avoid. */
+export function DelphiOverlay({
+  bands,
+  consensus,
+  max,
+  label,
+  caption,
+}: {
+  bands: { optimistic: number; likely: number; pessimistic: number }[];
+  consensus: { optimistic: number; likely: number; pessimistic: number } | null;
+  max: number;
+  label: string;
+  caption: string;
+}) {
+  // Never trust the caller's scale to cover these bands: clamping at 100% would draw
+  // two different pessimistic values as the same bar. Widen locally instead, so the
+  // worst case is a slightly compressed row rather than a wrong one.
+  const scale = Math.max(max || 1, ...bands.map((band) => band.pessimistic), 1);
+  const pct = (value: number) => `${Math.min(100, (value / scale) * 100)}%`;
+  const rowHeight = 15;
+  return (
+    <div style={{ display: "flex", gap: 22, alignItems: "center" }}>
+      <div style={{ width: 120, flexShrink: 0 }}>
+        <div className="lbl">{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--mut)", marginTop: 4 }}>
+          {bands.length} · anonymous
+        </div>
+      </div>
+      <div
+        style={{
+          flex: 1,
+          position: "relative",
+          height: bands.length * rowHeight + 16,
+          border: "1px solid var(--line)",
+          borderRadius: "var(--r)",
+          background: "var(--surf)",
+        }}
+      >
+        {consensus && (
+          <div
+            style={{
+              position: "absolute",
+              left: pct(consensus.optimistic),
+              right: `calc(100% - ${pct(consensus.pessimistic)})`,
+              top: 0,
+              bottom: 0,
+              background: "var(--acc-bg)",
+              borderLeft: "1px dashed var(--acc)",
+              borderRight: "1px dashed var(--acc)",
+            }}
+          />
+        )}
+        {bands.map((band, index) => (
+          <div
+            key={index}
+            style={{
+              position: "absolute",
+              left: pct(band.optimistic),
+              right: `calc(100% - ${pct(band.pessimistic)})`,
+              top: 10 + index * rowHeight,
+              height: 4,
+              borderRadius: 2,
+              background: "var(--ink2)",
+            }}
+          />
+        ))}
+      </div>
+      <div
+        style={{
+          width: 260,
+          fontSize: 12.5,
+          color: "var(--ink2)",
+          textWrap: "pretty",
+        }}
+      >
+        {caption}
+      </div>
     </div>
   );
 }

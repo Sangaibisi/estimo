@@ -3,6 +3,7 @@
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -478,3 +479,96 @@ async def test_desk_is_a_pure_read_and_the_reveal_belongs_to_the_recording(
     for _ in range(3):
         await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "A. Kaya"})
     assert await anchoring_samples() == after
+
+
+async def _desk(client: httpx.AsyncClient, estimate_id: object, estimator: str) -> dict[str, Any]:
+    response = await client.get(
+        f"/v1/estimates/{estimate_id}/desk", params={"estimator": estimator}
+    )
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+async def _panelled_item(client: httpx.AsyncClient, estimators: list[str]) -> tuple[str, str]:
+    """A built estimate whose first work item carries a band from each named estimator."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = str(summary["id"])
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+    desk = await _desk(client, estimate_id, estimators[0])
+    item_id = str(desk["items"][0]["work_item"]["id"])
+    for index, name in enumerate(estimators):
+        response = await client.post(
+            f"/v1/estimates/{estimate_id}/independent",
+            json={
+                "work_item_id": item_id,
+                "estimator": name,
+                # Distinct bands so a leak is identifiable, and so the spread is > 0.
+                "optimistic": 4 + index,
+                "likely": 8 + index * 2,
+                "pessimistic": 15 + index * 3,
+            },
+        )
+        assert response.status_code == 201, response.text
+    return estimate_id, item_id
+
+
+async def test_delphi_requires_your_own_band_first(client: httpx.AsyncClient) -> None:
+    """PRINCIPLES #4: the panel is another route to other people's numbers, so it sits
+    behind the same gate as the AI band — record yours before you see anyone's."""
+    estimate_id, item_id = await _panelled_item(client, ["B. Demir", "C. Ak", "D. Yel"])
+    desk = await _desk(client, estimate_id, "E. Yeni")  # has recorded nothing
+    entry = next(i for i in desk["items"] if i["work_item"]["id"] == item_id)
+    delphi = entry["delphi"]
+    assert delphi["state"] == "you_first"
+    assert delphi["bands"] == []
+    assert delphi["consensus"] is None
+    assert delphi["spread_likely"] is None
+    assert delphi["overlap"] is None
+
+
+async def test_delphi_stays_shut_below_the_anonymity_threshold(
+    client: httpx.AsyncClient,
+) -> None:
+    """With two panelists, a median plus your own band reconstructs the other person's
+    exactly — so below the threshold NO band-shaped number may be emitted at all."""
+    estimate_id, item_id = await _panelled_item(client, ["B. Demir", "C. Ak"])
+    desk = await _desk(client, estimate_id, "B. Demir")
+    delphi = next(i for i in desk["items"] if i["work_item"]["id"] == item_id)["delphi"]
+    assert delphi["state"] == "below_threshold"
+    assert delphi["estimators"] == 2 and delphi["threshold"] == 3
+    for key in ("bands", "consensus", "spread_likely", "overlap"):
+        assert delphi[key] in (None, []), f"{key} leaks a band-shaped value below k"
+
+
+async def test_delphi_opens_at_three_and_names_nobody(client: httpx.AsyncClient) -> None:
+    import json as _json
+
+    names = ["B. Demir", "C. Ak", "D. Yel"]
+    estimate_id, item_id = await _panelled_item(client, names)
+    desk = await _desk(client, estimate_id, "C. Ak")
+    delphi = next(i for i in desk["items"] if i["work_item"]["id"] == item_id)["delphi"]
+
+    assert delphi["state"] == "open"
+    assert len(delphi["bands"]) == 3
+    serialized = _json.dumps(delphi, ensure_ascii=False)
+    for name in names:
+        assert name not in serialized, "the panel must not carry an estimator identity"
+
+    # Sorted by value, so line order never reflects who recorded when.
+    optimistics = [band["optimistic"] for band in delphi["bands"]]
+    assert optimistics == sorted(optimistics)
+    # Consensus is a RANGE, never a point (PRINCIPLES #1).
+    assert set(delphi["consensus"]) == {"optimistic", "likely", "pessimistic"}
+    assert delphi["consensus"]["likely"] == 10.0  # median of 8, 10, 12
+    assert delphi["spread_likely"] == 4.0  # 12 - 8
+    assert delphi["overlap"] == "intersect"  # max(o)=6 <= min(p)=15
+
+
+async def test_delphi_is_per_item_not_per_estimate(client: httpx.AsyncClient) -> None:
+    """A threshold counted per estimate would open an item only two people estimated."""
+    estimate_id, item_id = await _panelled_item(client, ["B. Demir", "C. Ak", "D. Yel"])
+    desk = await _desk(client, estimate_id, "B. Demir")
+    other = next(i for i in desk["items"] if i["work_item"]["id"] != item_id)
+    assert other["delphi"]["state"] == "you_first"
+    assert other["delphi"]["estimators"] == 0

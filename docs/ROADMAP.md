@@ -328,9 +328,18 @@ that overstate the build. Each names what blocked it.
   nobody. Structure-aware chunking must land first; the header is a no-op without it,
   because the Turkish tsvector already indexes `title || text` and the Confluence lane
   already prefixes the space key onto the title.
-- [ ] S11-3 Anonymized Delphi aggregation view (S7-4) — per-estimator bands are already
-  stored and immutable, so this is a read model plus a UI, not new plumbing. Needs a
-  minimum-estimator threshold: a "Delphi" panel showing one other band de-anonymizes them.
+- [x] S11-3 Anonymized Delphi aggregation view (S7-4) — the desk carries a per-item
+  `delphi` block behind two server-side gates: the requester must have recorded their
+  own band for that item (independent-first is not bypassable through the panel), and
+  at least **3** estimators must have recorded on that item. Below either gate the block
+  carries no band-shaped value at all — with two panelists a median plus your own band
+  reconstructs the other person's exactly. Bands are sorted by VALUE and re-sorted per
+  item, so no line maps to a person and no index is stable across rows; there are no
+  "Reviewer A/B/C" pseudonyms. Consensus is a per-endpoint median (a range, never a
+  point). **Moderator identity reveal is deliberately not built** — there is no
+  moderator role and no reveal audit trail, and revealing names before sign-off is the
+  social-pressure sibling of the anchoring effect the flow exists to prevent; the
+  design's caption promising it was changed rather than shipped as a false promise.
 - [ ] S11-4 Team/domain calibration curves (S8-3) — **the blocker previously recorded here
   was wrong**: `ledger_entries` has carried `team` and `domain_tags` since migration 0002
   and the seed importer already populates both. The real gaps are (a) grouping inside the

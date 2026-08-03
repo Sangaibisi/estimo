@@ -9,6 +9,17 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S11-3 Delphi overlay**: the estimate desk shows every panelist's band for an item as
+  anonymous lines over the consensus range, with the spread and an intersect/disjoint
+  verdict. Two server-side gates, each proven load-bearing by removing it and watching
+  the test go red: you must have recorded your own band for that item (the panel is
+  otherwise a second route to other people's numbers, past the independent-first gate),
+  and at least three estimators must have recorded on it. Below either gate the block
+  carries no band-shaped number at all — with two panelists a median plus your own band
+  reconstructs the other person's exactly, so a "summary only" concession would leak the
+  same data with extra steps. Bands sort by value and re-sort per item, so no line maps
+  to a person. Moderator identity reveal is not built and the design caption promising
+  it was rewritten rather than shipped as a false promise.
 - **S10 authN/Z** (`apps/api/auth.py`): provider-agnostic OIDC bearer-token validation
   (PyJWT + PyJWKClient — `python-jose` banned) against the customer's own IdP, with a
   role model (`estimator` < `reviewer` < `signing_authority` < `admin`). Opt-in: with

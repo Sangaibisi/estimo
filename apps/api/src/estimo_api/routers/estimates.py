@@ -26,8 +26,10 @@ import datetime as dt
 import io
 import json
 import re
+import statistics
 import tempfile
 import uuid
+from collections import defaultdict
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
@@ -343,6 +345,79 @@ async def record_independent(
     return {"status": "recorded"}
 
 
+# A Delphi panel opens only once three estimators have recorded on the SAME item.
+# k=1 is self-disclosure; k=2 de-anonymizes completely, because the you-first gate makes
+# every viewer a participant — you see two lines, one is yours, so the other is the only
+# other panelist's. k=3 leaves every viewer a 2-anonymity set over the lines that are not
+# theirs. The delivered design labels the overlay "3 reviewers, anonymous".
+DELPHI_MIN_ESTIMATORS = 3
+
+
+def _delphi_block(rows: list[IndependentEstimate], has_own: bool) -> dict[str, Any]:
+    """Anonymized panel view for ONE work item.
+
+    Two gates, in precedence order. `you_first`: the requester has not recorded their
+    own band for this item, so showing them anyone else's would be the anchoring leak
+    the whole desk exists to prevent (PRINCIPLES #4). `below_threshold`: fewer than
+    three estimators, so any band-shaped number identifies a person.
+
+    Below either gate the block carries NO band-shaped value at all — not a median, not
+    a min, not a max. With two panelists a median plus your own band reconstructs the
+    other person's exactly, so a "summary only" concession would leak the same data
+    with extra steps. Only the participation count survives, because a count is not a
+    numeric anchor and it is what makes the closed state honest.
+    """
+    closed: dict[str, Any] = {
+        "estimators": len(rows),
+        "threshold": DELPHI_MIN_ESTIMATORS,
+        "bands": [],
+        "consensus": None,
+        "spread_likely": None,
+        "overlap": None,
+    }
+    if not has_own:
+        return {"state": "you_first", **closed}
+    if len(rows) < DELPHI_MIN_ESTIMATORS:
+        return {"state": "below_threshold", **closed}
+
+    # Sorted by VALUE, never by created_at or estimator name. Recording order is
+    # observable elsewhere on the desk, so an order-preserving list would map lines
+    # back to people. Re-sorted per item, so no line index is stable across rows —
+    # which is also why there are no "Reviewer A/B/C" pseudonyms.
+    bands = sorted(
+        (
+            {
+                "optimistic": float(row.optimistic),
+                "likely": float(row.likely),
+                "pessimistic": float(row.pessimistic),
+            }
+            for row in rows
+        ),
+        key=lambda band: (band["optimistic"], band["likely"], band["pessimistic"]),
+    )
+    likelies = [band["likely"] for band in bands]
+    return {
+        "state": "open",
+        "estimators": len(rows),
+        "threshold": DELPHI_MIN_ESTIMATORS,
+        "bands": bands,
+        # Per-endpoint median: the consensus stays a RANGE (PRINCIPLES #1 — never a
+        # point), and one outlier band cannot drag it the way a mean would.
+        "consensus": {
+            key: round(statistics.median(band[key] for band in bands), 1)
+            for key in ("optimistic", "likely", "pessimistic")
+        },
+        # The design's headline: the width of the disagreement is the finding.
+        "spread_likely": round(max(likelies) - min(likelies), 1),
+        "overlap": (
+            "intersect"
+            if max(band["optimistic"] for band in bands)
+            <= min(band["pessimistic"] for band in bands)
+            else "disjoint"
+        ),
+    }
+
+
 @router.get("/{estimate_id}/desk")
 async def estimate_desk(
     estimate_id: uuid.UUID,
@@ -359,18 +434,22 @@ async def estimate_desk(
     boe = BoeDocument.model_validate(record.boe) if record.boe else None
     lines_by_item = {line.work_item_id: line for line in (boe.lines if boe else ())}
 
-    independents = {
-        row.work_item_id: row
-        for row in (
-            await session.execute(
-                select(IndependentEstimate).where(
-                    IndependentEstimate.estimate_id == estimate_id,
-                    IndependentEstimate.estimator == estimator,
-                    IndependentEstimate.boe_version == record.boe_version,
-                )
+    # Every estimator's rows for this draft: the requester's drive independent-first,
+    # the rest form the Delphi panel. Scoped to boe_version like every other read here,
+    # so a rebuilt draft inherits no one's band.
+    panel: dict[str, list[IndependentEstimate]] = defaultdict(list)
+    independents: dict[str, IndependentEstimate] = {}
+    for row in (
+        await session.execute(
+            select(IndependentEstimate).where(
+                IndependentEstimate.estimate_id == estimate_id,
+                IndependentEstimate.boe_version == record.boe_version,
             )
-        ).scalars()
-    }
+        )
+    ).scalars():
+        panel[row.work_item_id].append(row)
+        if row.estimator == estimator:
+            independents[row.work_item_id] = row
     signatures = await _signed_item_ids(session, record)
 
     items: list[dict[str, Any]] = []
@@ -389,6 +468,9 @@ async def estimate_desk(
                 else None
             ),
             "signed": line is not None and item.id in signatures,
+            # Recomputed per item: a panel counted per ESTIMATE would open an item that
+            # only two people actually estimated.
+            "delphi": _delphi_block(panel[item.id], has_own=independent is not None),
             "ai": None,
             "delta_likely": None,
         }
