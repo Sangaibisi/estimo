@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 FROM python:3.14.6-slim-trixie
+LABEL org.opencontainers.image.source="https://github.com/Sangaibisi/estimo" \
+      org.opencontainers.image.licenses="Apache-2.0"
 RUN groupadd --system --gid 999 app \
     && useradd --system --uid 999 --gid app --home /app app
 WORKDIR /app

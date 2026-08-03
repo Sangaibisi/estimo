@@ -49,7 +49,7 @@ mapping table approved; golden set design written down.
 
 ---
 
-## S1 — Skeleton · `Status: 🟡 In progress` (all items done; exit gate awaits first green CI run)
+## S1 — Skeleton · `Status: 🟢 Done` (2026-08-03 — exit gate met: CI green incl. guard tests and multi-arch publish; compose e2e smoke passed)
 
 **Goal:** A working (still brainless) end-to-end backbone: monorepo infrastructure,
 domain models and the **gateway** module.
