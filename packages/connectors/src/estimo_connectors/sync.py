@@ -148,6 +148,12 @@ async def _last_checkpoint(session: AsyncSession, connection: Connection) -> dic
     return None
 
 
+def _page_prefix(source_ref: str) -> str:
+    """`wiki://123@4` -> `wiki://123@`, the family of every version of one page."""
+    base, sep, _ = source_ref.rpartition("@")
+    return f"{base}{sep}" if sep else source_ref
+
+
 async def _sync_confluence(
     session: AsyncSession, connection: Connection, run: SyncRun
 ) -> dict[str, Any]:
@@ -175,6 +181,19 @@ async def _sync_confluence(
                 acl_keys=list(document.acl_keys),
                 freshness_at=document.freshness_at,
                 authority=document.authority,
+            )
+            # A Confluence source_ref embeds the page VERSION (wiki://{id}@{n}), so an
+            # edit writes a new row and leaves the previous one behind. Unpruned, that
+            # is not merely untidy: superseded text stays retrievable forever under the
+            # ACL it had THEN, so restricting a page at the source never takes effect
+            # for the version that was public. The git lane already prunes by prefix;
+            # this lane never did.
+            await session.execute(
+                delete(KnowledgeChunk).where(
+                    KnowledgeChunk.source_type == document.source_type,
+                    KnowledgeChunk.source_ref.like(f"{_page_prefix(document.source_ref)}%"),
+                    KnowledgeChunk.source_ref != document.source_ref,
+                )
             )
             pages += 1
             if pages % CHECKPOINT_EVERY == 0:

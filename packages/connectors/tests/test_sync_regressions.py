@@ -1,8 +1,11 @@
 """DB-backed regression tests for the S9 review findings on sync orchestration."""
 
+import os
 import subprocess
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from estimo_connectors import Connection, SyncRun, run_sync
@@ -329,3 +332,85 @@ async def test_a_failing_embed_pass_leaves_the_run_succeeded(clean: AsyncSession
     assert run.status == "succeeded", "and it must be persisted that way"
     assert run.finished_at is not None
     assert (run.stats or {}).get("embed_failed_batches") == 1, "the failure must be reported"
+
+
+async def test_editing_a_page_prunes_the_superseded_version(clean: AsyncSession) -> None:
+    """A Confluence source_ref embeds the page VERSION, so an edit writes a new row.
+    Unpruned, the old one stays retrievable forever carrying the ACL it had THEN — so
+    restricting a page at the source never takes effect for the version that was public,
+    and superseded text keeps competing in search.
+
+    Drives `_sync_confluence` itself rather than replaying its SQL: a test that issues
+    the DELETE by hand passes just as happily when the lane forgets to.
+    """
+    session = clean
+    from estimo_knowledge import KnowledgeChunk, lexical_chunk_ids
+
+    connection = Connection(
+        kind="confluence",
+        name="aurora-wiki",
+        base_url="https://example.invalid",
+        secret_env="ESTIMO_SECRET_TEST",
+        acl_keys=["public"],
+        config={"email": "a@b.c", "space_keys": ["AUR"]},
+    )
+    session.add(connection)
+    await session.commit()
+
+    class FakeConnector:
+        """Yields one page whose version and ACL change between syncs."""
+
+        def __init__(self, version: int, acl: tuple[str, ...], body: str) -> None:
+            self.version, self.acl, self.body = version, acl, body
+
+        async def crawl(self, checkpoint: dict[str, object]) -> AsyncIterator[Any]:
+            from estimo_connectors import SourceDocument
+
+            yield SourceDocument(
+                source_type="confluence",
+                source_ref=f"wiki://77@{self.version}",
+                title="[AUR] Taksitlendirme",
+                text=self.body,
+                freshness_at=None,
+                authority=0.5,
+                acl_keys=self.acl,
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    import estimo_connectors.sync as sync_module
+
+    os.environ["ESTIMO_SECRET_TEST"] = "token"
+    original = sync_module.ConfluenceConnector  # type: ignore[attr-defined]
+    try:
+        sync_module.ConfluenceConnector = lambda **kw: FakeConnector(  # type: ignore[assignment,attr-defined]
+            1, ("public",), "Taksitlendirme herkese açık ilk sürüm."
+        )
+        run = await run_sync(session, connection)
+        assert run.status == "succeeded", run.error
+        assert await lexical_chunk_ids(session, "taksitlendirme", acl_keys=["public"])
+
+        # The page is edited AND restricted at the source.
+        sync_module.ConfluenceConnector = lambda **kw: FakeConnector(  # type: ignore[assignment,attr-defined]
+            2, ("confluence-group:finans",), "Taksitlendirme gizli ikinci sürüm."
+        )
+        run = await run_sync(session, connection)
+        assert run.status == "succeeded", run.error
+    finally:
+        sync_module.ConfluenceConnector = original  # type: ignore[attr-defined]
+        os.environ.pop("ESTIMO_SECRET_TEST", None)
+
+    refs = {row.source_ref for row in (await session.execute(select(KnowledgeChunk))).scalars()}
+    assert refs == {"wiki://77@2"}, f"the superseded version survived: {refs}"
+    # And a public reader can no longer reach the page at all.
+    assert await lexical_chunk_ids(session, "taksitlendirme", acl_keys=["public"]) == []
+
+
+def test_page_prefix_groups_every_version_of_one_page() -> None:
+    from estimo_connectors.sync import _page_prefix
+
+    assert _page_prefix("wiki://123@4") == "wiki://123@"
+    assert _page_prefix("wiki://123@11") == "wiki://123@"
+    # Defensive: a ref with no version must not collapse to a prefix matching siblings.
+    assert _page_prefix("wiki://123") == "wiki://123"

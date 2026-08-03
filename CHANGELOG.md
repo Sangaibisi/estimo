@@ -239,6 +239,14 @@ Until the first code release, entries track documentation and foundation milesto
   for edited text retrieves confidently against content that no longer says that.
 
 ### Security
+- **Editing a Confluence page no longer leaves its previous version retrievable.** A
+  Confluence `source_ref` embeds the page version (`wiki://{id}@{n}`), so every edit
+  wrote a new chunk — and nothing ever removed the old one. The git lane has pruned by
+  prefix since S9; this lane never did. Superseded text therefore stayed searchable
+  indefinitely, *carrying the ACL it had at the time*: restricting a page at the source
+  had no effect on the version that was public, which is the pre-filter silently
+  serving content the source system had already locked. The lane now prunes every other
+  version of a page as it ingests the current one.
 - **`GET /v1/canonical` filters by the caller's audience (S11-7 complete).** Clamping the
   sourcing path stopped a reviewer pulling restricted text into a *new* draft; it did
   nothing about pages an entitled curator had already published, whose bodies every
