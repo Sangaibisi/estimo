@@ -1,6 +1,25 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
 import "./tokens.css";
+import { Shell } from "@/components/Shell";
+
+// Self-hosted at build time — an air-gapped install must not reach out for fonts.
+const sans = IBM_Plex_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+});
+const mono = IBM_Plex_Mono({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+});
+const serif = IBM_Plex_Serif({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "600"],
+  variable: "--font-plex-serif",
+});
 
 export const metadata: Metadata = {
   title: "Estimo",
@@ -8,15 +27,20 @@ export const metadata: Metadata = {
 };
 
 // Rendered per request so ESTIMO_API_URL is read from the container environment at
-// runtime — the browser-visible API origin must never be baked into the image
-// (a build-time NEXT_PUBLIC_* bake breaks every deployment whose API host differs
-// from the build host).
+// runtime — the browser-visible API origin must never be baked into the image.
 export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const apiUrl = process.env.ESTIMO_API_URL ?? "";
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      // The design drives theme and row density from root data attributes; the
+      // toggles in the top bar rewrite them.
+      data-theme="light"
+      data-density="dense"
+      className={`${sans.variable} ${mono.variable} ${serif.variable}`}
+    >
       <body>
         {apiUrl && (
           <script
@@ -25,9 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             }}
           />
         )}
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
-          {children}
-        </div>
+        <Shell>{children}</Shell>
       </body>
     </html>
   );

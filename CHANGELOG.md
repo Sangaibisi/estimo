@@ -201,6 +201,22 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Changed
+- **The web UI now implements the delivered design system**, not just its colour
+  tokens (`docs/design/estimo-ui.dc.html`). Ported: the full token set (surfaces,
+  ink tiers, two-tier borders, status and evidence roles, shadows), both density
+  modes, IBM Plex Sans/Mono/Serif self-hosted at build time, and the component
+  layer (`.dt` · `.card` · `.chip` · `.btn`/`.btn.p` · `.rail-i` · `.stg` · `.ph` ·
+  `.lbl`/`.num`/`.mn`). Bespoke components implemented as the design specifies them:
+  **RangeBar** (three-point band with the overhanging likely marker), **EvidenceChip**
+  (a third colour role), **StatusChip** where **shape carries state alongside colour**
+  (circle = good, diamond = warning, square = critical), and the **StageStrip**.
+  The app now has the design's chrome — sticky top bar with theme/density toggles and
+  the 184px left rail — and its screens: Workspace, Reading Room, Question Board,
+  **Impact Map**, Estimate Desk (with the honest closed state — never a blurred
+  reveal), BoE Preview & Signature, **Ledger & Analog Search** (new,
+  `GET /v1/ledger`), Calibration Dashboard, Knowledge Curation, and Admin.
+
+#### Earlier
 - Project renamed from **Eforge** to **Estimo** (briefly Lodestar) — from the Latin
   *aestimo*, "I estimate, I appraise".
 - **English is now the repository's single language**: the research dossier, roadmap and

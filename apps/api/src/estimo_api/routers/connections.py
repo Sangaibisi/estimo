@@ -44,6 +44,10 @@ from estimo_api.tenancy import bind_tenant_guc, get_current_tenant, set_current_
 from estimo_gateway import GatewayClient
 
 router = APIRouter(prefix="/v1", tags=["connections"])
+# The webhook receiver authenticates by HMAC over the raw body, not a bearer
+# token — a git host has no user identity — so it is mounted WITHOUT the
+# role dependency the rest of this surface carries.
+webhook_router = APIRouter(prefix="/v1", tags=["connections"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -235,7 +239,7 @@ async def list_runs(connection_id: uuid.UUID, session: SessionDep) -> list[dict[
     ]
 
 
-@router.post("/webhooks/{connection_id}", status_code=status.HTTP_202_ACCEPTED)
+@webhook_router.post("/webhooks/{connection_id}", status_code=status.HTTP_202_ACCEPTED)
 async def receive_webhook(
     connection_id: uuid.UUID,
     request: Request,

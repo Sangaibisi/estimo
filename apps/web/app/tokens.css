@@ -1,83 +1,316 @@
-:root {
-  /* Estimo design tokens — source of truth: docs/design/estimo-ui.dc.html */
+/* Estimo design system — faithful port of docs/design/estimo-ui.dc.html
+   (Foundations + component layer). The design file is the source of truth; when
+   this file and the design disagree, the design wins (docs/design/README.md). */
+
+:root,
+[data-theme="light"] {
   --bg: #f4f4f1;
   --surf: #ffffff;
+  --surf2: #fafaf7;
+  --surf3: #efefea;
   --ink: #15181c;
+  --ink2: #3d434b;
   --mut: #6b717a;
   --line: #e2e2dc;
+  --line2: #cfcfc7;
   --acc: #1f4b8e;
-  --acc-bg: #eaf0f9;
   --acc-ink: #ffffff;
+  --acc-bg: #eaf0f9;
   --acc-line: #b9cce6;
   --ok: #2c6a4b;
   --ok-bg: #e9f2ec;
+  --warn: #93651a;
+  --warn-bg: #f8f1e2;
   --crit: #9c3a26;
   --crit-bg: #f8ebe7;
   --ev-code: #463f8f;
   --ev-wiki: #1a6570;
   --ev-analog: #7a4076;
   --ev-ans: #3a6428;
-  --r: 6px;
   --sh: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sh2: 0 8px 24px rgba(20, 24, 28, 0.1);
+  --r: 6px;
+  --r2: 10px;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-serif: var(--font-plex-serif), Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1013;
-    --surf: #16191e;
-    --ink: #e9eaec;
-    --mut: #8d949d;
-    --line: #272c34;
-    --acc: #7ba5e8;
-    --acc-bg: #17253a;
-    --acc-ink: #0e1013;
-    --acc-line: #31435f;
-    --ok: #63b189;
-    --ok-bg: #14251d;
-    --crit: #de8069;
-    --crit-bg: #2c1a15;
-    --ev-code: #9e97e8;
-    --ev-wiki: #5cb6c2;
-    --ev-analog: #c48abf;
-    --ev-ans: #8fbf72;
-    --sh: 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
+[data-theme="dark"] {
+  --bg: #0e1013;
+  --surf: #16191e;
+  --surf2: #1b1f25;
+  --surf3: #232830;
+  --ink: #e9eaec;
+  --ink2: #c2c7ce;
+  --mut: #8d949d;
+  --line: #272c34;
+  --line2: #39404a;
+  --acc: #7ba5e8;
+  --acc-ink: #0e1013;
+  --acc-bg: #17253a;
+  --acc-line: #31435f;
+  --ok: #63b189;
+  --ok-bg: #14251d;
+  --warn: #d2a557;
+  --warn-bg: #2a2214;
+  --crit: #de8069;
+  --crit-bg: #2c1a15;
+  --ev-code: #9e97e8;
+  --ev-wiki: #5cb6c2;
+  --ev-analog: #c48abf;
+  --ev-ans: #8fbf72;
+  --sh: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sh2: 0 10px 28px rgba(0, 0, 0, 0.55);
 }
 
-* { box-sizing: border-box; }
+/* Row density (the design ships two modes; comfortable is the default). */
+:root,
+[data-density="comfortable"] {
+  --rp: 12px 12px;
+  --rh: 46px;
+}
+[data-density="dense"] {
+  --rp: 7px 10px;
+  --rh: 34px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3 { letter-spacing: -0.01em; }
-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
-th { color: var(--mut); font-weight: 600; font-size: 12px; text-transform: none; }
-button {
-  font: inherit;
-  border: 1px solid var(--acc-line);
-  background: var(--acc-bg);
+
+a {
   color: var(--acc);
-  border-radius: var(--r);
-  padding: 6px 12px;
-  cursor: pointer;
+  text-decoration: none;
 }
-button.primary { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-input, select {
-  font: inherit;
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Data table ---- */
+.dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dt th {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mut);
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line2);
+  white-space: nowrap;
+  background: var(--surf2);
+}
+.dt td {
+  padding: var(--rp);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  height: var(--rh);
+}
+.dt tbody tr:hover {
+  background: var(--surf2);
+}
+
+/* ---- Numerics & labels ---- */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  text-align: right;
+  white-space: nowrap;
+}
+.mn {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+.lbl {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+
+/* ---- Surfaces ---- */
+.card {
+  background: var(--surf);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 6px 8px;
+  box-shadow: var(--sh);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11.5px;
+  color: var(--ink2);
+  background: var(--surf);
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surf);
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn:hover {
+  background: var(--surf3);
+}
+.btn:focus-visible,
+.stg:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+.btn.p {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-ink);
+}
+.btn.p:hover {
+  filter: brightness(1.08);
+}
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Left rail navigation ---- */
+.rail-i {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--ink2);
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+}
+.rail-i:hover {
+  background: var(--surf3);
+  text-decoration: none;
+}
+.rail-i.on {
+  background: var(--acc-bg);
+  border-color: var(--acc-line);
+  color: var(--acc);
+  font-weight: 500;
+}
+
+/* ---- Stage stepper ---- */
+.stg {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  font-size: 12.5px;
+  color: var(--mut);
+  background: var(--surf);
+  border: 1px solid var(--line2);
+  border-right: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.stg:first-child {
+  border-radius: 5px 0 0 5px;
+}
+.stg:last-child {
+  border-right: 1px solid var(--line2);
+  border-radius: 0 5px 5px 0;
+}
+.stg.done {
+  color: var(--ink2);
+  background: var(--surf2);
+}
+.stg.on {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-ink);
+  font-weight: 500;
+}
+
+/* ---- Placeholder / drop target ---- */
+.ph {
+  background: var(--surf2);
+  border: 1px dashed var(--line2);
+  border-radius: var(--r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mut);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---- Form controls (design-consistent, not in the spec sheet) ---- */
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 12.5px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 6px 9px;
   background: var(--surf);
   color: var(--ink);
 }
-.card { background: var(--surf); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh); padding: 16px; }
-.chip { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 12px; border: 1px solid var(--line); }
-.muted { color: var(--mut); }
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+input::placeholder {
+  color: var(--mut);
+}
+
+.muted {
+  color: var(--mut);
+}
+
+/* Anchor offset under the sticky top bar (design: .scr). */
+.scr {
+  scroll-margin-top: 70px;
+}
+
+/* Document context — the BoE reads in Plex Serif so the exported artefact and the
+   screen agree; Turkish casing (İstanbul / ısı) is correct in this family. */
+.doc {
+  font-family: var(--font-serif);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rv {
+    transition: opacity 0.28s ease, transform 0.28s ease;
+  }
+}

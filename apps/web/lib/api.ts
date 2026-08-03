@@ -137,6 +137,13 @@ export const api = {
     }),
   listActuals: (id: string) => request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
   metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
+  ledger: (q: string) =>
+    request<{
+      entries: LedgerEntry[];
+      total: number;
+      with_actuals: number;
+      searched: boolean;
+    }>(`/v1/ledger?q=${encodeURIComponent(q)}`),
   listConnections: () => request<ConnectionEntry[]>("/v1/connections"),
   createConnection: (payload: {
     kind: string;
@@ -258,4 +265,24 @@ export interface MetricsOverview {
     question_revision_rate: number | null;
     rebuild_share: number | null;
   };
+}
+
+export interface LedgerEntry {
+  id: string;
+  brd_ref: string;
+  item_title: string;
+  module_tags: string[];
+  team: string | null;
+  estimate: {
+    optimistic: number | null;
+    likely: number | null;
+    pessimistic: number | null;
+    single: number | null;
+  };
+  actual_effort: number | null;
+  actual_source: string | null;
+  scope_changed: boolean;
+  deviation: number | null;
+  origin: "product" | "imported";
+  completed_at: string | null;
 }
