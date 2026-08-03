@@ -277,6 +277,9 @@ async def test_the_chunk_dense_leg_exists_and_honours_the_acl_prefilter(
 
     # And the fused path carries the filter through.
     fused = await hybrid_chunk_ids(
-        session, "taksitlendirme", acl_keys=["public"], client=FakeEmbedder()
-    )  # type: ignore[arg-type]
+        session,
+        "taksitlendirme",
+        acl_keys=["public"],
+        client=FakeEmbedder(),  # type: ignore[arg-type]
+    )
     assert len(fused) == 1
