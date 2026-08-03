@@ -255,7 +255,7 @@ setup; ACL tests green.
 
 ---
 
-## S10 — Productization & Atlassian Surface · `Status: 🔵 Planned`
+## S10 — Productization & Atlassian Surface · `Status: 🟡 In progress`
 
 **Goal:** From single-tenant to product: identity, isolation, packaging, distribution surfaces.
 

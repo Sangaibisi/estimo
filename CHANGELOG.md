@@ -62,6 +62,16 @@ Until the first code release, entries track documentation and foundation milesto
   image at build time.
 
 ### Security
+- **S9 review hardening** (adversarial review; 28 confirmed findings fixed): the ACL
+  pre-filter provably never widens — Confluence connections require explicit
+  `space_keys`, read restrictions resolve by walking ancestors (inheritance), and
+  canonical approval publishes the intersection of its sources' ACL keys (refusing
+  mixed-audience defaults). Connection names are slugged before becoming filesystem
+  paths (no `../` escape). Also: one-running-sync-per-connection is DB-enforced
+  (migration `0008`), interrupted runs are swept at startup, pagination follows
+  `_links.next` verbatim (no cursor double-encoding), the incremental watermark uses
+  real datetimes with a 26h overlap, deleted source modules are pruned from
+  retrieval, and GitLab signed webhooks enforce a replay window.
 - **S7 review hardening** (adversarial review; 14 confirmed findings fixed):
   independent-first now holds across the WHOLE API surface — `GET /{id}`, the build
   response and the `.docx` export withhold the draft body until every line is signed,
