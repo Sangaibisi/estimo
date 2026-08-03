@@ -1,8 +1,12 @@
 # Architecture Reference
 
-Condensed from the founding research ([RESEARCH.md](RESEARCH.md) §5, Turkish, fully
-sourced). This file is the canonical technical map; decisions live in [adr/](adr/).
-The sprint-by-sprint build order is in [ROADMAP.md](ROADMAP.md).
+Condensed from the founding research ([RESEARCH.md](RESEARCH.md) §5, fully sourced).
+This file is the canonical technical map; decisions live in [adr/](adr/). The
+sprint-by-sprint build order is in [ROADMAP.md](ROADMAP.md).
+
+**Reconciled against the code on 2026-08-03, after S10.** The Status column below says
+what is actually running, not what was planned — `shipped` means there is code and a
+test; `partial` and `not built` say what is missing and why.
 
 ## System overview
 
@@ -17,8 +21,8 @@ flowchart TB
 
     subgraph KNW["KNOWLEDGE LAYER - four shelves"]
         PARSE["Structural parse: requirement table with stable IDs"]
-        CODE["Code shelf: SCIP graph + repo map + module wiki"]
-        WIKI["Wiki shelf: hybrid search + reranker + canonical pages"]
+        CODE["Code shelf: tree-sitter symbol graph"]
+        WIKI["Wiki shelf: hybrid search + canonical pages"]
         LEDGER["Estimate ledger: item-estimate-actual triples"]
         ONTO["Ontology: module taxonomy, telco eTOM/SID optional"]
     end
@@ -64,21 +68,21 @@ code is reserved for the differentiation core — see
 
 | Component | Choice | Status | Rationale / ADR |
 |---|---|---|---|
-| BRD parsing | Docling (primary), python-docx (surgical + BoE output), MarkItDown (fallback) | accepted | Structural tables/headings from enterprise .docx; all MIT ([RESEARCH §5.6]) |
-| Pipeline orchestration | LangGraph (durable graph, checkpoints, HITL interrupts) + Pydantic AI (typed nodes) | accepted | Battle-tested, MIT, model-agnostic |
-| Model access | OpenAI-compatible client → deployment's LiteLLM gateway; **no provider SDKs** | accepted | [ADR-0001](adr/0001-litellm-gateway-only.md) |
-| API service | FastAPI (Python 3.12+) | proposed | Ecosystem fit with parse/pipeline packages |
-| Storage | Postgres (+pgvector) for ledger, runs, chunks | proposed | One database until scale demands more |
-| Wiki retrieval | Hybrid BM25 + dense (multilingual embedder) + reranker + contextual chunk headers | accepted | ~67% retrieval-failure reduction pattern; TR-first ([ADR-0004](adr/0004-turkish-first-pipeline.md)) |
-| Code intelligence | tree-sitter repo map (MVP) → SCIP symbol graph (deterministic impact) → generated module wikis (deepwiki-open fork) | accepted | Cheap first, precise later; AGPL-free path |
+| BRD parsing | `docling-slim` (structural .docx backend, imported directly to avoid the PDF chain), python-docx for BoE output | shipped `packages/parse` | Structural tables/headings from enterprise .docx; MarkItDown was not needed ([RESEARCH §5.6]) |
+| Pipeline orchestration | LangGraph (durable graph, checkpoints, HITL interrupts) | shipped `packages/pipeline` | **Pydantic AI was deliberately not adopted** — its own model clients would bypass ADR-0001 |
+| Model access | OpenAI-compatible client → deployment's LiteLLM gateway | shipped `packages/gateway` | The `openai` package is the *protocol* client and is confined to this one package; CI fails the build on a provider import anywhere else ([ADR-0001](adr/0001-litellm-gateway-only.md)) |
+| API service | FastAPI, Python 3.13+ | shipped `apps/api` | Ecosystem fit with parse/pipeline packages |
+| Storage | Postgres 18 + pgvector for ledger, runs, chunks, estimates | shipped (Alembic 0001–0010) | One database until scale demands more; tenant isolation is RLS ([ADR-0007](adr/0007-multitenant-auth.md)) |
+| Wiki retrieval | Turkish FTS lexical + dense, fused with RRF (k=60), ACL pre-filter | **partial** `packages/knowledge` | Shipped without the two pieces that need more than we have: the cross-encoder rerank slot is an interface awaiting a gateway rerank route, and contextual chunk headers are unbuilt (S11-1/2). TR lexical choice measured, not assumed ([ADR-0004](adr/0004-turkish-first-pipeline.md)) |
+| Code intelligence | tree-sitter symbol graph (Java/TypeScript) | **partial** `packages/code` | The MVP leg is shipped; SCIP indexes and generated module wikis are not built. Impact analysis is therefore heuristic — items it cannot resolve become explicit discovery-effort lines rather than silent guesses |
 | GraphRAG | **Skipped in v1** | accepted | Free graphs already exist (code graph, page hierarchy); revisit only for multi-hop needs |
 | Knowledge curation | Canonical pages tier outranks raw wiki; freshness + authority scores on chunks | accepted | Stale-wiki poisoning defense |
-| Calibration | Analog few-shot selection + conformal intervals + historical error distributions | accepted | The two evidence-backed accuracy levers (RESEARCH §3.2) |
-| Evals | Golden synthetic set + Ragas/DeepEval/promptfoo offline; Langfuse online feedback | accepted | Naive-baseline reporting mandatory (PRINCIPLES #7) |
-| Review UI | Next.js/TypeScript web app; `en` default locale, `tr` first localization | proposed | Design system incoming via [UI-VISION.md](UI-VISION.md); [ADR-0004](adr/0004-turkish-first-pipeline.md) |
-| Connectors | First-party ingestors: Confluence v2 crawl (ACL+version metadata), Jira JQL cursor, git hosting via provider APIs + git protocol — **Bitbucket first-class** (Atlassian shops), GitHub, GitLab; webhook-triggered re-index | accepted | Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
-| Atlassian surface | Thin Forge Rovo Agent front-door + product's own MCP server | planned | Distribution without platform lock-in ([ADR-0002](adr/0002-atlassian-adjacent-core.md)) |
-| Deployment | **Fully containerized** — every component an OCI image on GHCR (multi-arch); `docker compose up` = dev & single-node deploys; Helm (same images) for k8s; ladder SaaS → VPC → BYOC → air-gap; stateless per tenant | accepted | Easy distribution; [ADR-0006](adr/0006-fully-containerized.md) |
+| Calibration | Analog retrieval + conformal-style quantiles on the **analog-transfer** error, recomputed per actual | shipped `packages/estimate` | The two evidence-backed accuracy levers (RESEARCH §3.2). Validated only on a 15-row synthetic ledger so far |
+| Evals | Purpose-built offline harnesses over golden synthetic sets (`evals/`); Langfuse optional for online telemetry | shipped | Ragas/DeepEval/promptfoo were surveyed and not adopted — the scoring the gates need is deterministic and small. Naive-baseline reporting mandatory (PRINCIPLES #7) |
+| Review UI | Next.js 16 / React 19; `en` default locale, `tr` first localization | shipped `apps/web` | Implements the delivered design system in `docs/design/`; OIDC login flow in the SPA is deferred ([UI-VISION.md](UI-VISION.md), [ADR-0004](adr/0004-turkish-first-pipeline.md)) |
+| Connectors | Confluence v2 crawl (ACL+version metadata), Jira JQL cursor, git hosting via provider APIs + git protocol — **Bitbucket first-class**, GitHub, GitLab; HMAC-verified webhook re-index | shipped `packages/connectors` | Configured by form (clone URL + JSON), not an OAuth repo picker (S11-5). Bulk sync never via MCP (rate limits); [ADR-0002](adr/0002-atlassian-adjacent-core.md) |
+| Atlassian surface | Estimo's own MCP server at `/mcp` (FastMCP 3, 3 read tools, OAuth2 resource server) | **partial** | The MCP server is shipped; the Forge Rovo Agent front-door is deferred — it is a client of already-shipped endpoints ([ADR-0002](adr/0002-atlassian-adjacent-core.md)) |
+| Deployment | **Fully containerized** — multi-arch OCI images on GHCR with SBOM + provenance; `docker compose up` for dev/single-node; Helm (same images) for k8s | shipped `infra/helm` | Ladder SaaS → VPC → BYOC → air-gap; stateless per tenant. [ADR-0006](adr/0006-fully-containerized.md) |
 
 ## Indexing pipelines (ordered)
 
@@ -87,16 +91,17 @@ resumable** pipeline — every stage idempotent, per-tenant namespaced, safe to 
 
 **Wiki lane** (Confluence → wiki shelf):
 `crawl (v2 API, page+ACL+version, checkpointed)` → `normalize (HTML→markdown)` →
-`structure-aware chunking (heading/table boundaries)` → `contextual header generation
-(LLM, cached)` → `dual index write (BM25 + vector)` → `freshness/authority scoring`.
+`structure-aware chunking (heading/table boundaries)` → `dual index write (FTS + vector)`
+→ `freshness/authority scoring`. A contextual-header generation stage belongs between
+chunking and indexing and is **not built** (S11-2).
 Incremental sync diffs page versions; a permission change re-syncs ACL metadata without
 re-embedding. Canonical pages enter this lane post-approval with a rank boost.
 
 **Code lane** (git hosting → code shelf):
-`clone/fetch (Bitbucket/GitHub/GitLab APIs + git protocol)` → `tree-sitter repo map
-(symbols, ranked)` → `SCIP index (defs/refs/dependents → graph store)` → `module-wiki
-generation (nightly, LLM)` — generated module pages then flow through the wiki lane's
-chunk/index stages. Webhook push events (or polling fallback) trigger incremental
+`clone/fetch (Bitbucket/GitHub/GitLab APIs + git protocol)` → `tree-sitter symbol graph
+(Java/TypeScript)`. The two later stages — a SCIP index for deterministic
+defs/refs/dependents, and nightly module-wiki generation feeding the wiki lane — are
+designed but **not built**. Webhook push events (or polling fallback) trigger incremental
 re-index of changed paths only.
 
 **Ledger lane** (seed import / live BoE writes → estimate ledger):
@@ -105,14 +110,18 @@ re-index of changed paths only.
 `error/review queues (unknown modules, rejected rows)`. Actuals arriving later update
 calibration aggregates as a scheduled job.
 
-**Query path** (at estimation time): `hybrid retrieve (BM25 + dense, ACL pre-filter,
-freshness-weighted)` → `rerank` → `evidence assembly with URIs`. Retrieval never sees
-content the requesting user couldn't read at the source.
+**Query path** (at estimation time): `hybrid retrieve (Turkish FTS + dense, ACL
+pre-filter, freshness-weighted)` → `RRF fusion` → `evidence assembly with URIs`. The
+rerank stage between fusion and assembly is designed but **not wired** (S11-1). Retrieval
+never sees content the requesting user couldn't read at the source — with the caveat that
+ACL keys are matched per connection, and `GET /v1/canonical` has no per-user filter yet
+(S11-7).
 
 ## Non-negotiables encoded in code structure
 
 - `packages/gateway/` is the **only** module importing an LLM client; CI greps for
-  provider SDK imports elsewhere and fails the build.
+  provider SDK imports elsewhere and fails the build. Model names never appear in code —
+  stages name a *profile*, the deployment maps profiles to models.
 - ACL metadata travels with every chunk from ingestion to retrieval; enforcement is a
   **pre-filter**, never prompt-level.
 - Every pipeline stage emits evidence URIs; the BoE assembler refuses lines without them

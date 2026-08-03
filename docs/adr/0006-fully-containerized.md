@@ -27,8 +27,9 @@ design is the customer's LiteLLM gateway (ADR-0001), reached over the network.
   images), `.dockerignore` mirrors repo hygiene (no fixtures/secrets baked in),
   healthchecks defined in the images, configuration exclusively via environment
   (`.env` / injected secrets — never baked).
-- **Compose profiles** separate concerns: core (api, web, postgres), `--profile evals`
-  (Langfuse etc.), so a minimal install stays minimal.
+- **Compose profiles** separate concerns: core (api, web, postgres) plus `--profile mock`
+  (a stub gateway for a no-model walkthrough) and `--profile observability` (Langfuse
+  self-host), so a minimal install stays minimal.
 
 ## Consequences
 

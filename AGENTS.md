@@ -165,3 +165,4 @@ sequentially, link it from `docs/ARCHITECTURE.md`. Existing accepted ADRs:
 - [0004 — English-first product, Turkish-first input](docs/adr/0004-turkish-first-pipeline.md)
 - [0005 — OSS-first composition: adopt proven components, build only the core](docs/adr/0005-oss-first-composition.md)
 - [0006 — Fully containerized: containers are the only supported runtime](docs/adr/0006-fully-containerized.md)
+- [0007 — Multi-tenant isolation via Postgres RLS; OIDC bearer auth](docs/adr/0007-multitenant-auth.md)

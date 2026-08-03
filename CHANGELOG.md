@@ -82,45 +82,14 @@ Until the first code release, entries track documentation and foundation milesto
   API origin is injected at **runtime** from `ESTIMO_API_URL` — never baked into the
   image at build time.
 
-### Security
-- **S10 review hardening** (adversarial review; 10 confirmed findings fixed): the MCP
-  endpoint is now an OAuth2 resource server (FastMCP `JWTVerifier`) that pins the
-  caller's tenant from the validated token — it was reachable unauthenticated and read
-  the default tenant. Unique keys on tenant tables are composite with `tenant_id`
-  (migration `0010`) so one tenant's write can no longer collide with, overwrite, or
-  probe another's. Helm: the API/migration split onto the right DB roles (RLS was
-  bypassed by connecting as the owner), the migration moved to an init container (the
-  hook ran before the bundled Postgres existed), and the bundled password is reused
-  across upgrades instead of regenerated. Cross-tenant system paths take an optional
-  owner connection; the sync trigger self-heals orphaned `running` rows. Role claims
-  accept a space-delimited string (a bare string was iterated per character, silently
-  denying every role).
-- **S9 review hardening** (adversarial review; 28 confirmed findings fixed): the ACL
-  pre-filter provably never widens — Confluence connections require explicit
-  `space_keys`, read restrictions resolve by walking ancestors (inheritance), and
-  canonical approval publishes the intersection of its sources' ACL keys (refusing
-  mixed-audience defaults). Connection names are slugged before becoming filesystem
-  paths (no `../` escape). Also: one-running-sync-per-connection is DB-enforced
-  (migration `0008`), interrupted runs are swept at startup, pagination follows
-  `_links.next` verbatim (no cursor double-encoding), the incremental watermark uses
-  real datetimes with a 26h overlap, deleted source modules are pruned from
-  retrieval, and GitLab signed webhooks enforce a replay window.
-- **S7 review hardening** (adversarial review; 14 confirmed findings fixed):
-  independent-first now holds across the WHOLE API surface — `GET /{id}`, the build
-  response and the `.docx` export withhold the draft body until every line is signed,
-  and signing itself requires the signer's own revealed band. BoE drafts are
-  **versioned** (migration `0005`): reveals, sign-offs and anchoring telemetry are
-  bound to the draft they were recorded against, so a rebuild never inherits them,
-  and rebuilding over a live draft is refused. Also: upload size limit enforced while
-  streaming; `Content-Disposition` uses an ASCII slug + RFC 5987 `filename*` (no
-  header injection, no non-latin-1 500s); server-reserved telemetry kinds are not
-  forgeable; empty answers no longer close questions; `.dockerignore` patterns fixed
-  so nested env files and Node artifacts stay out of build contexts.
 - **S6 estimation** (`packages/estimate`): analog-grounded three-point bands with
   conformal-style calibration on the ledger's **analog-transfer** error (leave-one-out
-  actual/analog-median quantiles — measured on the seed set: 80% interval coverage at
-  nominal 80% vs 7% with the naive deviation model; MAE at parity with the raw analog
-  median). Cold-start priors below 8 samples (always labeled), small-item overhead
+  actual/analog-median quantiles — measured leave-one-out on the 15-row synthetic seed
+  ledger: **87% interval coverage at nominal 80%**, and MAE 6.35 pd against a naive
+  analog-median baseline of 7.07 pd. Calibrating on per-entry estimate deviation instead
+  gave 7% coverage, which is why the transfer distribution is the one used. The
+  quantiles are fit in-sample on 15 rows, so these numbers demonstrate the mechanism,
+  not field accuracy — see `evals/reports/2026-08-03-s6-loo-eval.md`). Cold-start priors below 8 samples (always labeled), small-item overhead
   floors, expert-recall down-weighting. The estimator refuses non-ready states
   (PRINCIPLES #3), attaches ledger://+repo://+answer:// evidence to every line,
   converts LOW-confidence impacts into discovery risks with contingency, and lets the
@@ -199,6 +168,41 @@ Until the first code release, entries track documentation and foundation milesto
 - ADR-0005: OSS-first composition — adopt proven, license-safe components behind internal
   interfaces; from-scratch code reserved for the differentiation core. Linked from
   AGENTS.md golden rules and ARCHITECTURE.md.
+
+### Security
+- **S10 review hardening** (adversarial review; 10 confirmed findings fixed): the MCP
+  endpoint is now an OAuth2 resource server (FastMCP `JWTVerifier`) that pins the
+  caller's tenant from the validated token — it was reachable unauthenticated and read
+  the default tenant. Unique keys on tenant tables are composite with `tenant_id`
+  (migration `0010`) so one tenant's write can no longer collide with, overwrite, or
+  probe another's. Helm: the API/migration split onto the right DB roles (RLS was
+  bypassed by connecting as the owner), the migration moved to an init container (the
+  hook ran before the bundled Postgres existed), and the bundled password is reused
+  across upgrades instead of regenerated. Cross-tenant system paths take an optional
+  owner connection; the sync trigger self-heals orphaned `running` rows. Role claims
+  accept a space-delimited string (a bare string was iterated per character, silently
+  denying every role).
+- **S9 review hardening** (adversarial review; 28 confirmed findings fixed): the ACL
+  pre-filter provably never widens — Confluence connections require explicit
+  `space_keys`, read restrictions resolve by walking ancestors (inheritance), and
+  canonical approval publishes the intersection of its sources' ACL keys (refusing
+  mixed-audience defaults). Connection names are slugged before becoming filesystem
+  paths (no `../` escape). Also: one-running-sync-per-connection is DB-enforced
+  (migration `0008`), interrupted runs are swept at startup, pagination follows
+  `_links.next` verbatim (no cursor double-encoding), the incremental watermark uses
+  real datetimes with a 26h overlap, deleted source modules are pruned from
+  retrieval, and GitLab signed webhooks enforce a replay window.
+- **S7 review hardening** (adversarial review; 14 confirmed findings fixed):
+  independent-first now holds across the WHOLE API surface — `GET /{id}`, the build
+  response and the `.docx` export withhold the draft body until every line is signed,
+  and signing itself requires the signer's own revealed band. BoE drafts are
+  **versioned** (migration `0005`): reveals, sign-offs and anchoring telemetry are
+  bound to the draft they were recorded against, so a rebuild never inherits them,
+  and rebuilding over a live draft is refused. Also: upload size limit enforced while
+  streaming; `Content-Disposition` uses an ASCII slug + RFC 5987 `filename*` (no
+  header injection, no non-latin-1 500s); server-reserved telemetry kinds are not
+  forgeable; empty answers no longer close questions; `.dockerignore` patterns fixed
+  so nested env files and Node artifacts stay out of build contexts.
 
 ### Changed
 - **The web UI now implements the delivered design system**, not just its colour

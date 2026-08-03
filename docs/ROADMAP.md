@@ -105,7 +105,7 @@ planted anchor in the fixtures; parse eval in CI.
 
 - [x] S3-1 Postgres implementation of the ledger schema + import CLI (xlsx/csv mapping per the S0-4 table; bad-row report)
 - [x] S3-2 **Turkish retrieval spike**: benchmark BM25 with a TR analyzer + 2–3 multilingual embedders + reranker candidates on the synthetic TR golden retrieval set → the outcome is locked in via an ADR-0004 update — **done for the lexical leg** (PostgreSQL `turkish` FTS + query-side suffix-strip prefix matching, chosen empirically: raw snowball missed derivational/possessive forms; locked in ADR-0004). The **embedder/reranker shoot-out needs live embedding endpoints** — the harness + golden set are in the repo (`evals/golden/retrieval-tr/`), the comparison runs at first real gateway deployment; mock vectors cannot rank semantics
-- [x] S3-3 Hybrid search service: BM25 + dense + reranker + contextual chunk headers; ACL/freshness metadata fields ready in the schema
+- [x] S3-3 Hybrid search service: BM25 + dense fused with RRF (k=60); ACL/freshness metadata fields ready in the schema. **Two pieces named in the original scope are not built:** the cross-encoder rerank slot after fusion is an interface only (it needs a gateway rerank route to wire to), and contextual chunk headers were not implemented at all — both carried to S11
 - [x] S3-4 Analogy query: work item → closest past items (similarity + effort given at the time + actuals + deviation); "analogy card" API contract
 - [x] S3-5 Retrieval eval (Ragas-style): recall/precision dashboard in CI
 
@@ -127,7 +127,7 @@ evaluation on the golden set.
 - [x] S4-3 Ambiguity gate: ambiguity score threshold; an item that fails drops into "question generation" and **cannot enter** effort estimation (PRINCIPLES #3 enforced mechanically)
 - [x] S4-4 Clarification question generator: company-style few-shot with 10+ examples (from the fixture universe), question quality rubric
 - [x] S4-5 HITL checkpoint v0 (at the CLI/JSON level): answers feed back into the pipeline, the gate re-evaluates
-- [x] S4-6 Eval harness v1 (DeepEval/promptfoo): decomposition coverage, question quality (rubric + human-labeled mini set), report format including the **naive baseline calculation**
+- [x] S4-6 Eval harness v1: decomposition coverage, question quality (rubric + human-labeled mini set), report format including the **naive baseline calculation**. DeepEval/promptfoo were surveyed and not adopted — the gates score deterministic structural properties against a golden manifest, which needs no LLM-judge framework
 - [x] S4-7 Prompt versioning scheme: `packages/pipeline/prompts/` + a prompt-change→eval trigger in CI
 
 **Exit gate (F1 blinded evaluation):** Decomposition+question outputs blind-compared
@@ -159,11 +159,11 @@ the fixture repo; every impact claim carries an evidence URI.
 
 **Goal:** Analogy-based three-point bands + assumption/risk registers + the BoE document.
 
-**Architecture slice:** `packages/calibrate`, `packages/pipeline` effort nodes, BoE render.
+**Architecture slice:** `packages/estimate` (calibration + bands + BoE render), `packages/pipeline` effort nodes.
 
 - [x] S6-1 Analog few-shot selector: item-similar history from the ledger (SSBSE-2023 finding: selection quality matters more than model quality)
 - [x] S6-2 Three-point generation: analog distribution + LLM reasoning; sampling variance instead of verbal confidence (PRINCIPLES #6)
-- [x] S6-3 Conformal/quantile intervals: bands calibrated on the ledger's **analog-transfer** error distribution (leave-one-out actual/analog-median ratios — measured: calibrating on per-entry estimate deviation gave 7% coverage, transfer quantiles give 80% at nominal 80%); cold-start priors below 8 samples, always labeled; small-item overhead floor (PRINCIPLES #10)
+- [x] S6-3 Conformal/quantile intervals: bands calibrated on the ledger's **analog-transfer** error distribution (leave-one-out actual/analog-median ratios — measured: calibrating on per-entry estimate deviation gave 7% coverage, transfer quantiles give **87%** at nominal 80%); cold-start priors below 8 samples, always labeled; small-item overhead floor (PRINCIPLES #10)
 - [x] S6-4 Assumption & risk generator: per-item + document-wide register; cone stage label
 - [x] S6-5 Critic/consistency pass: cross-item conflicts, sum consistency, rejection of evidence-free lines; judge ≠ generator
 - [x] S6-6 BoE `.docx` render: template-parameterized (logo/header), signature blocks, provenance appendices; TR number formatting
@@ -193,7 +193,7 @@ produced end to end from a fixture BRD; the eval report includes the naive basel
 - [x] S7-1 Design system integration (token + component library from the Claude Design output)
 - [x] S7-2 Workspace + BRD upload + pipeline status timeline
 - [x] S7-3 Requirement/question board: item list, ambiguity highlights, question cards (copyable customer question-set output)
-- [x] S7-4 **Independent-first Estimate Desk**: AI column hidden → enter your own estimate → reveal → delta display; anonymous multi-estimator (Delphi) mode
+- [x] S7-4 **Independent-first Estimate Desk**: AI column hidden → enter your own estimate → reveal → delta display, enforced server-side and on every read surface (REST, `.docx`, MCP). **Delphi mode is not built** — bands are per-estimator and immutable, but there is no anonymized multi-estimator aggregation view; carried to S11
 - [x] S7-5 Evidence chips: code/wiki/analogy references with hover/focus previews
 - [x] S7-6 Line sign-off + document approval flow; BoE preview/`.docx` export
 - [x] S7-7 Edit telemetry: per-section correction distance + anchoring delta capture (events to Langfuse)
@@ -219,11 +219,11 @@ independent-first review → sign-off → export) completes through the UI.
 **Goal:** Turn the product into a learning system: actuals flow in, intervals and analogy
 selection update, honesty dashboards open to everyone.
 
-**Architecture slice:** `packages/calibrate` loop, `apps/web` dashboards, Langfuse self-host.
+**Architecture slice:** `packages/estimate` calibration loop, `apps/web` dashboards, Langfuse self-host.
 
 - [x] S8-1 Actuals entry: manual form + bulk import; the work item ↔ actuals matching experience
 - [x] S8-2 Calibration jobs: error distribution update → interval widths; feedback into analogy ranking (edit + actuals signals — PRINCIPLES #8)
-- [x] S8-3 Dashboards: interval coverage vs nominal, team/domain curves, anchoring telemetry, naive-baseline comparison, post-question revision rate
+- [x] S8-3 Dashboards: interval coverage vs nominal, anchoring telemetry, naive-baseline comparison, post-question revision rate. **Team/domain curves are not built** — the ledger has no team or domain dimension to slice on yet; carried to S11
 - [x] S8-4 Langfuse self-host integration: traces + user feedback + evaluation queue
 - [ ] S8-5 Dogfood pilot run: N BRDs in the real workflow (in-house) — only anonymized metric summaries enter the repo
 - [x] S8-6 DORA-style second-order monitoring: rework/WIP watch notes while draft speed ↑
@@ -253,7 +253,7 @@ band, staff satisfaction survey positive; decision report written.
 **Architecture slice:** `packages/connectors`.
 
 - [x] S9-1 Confluence v2 crawl: page+restriction(ACL)+version metadata, checkpointed incremental sync, points-limit-compliant rate plan (UX for a first sync that can take days)
-- [x] S9-2 Git hosting connectors: **Bitbucket first-class** (Atlassian shops — OAuth/app link, workspace/repo picker in Admin → Connections, webhook push events), GitHub and GitLab equivalents, plain git-protocol fallback; multi-repo clone/fetch + webhook-triggered incremental re-index
+- [x] S9-2 Git hosting connectors: **Bitbucket first-class** (Atlassian shops), GitHub and GitLab equivalents, plain git-protocol fallback; multi-repo clone/fetch + HMAC-verified webhook-triggered incremental re-index. Admin → Connections is a **config form** (clone URL, secret env-var name, JSON config), **not** the OAuth-backed workspace/repo picker originally scoped — browsing a workspace needs an OAuth app install flow; carried to S11
 - [x] S9-3 ACL pre-filter becomes mandatory in retrieval (the SECURITY.md principle becomes mechanical)
 - [x] S9-4 Canonical pages curation flow: candidate generation (LLM distillation) → human approval → versioning → retrieval priority
 - [x] S9-5 Freshness/authority scoring + stale-source warnings ("this page has not been updated in 18 months" on the evidence chip)
@@ -274,8 +274,10 @@ setup; ACL tests green.
 > (PyJWT over the abandoned python-jose; transaction-local tenant GUC; FastMCP 3.x).
 > Deferred by design (documented): the web SPA's OIDC login flow, the Forge Rovo Agent
 > (S10-4 — a Marketplace-hosted client of shipped endpoints), and the FP/COSMIC layer
-> (S10-7 — follows the S8 pilot data). ⚠️ **The exit gate — onboarding a second
-> external installation in < 2 weeks + a security review — needs the maintainer.**
+> (S10-7 — follows the S8 pilot data), and the documentation site + Marketplace
+> assessment (S10-6, which the deferred Forge surface would be the subject of).
+> ⚠️ **The exit gate — onboarding a second external installation in < 2 weeks + a
+> security review — needs the maintainer.**
 
 **Goal:** From single-tenant to product: identity, isolation, packaging, distribution surfaces.
 
@@ -286,11 +288,33 @@ setup; ACL tests green.
 - [x] S10-3 Helm chart + BYOC installation guide; air-gapped installation notes (open-weight model profile)
 - [~] S10-4 Forge Rovo Agent front-door: "send to Estimo" from inside Jira/Confluence + a status card
 - [x] S10-5 Estimo MCP server: estimate/evidence/decomposition query tools (OAuth, stateless HTTP)
-- [x] S10-6 Documentation site + installation quick-start; Marketplace readiness assessment
+- [ ] S10-6 Documentation site + Marketplace readiness assessment — **not done**. The installation quick-start shipped (README), but there is no docs site and no Marketplace assessment was written; the Forge/Rovo surface it would assess is itself deferred (see the S10 note above)
 - [~] S10-7 FP/COSMIC optional layer design note (Nesma enhancement-FPA) — implementation deferred to the next cycle
 
 **Exit gate:** Onboarding of the second (external) installation < 2 weeks; security review
 (ACL, tenant leak tests) green.
+
+---
+
+## S11 — Carried forward · `Status: ⚪ Not started`
+
+Items that S3–S10 scoped but did not deliver, collected here rather than left as ticks
+that overstate the build. Each names what blocked it.
+
+- [ ] S11-1 Cross-encoder rerank after RRF fusion (S3-3) — the slot exists in
+  `packages/knowledge/search.py`; it needs a gateway rerank route to call.
+- [ ] S11-2 Contextual chunk headers (S3-3) — prepend a document/section summary to each
+  chunk before embedding; never implemented.
+- [ ] S11-3 Anonymized Delphi aggregation view (S7-4) — per-estimator bands are already
+  stored and immutable, so this is a read model plus a UI, not new plumbing.
+- [ ] S11-4 Team/domain calibration curves (S8-3) — blocked on the ledger having a team
+  and domain dimension to slice on.
+- [ ] S11-5 OAuth workspace/repo picker for Bitbucket/GitHub/GitLab (S9-2) — needs the
+  OAuth app-install flow; today Admin → Connections takes a clone URL and a JSON config.
+- [ ] S11-6 Documentation site + Marketplace readiness assessment (S10-6).
+- [ ] S11-7 Per-user ACL filtering on `GET /v1/canonical` — chunk ACL keys are stored and
+  the endpoint is reviewer-gated, but there is no user→ACL-key mapping to filter against,
+  so a reviewer sees every canonical page in their tenant.
 
 ---
 

@@ -6,12 +6,46 @@ clarification questions, impacted-module analysis and calibrated effort ranges �
 in three things no generic AI tool has: **your codebase, your wiki know-how, and your own
 estimate-vs-actual history.** Always reviewed and signed by humans.
 
-> 📍 **Status: research & foundation phase (pre-code).**
-> The founding research dossier lives in [docs/RESEARCH.md](docs/RESEARCH.md);
-> the build plan in [docs/ROADMAP.md](docs/ROADMAP.md).
+> 📍 **Status: the S0–S10 build is complete and the flow runs end to end** — upload a
+> Turkish BRD, answer the clarification gate, record your own band, reveal the AI draft,
+> sign, export the `.docx`. What has *not* happened yet is field validation: the
+> calibration numbers come from a 15-row synthetic seed ledger, and no pilot has run
+> against real delivery data. See [docs/ROADMAP.md](docs/ROADMAP.md) for exactly what is
+> done, what is deferred, and what needs a human decision; the founding research dossier
+> is [docs/RESEARCH.md](docs/RESEARCH.md).
 
 **Why "Estimo"?** From the Latin *aestimo* — "I estimate, I appraise." One word, one
 job: turning requirements into estimates you can defend line by line.
+
+## Quick start
+
+Containers are the only supported runtime ([ADR-0006](docs/adr/0006-fully-containerized.md)).
+
+```bash
+git clone https://github.com/Sangaibisi/estimo.git && cd estimo
+cp .env.example .env          # then set ESTIMO_GATEWAY__* to your LiteLLM endpoint
+docker compose up --build
+```
+
+The web app comes up on <http://localhost:3000> and the API on <http://localhost:8000>
+(OpenAPI at `/docs`). Migrations run automatically on API start.
+
+Two things to know before you read anything into the output:
+
+- **No gateway configured means no estimation.** Parsing, decomposition and the
+  question gate are deterministic and work offline, but effort bands need a model.
+  For a look around without one, `docker compose --profile mock up` serves a stub
+  gateway that returns fixed responses.
+- **A default install is unauthenticated and single-tenant.** Leave `ESTIMO_AUTH__ISSUER`
+  empty and every endpoint is open and every request runs as the default tenant. Set an
+  OIDC issuer — and connect as the `estimo_app` role, not the owner — before exposing it
+  to anyone ([ADR-0007](docs/adr/0007-multitenant-auth.md)).
+
+Four synthetic Turkish BRDs live in `fixtures/brd/` — upload one to see the whole flow
+without touching customer material. Real BRDs must never enter this repo ([SECURITY.md](SECURITY.md)).
+
+For Kubernetes, `infra/helm/estimo/` deploys the same images; `helm install` prints the
+auth, database and gateway posture it is about to give you.
 
 ## Why
 
@@ -45,8 +79,11 @@ found that:
    (anchoring protection), then review, edit and sign line by line. Edits and eventual
    actuals feed the calibration loop.
 
-All model calls go through an **OpenAI-compatible gateway (LiteLLM)** — model-agnostic,
-self-host friendly, no provider SDKs anywhere in the codebase.
+All model calls go through an **OpenAI-compatible gateway (LiteLLM)** — model-agnostic and
+self-host friendly. `packages/gateway` is the only package that talks to a model at all,
+and it does so through the OpenAI *protocol* client pointed at your gateway; no vendor
+binding and no hardcoded model name exists anywhere else
+([ADR-0001](docs/adr/0001-litellm-gateway-only.md)).
 
 ## Product laws
 

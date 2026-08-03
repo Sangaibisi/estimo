@@ -23,6 +23,6 @@ vocabulary, not documentation language.
 | **Naive baseline** | Naif taban çizgisi | Median/mean of retrieved analogs; every eval reports the pipeline's delta against it. |
 | **Impact map** | Etki haritası | Modules/services likely touched by a work item, derived from the code graph + LLM judgment, with confidence levels. |
 | **Repo map** | Repo haritası | Token-budgeted structural summary of a codebase (tree-sitter symbols, ranked). |
-| **Code graph** | Kod grafı | Precise symbol index (SCIP): definitions, references, dependents — used for deterministic impact traversal. |
+| **Code graph** | Kod grafı | Symbol index — definitions, references, dependents — used for impact traversal. Populated today by tree-sitter; the store is indexer-agnostic so a SCIP index can replace it without changing the impact API. |
 | **Gateway** | Geçit | The single OpenAI-compatible endpoint (LiteLLM in deployments) through which all model calls flow. |
 | **Golden set** | Altın set | Frozen synthetic evaluation corpus with reference outputs used to regression-test estimation behavior. |
