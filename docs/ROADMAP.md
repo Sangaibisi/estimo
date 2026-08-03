@@ -146,7 +146,7 @@ the fixture repo; every impact claim carries an evidence URI.
 
 ---
 
-## S6 — Effort Bands & Calibration v1 · `Status: 🟡 In progress` (all items done; exit gate awaits green CI)
+## S6 — Effort Bands & Calibration v1 · `Status: 🟢 Done` (2026-08-03 — exit gate met: end-to-end BoE .docx from fixture BRDs with evidence-linked three-point lines; LOO eval 87% coverage at nominal 80%, MAE beats naive by 0.72 pd — evals/reports/2026-08-03-s6-loo-eval.md)
 
 **Goal:** Analogy-based three-point bands + assumption/risk registers + the BoE document.
 
@@ -165,7 +165,7 @@ produced end to end from a fixture BRD; the eval report includes the naive basel
 
 ---
 
-## S7 — Review UI & Independent-First Flow · `Status: 🔵 Planned`
+## S7 — Review UI & Independent-First Flow · `Status: 🟡 In progress`
 
 **Goal:** The human layer: review, correct and sign the draft — without getting anchored.
 
