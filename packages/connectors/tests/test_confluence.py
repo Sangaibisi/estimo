@@ -9,13 +9,16 @@ BASE = "https://aurora.atlassian.net"
 
 
 def _connector(**kwargs: object) -> ConfluenceConnector:
-    return ConfluenceConnector(
-        base_url=BASE,
-        email="svc@aurora.example",
-        api_token="token",
-        plan=RatePlan(min_interval=0.0),
-        **kwargs,  # type: ignore[arg-type]
-    )
+    defaults: dict[str, object] = {
+        "base_url": BASE,
+        "email": "svc@aurora.example",
+        "api_token": "token",
+        "space_keys": ("AUR",),
+        "default_acl": ("space:AUR",),
+        "plan": RatePlan(min_interval=0.0),
+    }
+    defaults.update(kwargs)
+    return ConfluenceConnector(**defaults)  # type: ignore[arg-type]
 
 
 def _page_payload(page_id: str, title: str, *, version: int = 3) -> dict[str, object]:
@@ -100,7 +103,8 @@ async def test_full_crawl_maps_acl_and_checkpoints() -> None:
     assert documents[0].freshness_at is not None
     assert documents[0].freshness_at.year == 2026
     assert "[AUR]" in documents[0].title
-    assert checkpoint["last_modified"] == "2026-07-01T10:00:00Z"
+    assert str(checkpoint["last_modified"]).startswith("2026-07-01T10:00:00")
+    assert "space_index" not in checkpoint  # completed full crawl → incremental next
 
 
 @pytest.mark.asyncio
@@ -128,7 +132,9 @@ async def test_incremental_crawl_uses_cql_and_advances_checkpoint() -> None:
     assert len(documents) == 1
     cql = search.calls[0].request.url.params["cql"]
     assert "lastmodified >=" in cql and "order by lastmodified asc" in cql
-    assert checkpoint["last_modified"] == "2026-08-01T09:00:00Z"
+    assert 'space in ("AUR")' in cql
+    # Watermark advances to the newest edit (stored as ISO-UTC).
+    assert str(checkpoint["last_modified"]).startswith("2026-08-01T09:00:00")
 
 
 @pytest.mark.asyncio

@@ -123,8 +123,13 @@ export default function ConnectionsPage() {
                     ? aclKeys.split(",").map((key) => key.trim()).filter(Boolean)
                     : null,
                 });
+                // Reset the whole form — otherwise the next connection silently
+                // inherits this one's secret env / ACL keys / config.
                 setName("");
                 setBaseUrl("");
+                setSecretEnv("");
+                setAclKeys("");
+                setConfigText("{}");
               })
             }
           >
@@ -195,7 +200,16 @@ export default function ConnectionsPage() {
                     </button>{" "}
                     <button
                       disabled={busy}
-                      onClick={() => run(() => api.deleteConnection(connection.id))}
+                      title={t(locale, "deleteConnection")}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t(locale, "confirmDeleteConnection").replace("{name}", connection.name),
+                          )
+                        ) {
+                          run(() => api.deleteConnection(connection.id));
+                        }
+                      }}
                     >
                       ✕
                     </button>

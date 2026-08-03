@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 
+import estimo_connectors.db  # noqa: F401 - registers connector tables on KnowledgeBase
 from alembic import context
 from estimo_knowledge.db import Base as KnowledgeBase
 from sqlalchemy.engine import Connection

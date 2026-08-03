@@ -94,13 +94,15 @@ async def clone_or_fetch(
     """Idempotent sync of one repo working tree; returns the synced HEAD state."""
     if (dest / ".git").exists():
         await _run_git(
-            ["fetch", "--depth", str(depth), "origin", *([branch] if branch else [])],
+            ["fetch", "--depth", str(depth), "origin", *([branch] if branch else ["HEAD"])],
             cwd=dest,
             username=username,
             token=token,
         )
-        target = f"origin/{branch}" if branch else "FETCH_HEAD"
-        await _run_git(["reset", "--hard", target], cwd=dest)
+        # Always reset to FETCH_HEAD: after a --single-branch clone the fetch
+        # refspec does not track OTHER branches, so origin/<new-branch> never
+        # materialises when the configured branch changes — FETCH_HEAD does.
+        await _run_git(["reset", "--hard", "FETCH_HEAD"], cwd=dest)
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
         args = ["clone", "--depth", str(depth), "--single-branch"]

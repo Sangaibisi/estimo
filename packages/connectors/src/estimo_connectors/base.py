@@ -54,13 +54,18 @@ def resolve_secret(secret_env: str | None) -> str | None:
 class RatePlan:
     """Compliant pacing for cost-budgeted APIs (Atlassian's points model).
 
-    Two mechanisms, both mandatory for a days-long first sync:
+    Mechanisms, all mandatory for a days-long first sync:
     - a floor delay between requests (steady, budget-friendly cadence);
-    - full obedience to 429/`Retry-After` with capped exponential fallback when the
-      server does not say how long.
+    - proactive slowdown while the server signals `X-RateLimit-NearLimit`, decaying
+      back to the base cadence once the budget recovers;
+    - full obedience to 429/`Retry-After` (the SERVER's value wins, up to a sanity
+      ceiling) with capped exponential fallback when it does not say how long.
     """
 
+    RETRY_AFTER_CEILING = 900.0  # honor the server up to 15 minutes
+
     def __init__(self, *, min_interval: float = 0.3, max_backoff: float = 120.0) -> None:
+        self.base_interval = min_interval
         self.min_interval = min_interval
         self.max_backoff = max_backoff
         self._backoff = 1.0
@@ -68,17 +73,26 @@ class RatePlan:
     async def pace(self) -> None:
         await asyncio.sleep(self.min_interval)
 
+    def observe_budget(self, response: httpx.Response) -> None:
+        """Adjust cadence from budget headers: slow near the limit, recover after."""
+        near = response.headers.get("X-RateLimit-NearLimit", "").lower() == "true"
+        if near:
+            self.min_interval = min(self.min_interval * 2, 5.0)
+        elif self.min_interval > self.base_interval:
+            self.min_interval = max(self.base_interval, self.min_interval / 2)
+
     async def on_response(self, response: httpx.Response) -> bool:
         """Returns True when the request should be retried after backing off."""
         if response.status_code != 429:
             self._backoff = 1.0
+            self.observe_budget(response)
             return False
         retry_after = response.headers.get("Retry-After")
         try:
             delay = float(retry_after) if retry_after else self._backoff
         except ValueError:
             delay = self._backoff
-        delay = min(delay, self.max_backoff)
+        delay = min(delay, self.RETRY_AFTER_CEILING)
         self._backoff = min(self._backoff * 2, self.max_backoff)
         logger.warning("rate limited; sleeping %.1fs", delay)
         await asyncio.sleep(delay)

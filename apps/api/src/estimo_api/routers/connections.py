@@ -26,6 +26,7 @@ from estimo_connectors import (
     run_sync,
     verify_webhook,
 )
+from estimo_connectors.sync import SyncAlreadyRunningError
 from estimo_knowledge import is_stale
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -33,17 +34,25 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from estimo_api.db import get_session
+from estimo_api.settings import Settings
+from estimo_gateway import GatewayClient
 
 router = APIRouter(prefix="/v1", tags=["connections"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
-REPOS_DIR = Path(os.environ.get("ESTIMO_REPOS_DIR", "/tmp/estimo-repos"))
+
+def _repos_dir() -> Path:
+    # Read at call time (tests/deploys override the env after import); the default
+    # matches the path the image prepares with app-user ownership.
+    return Path(os.environ.get("ESTIMO_REPOS_DIR", "/data/repos"))
 
 
 class ConnectionIn(BaseModel):
     kind: str = Field(pattern="^(" + "|".join(CONNECTION_KINDS) + ")$")
-    name: str = Field(min_length=1, max_length=120)
+    # The name feeds a working-tree directory name; keep it path-safe at the
+    # boundary (defense in depth — sync also slugs it).
+    name: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9._ -]*$")
     base_url: str = Field(min_length=1, max_length=500)
     config: dict[str, Any] = Field(default_factory=dict)
     secret_env: str | None = Field(default=None, max_length=120)
@@ -123,13 +132,35 @@ async def delete_connection(connection_id: uuid.UUID, session: SessionDep) -> No
     await session.commit()
 
 
+def _gateway_client(settings: Settings) -> GatewayClient | None:
+    """Best-effort gateway for distillation/wiki generation; connectors degrade to
+    deterministic skeletons when the gateway is unreachable."""
+    try:
+        return GatewayClient(settings.gateway)
+    except Exception:  # noqa: BLE001 - observability of the LLM leg must not block sync
+        return None
+
+
 async def _run_sync_bg(
-    sessionmaker: async_sessionmaker[AsyncSession], connection_id: uuid.UUID
+    sessionmaker: async_sessionmaker[AsyncSession],
+    connection_id: uuid.UUID,
+    settings: Settings,
 ) -> None:
     async with sessionmaker() as session:
         connection = await session.get(Connection, connection_id)
-        if connection is not None:
-            await run_sync(session, connection, repos_dir=REPOS_DIR)
+        if connection is None:
+            return
+        try:
+            await run_sync(
+                session,
+                connection,
+                repos_dir=_repos_dir(),
+                client=_gateway_client(settings),
+            )
+        except SyncAlreadyRunningError:
+            # The DB-level guard (one running run per connection) already refused
+            # the duplicate — e.g. a webhook burst; nothing to do.
+            return
 
 
 @router.post("/connections/{connection_id}/sync", status_code=status.HTTP_202_ACCEPTED)
@@ -147,7 +178,9 @@ async def trigger_sync(
     )
     if running is not None:
         raise HTTPException(status_code=409, detail="a sync is already running")
-    background.add_task(_run_sync_bg, request.app.state.sessionmaker, connection_id)
+    background.add_task(
+        _run_sync_bg, request.app.state.sessionmaker, connection_id, request.app.state.settings
+    )
     return {"status": "scheduled"}
 
 
@@ -198,7 +231,9 @@ async def receive_webhook(
     configured_branch = (connection.config or {}).get("branch")
     if configured_branch and branches and configured_branch not in branches:
         return {"status": "ignored"}  # push to a branch we do not index
-    background.add_task(_run_sync_bg, request.app.state.sessionmaker, connection_id)
+    background.add_task(
+        _run_sync_bg, request.app.state.sessionmaker, connection_id, request.app.state.settings
+    )
     return {"status": "scheduled"}
 
 
@@ -212,11 +247,25 @@ class CandidateIn(BaseModel):
 
 class ApproveIn(BaseModel):
     approver: str = Field(min_length=1, max_length=120)
+    # Required when the sources share no common ACL audience (mixed visibility) —
+    # the approver states who may read the page; defaulting to public would widen.
+    acl_keys: list[str] | None = None
 
 
 @router.get("/canonical")
 async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
+    from estimo_knowledge import KnowledgeChunk
+
     result = await session.execute(select(CanonicalPage).order_by(CanonicalPage.topic))
+    pages = list(result.scalars())
+    # Staleness follows the published chunk, which carries the OLDEST SOURCE's
+    # freshness — curation time would hide a page built on stale sources.
+    freshness_rows = await session.execute(
+        select(KnowledgeChunk.source_ref, KnowledgeChunk.freshness_at).where(
+            KnowledgeChunk.source_type == "canonical"
+        )
+    )
+    chunk_freshness: dict[str, Any] = {ref: freshness for ref, freshness in freshness_rows.all()}
     return [
         {
             "id": str(page.id),
@@ -227,16 +276,27 @@ async def list_canonical(session: SessionDep) -> list[dict[str, Any]]:
             "version": page.version,
             "approved_by": page.approved_by,
             "source_refs": page.source_refs,
-            "stale": is_stale(page.updated_at),
+            "stale": is_stale(
+                chunk_freshness.get(f"canonical://{page.topic}", page.updated_at)
+                if page.status == "approved"
+                else page.updated_at
+            ),
             "updated_at": page.updated_at.isoformat(),
         }
-        for page in result.scalars()
+        for page in pages
     ]
 
 
 @router.post("/canonical", status_code=status.HTTP_201_CREATED)
-async def create_candidate(payload: CandidateIn, session: SessionDep) -> dict[str, str]:
-    page = await generate_candidate(session, topic=payload.topic, acl_keys=payload.acl_keys)
+async def create_candidate(
+    payload: CandidateIn, session: SessionDep, request: Request
+) -> dict[str, str]:
+    page = await generate_candidate(
+        session,
+        topic=payload.topic,
+        acl_keys=payload.acl_keys,
+        client=_gateway_client(request.app.state.settings),
+    )
     await session.commit()
     return {"id": str(page.id), "status": page.status}
 
@@ -248,6 +308,9 @@ async def approve_candidate(
     page = await session.get(CanonicalPage, page_id)
     if page is None:
         raise HTTPException(status_code=404, detail="canonical page not found")
-    page = await approve(session, page, approver=payload.approver)
+    try:
+        page = await approve(session, page, approver=payload.approver, acl_keys=payload.acl_keys)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     await session.commit()
     return {"id": str(page.id), "status": page.status, "version": page.version}

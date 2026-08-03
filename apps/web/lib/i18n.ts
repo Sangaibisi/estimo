@@ -83,6 +83,8 @@ const dict = {
     generateCandidate: "Generate candidate",
     approve: "Approve",
     staleSource: "stale",
+    deleteConnection: "Delete connection",
+    confirmDeleteConnection: "Delete connection “{name}” and its sync history?",
   },
   tr: {
     appTitle: "Estimo",
@@ -165,6 +167,8 @@ const dict = {
     generateCandidate: "Aday üret",
     approve: "Onayla",
     staleSource: "bayat",
+    deleteConnection: "Bağlantıyı sil",
+    confirmDeleteConnection: "“{name}” bağlantısı ve senkron geçmişi silinsin mi?",
   },
 } as const;
 

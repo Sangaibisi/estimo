@@ -27,6 +27,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = app_settings
         app.state.engine = engine
         app.state.sessionmaker = build_sessionmaker(engine)
+        # A crashed process leaves sync runs 'running' forever, which would block
+        # every future sync of those connections (S9 concurrency guard). Best-effort:
+        # startup must not hinge on the DB being reachable this instant (readiness
+        # is /readyz's job).
+        from estimo_connectors.sync import sweep_interrupted_runs
+
+        try:
+            async with app.state.sessionmaker() as session:
+                swept = await sweep_interrupted_runs(session)
+            if swept:
+                logging.getLogger("estimo.api").warning(
+                    "marked %d interrupted sync run(s) as failed", swept
+                )
+        except Exception:  # noqa: BLE001 - the sweep is a janitor, not a gate
+            logging.getLogger("estimo.api").warning(
+                "interrupted-run sweep skipped (db not ready at startup)", exc_info=True
+            )
         try:
             yield
         finally:

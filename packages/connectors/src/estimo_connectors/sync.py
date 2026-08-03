@@ -1,15 +1,26 @@
 """Sync orchestration (S9): one SyncRun per execution, checkpoint persisted as the
-crawl advances so a days-long first sync survives restarts."""
+crawl advances so a days-long first sync survives restarts.
+
+Concurrency: a partial unique index (one `running` row per connection, migration
+0008) makes starting a second concurrent sync an IntegrityError instead of a race —
+the manual trigger, the webhook path, and any future scheduler all funnel through
+`run_sync` and inherit the guarantee. Interrupted runs are swept to `failed` at API
+startup so a crashed container never blocks future syncs.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 from estimo_code import CodeGraph, generate_module_wikis
-from estimo_knowledge import upsert_document
+from estimo_knowledge import KnowledgeChunk, upsert_document
+from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_connectors.base import resolve_secret
@@ -17,11 +28,41 @@ from estimo_connectors.confluence import ConfluenceConnector
 from estimo_connectors.db import Connection, SyncRun
 from estimo_connectors.gitrepo import clone_or_fetch
 from estimo_connectors.hosting import clone_username
+from estimo_connectors.jira import JiraConnector
 from estimo_gateway import GatewayClient
 
 logger = logging.getLogger("estimo.connectors.sync")
 
 CHECKPOINT_EVERY = 25  # pages between checkpoint commits
+
+_PATH_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+class SyncAlreadyRunningError(RuntimeError):
+    pass
+
+
+def _workdir_name(connection: Connection) -> str:
+    """Filesystem-safe working-tree name: the display name is user input and must
+    not become a path component verbatim ('..', '/', …)."""
+    slug = _PATH_SAFE.sub("_", connection.name).strip("._") or "repo"
+    return f"{slug}-{str(connection.id)[:8]}"
+
+
+async def sweep_interrupted_runs(session: AsyncSession) -> int:
+    """Startup janitor: a killed container leaves runs `running` forever, which
+    would 409-block every future sync of those connections."""
+    result = await session.execute(
+        update(SyncRun)
+        .where(SyncRun.status == "running")
+        .values(
+            status="failed",
+            error="interrupted (process restarted mid-sync)",
+            finished_at=dt.datetime.now(dt.UTC),
+        )
+    )
+    await session.commit()
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 async def run_sync(
@@ -35,10 +76,16 @@ async def run_sync(
     previous = await _last_checkpoint(session, connection)
     run = SyncRun(connection_id=connection.id, checkpoint=dict(previous or {}))
     session.add(run)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise SyncAlreadyRunningError(f"a sync is already running for {connection.name}") from exc
     try:
         if connection.kind == "confluence":
             stats = await _sync_confluence(session, connection, run)
+        elif connection.kind == "jira":
+            stats = await _sync_jira(session, connection, run)
         elif connection.kind in {"bitbucket", "github", "gitlab", "git"}:
             if repos_dir is None:
                 raise ValueError("repos_dir is required for git-kind connections")
@@ -49,23 +96,31 @@ async def run_sync(
         run.stats = stats
     except Exception as exc:
         logger.exception("sync failed for %s", connection.name)
+        # The session may be in a failed transaction; roll back BEFORE the
+        # bookkeeping writes or the failure record itself fails.
+        await session.rollback()
         run.status = "failed"
         run.error = str(exc)[:2000]
+        session.add(run)
     run.finished_at = dt.datetime.now(dt.UTC)
     await session.commit()
     return run
 
 
 async def _last_checkpoint(session: AsyncSession, connection: Connection) -> dict[str, Any] | None:
-    from sqlalchemy import select
-
-    last = await session.scalar(
-        select(SyncRun)
-        .where(SyncRun.connection_id == connection.id, SyncRun.status == "succeeded")
+    """Latest run WITH a checkpoint, regardless of status — a failed/interrupted
+    run carries the partial progress that makes resuming a days-long first crawl
+    possible (its mid-crawl commits are the whole point)."""
+    result = await session.execute(
+        select(SyncRun.checkpoint)
+        .where(SyncRun.connection_id == connection.id, SyncRun.checkpoint.is_not(None))
         .order_by(SyncRun.started_at.desc())
-        .limit(1)
+        .limit(10)
     )
-    return dict(last.checkpoint) if last is not None and last.checkpoint else None
+    for checkpoint in result.scalars():
+        if checkpoint:  # skip runs that died before making any progress ({})
+            return dict(checkpoint)
+    return None
 
 
 async def _sync_confluence(
@@ -80,7 +135,7 @@ async def _sync_confluence(
         email=str(config.get("email", "")),
         api_token=token,
         space_keys=tuple(config.get("space_keys", ())),
-        default_acl=tuple(connection.acl_keys or ("public",)),
+        default_acl=tuple(connection.acl_keys or ()),
     )
     pages = 0
     checkpoint: dict[str, Any] = dict(run.checkpoint or {})
@@ -118,15 +173,21 @@ async def _sync_git(
     token = resolve_secret(connection.secret_env)
     state = await clone_or_fetch(
         connection.base_url,
-        repos_dir / connection.name,
+        repos_dir / _workdir_name(connection),
         branch=config.get("branch"),
         username=config.get("username") or clone_username(connection.kind),
         token=token,
     )
-    graph = CodeGraph.build(state.path, repo=connection.name, commit=state.head_sha)
-    pages = await generate_module_wikis(graph, client=client)
+    # Whole-repo parsing is CPU-bound; keep it off the API event loop or /healthz
+    # stalls while a large repo indexes.
+    graph = await asyncio.to_thread(
+        CodeGraph.build, state.path, repo=connection.name, commit=state.head_sha
+    )
+    wiki_pages = await generate_module_wikis(graph, client=client)
     acl = list(connection.acl_keys or ["public"])
-    for page in pages:
+    current_refs: set[str] = set()
+    for page in wiki_pages:
+        current_refs.add(page.source_ref)
         await upsert_document(
             session,
             source_type="code-wiki",
@@ -137,6 +198,69 @@ async def _sync_git(
             freshness_at=state.head_committed_at,
             authority=0.7,
         )
+    # Prune: modules deleted at the source must leave retrieval too. This
+    # connection's pages share the repo prefix.
+    # Module-wiki refs embed the commit (repo://{name}@{sha}/{path}); prune every
+    # ref of this repo NOT produced by the current commit.
+    prefix = f"repo://{connection.name}@"
+    pruned = await session.execute(
+        delete(KnowledgeChunk).where(
+            KnowledgeChunk.source_type == "code-wiki",
+            KnowledgeChunk.source_ref.like(f"{prefix}%"),
+            KnowledgeChunk.source_ref.not_in(current_refs),
+        )
+    )
     run.checkpoint = {"head_sha": state.head_sha}
     await session.commit()
-    return {"modules": len(pages), "head_sha": state.head_sha}
+    return {
+        "modules": len(wiki_pages),
+        "pruned": int(getattr(pruned, "rowcount", 0) or 0),
+        "head_sha": state.head_sha,
+    }
+
+
+async def _sync_jira(session: AsyncSession, connection: Connection, run: SyncRun) -> dict[str, Any]:
+    """Optional ledger feed (S9-6). Story points are NOT person-days: the operator
+    must state the conversion (`points_to_pd`) — importing raw points as effort
+    would silently corrupt calibration."""
+    config = connection.config or {}
+    token = resolve_secret(connection.secret_env)
+    if not token:
+        raise ValueError("jira connection requires secret_env (API token)")
+    factor = config.get("points_to_pd")
+    if not isinstance(factor, int | float) or factor <= 0:
+        raise ValueError(
+            "jira connection requires config.points_to_pd (> 0): story points are "
+            "not person-days, and the mapping is the operator's claim"
+        )
+    jql = str(config.get("jql") or "issuetype in (Epic, Story) order by created asc")
+    connector = JiraConnector(
+        base_url=connection.base_url,
+        email=str(config.get("email", "")),
+        api_token=token,
+    )
+    try:
+        issues = await connector.pull_issues(jql=jql)
+    finally:
+        await connector.aclose()
+
+    from estimo_knowledge import LedgerEntryRow
+
+    imported = 0
+    for issue in issues:
+        if issue.story_points is None:
+            continue
+        ref = f"jira://{issue.key}"
+        row = await session.scalar(select(LedgerEntryRow).where(LedgerEntryRow.origin_ref == ref))
+        if row is None:
+            row = LedgerEntryRow(origin_ref=ref)
+            session.add(row)
+        row.brd_ref = issue.parent_key or issue.key
+        row.item_title = issue.summary
+        row.item_description = issue.description
+        row.estimate_single = issue.story_points * float(factor)
+        row.method = "jira-story-points"
+        imported += 1
+    run.checkpoint = {"jql": jql, "issues_seen": len(issues)}
+    await session.commit()
+    return {"issues": len(issues), "imported": imported}

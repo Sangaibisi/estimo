@@ -94,25 +94,67 @@ async def generate_candidate(
     return page
 
 
-async def approve(session: AsyncSession, page: CanonicalPage, *, approver: str) -> CanonicalPage:
-    """Human gate: version-bump, mark approved, publish into retrieval."""
+async def _source_chunks(session: AsyncSession, page: CanonicalPage) -> list[KnowledgeChunk]:
+    refs = [ref.split(":", 1)[1] for ref in (page.source_refs or []) if ":" in ref]
+    if not refs:
+        return []
+    result = await session.execute(
+        select(KnowledgeChunk).where(KnowledgeChunk.source_ref.in_(refs))
+    )
+    return list(result.scalars())
+
+
+async def approve(
+    session: AsyncSession,
+    page: CanonicalPage,
+    *,
+    approver: str,
+    acl_keys: list[str] | None = None,
+) -> CanonicalPage:
+    """Human gate: version-bump, mark approved, publish into retrieval.
+
+    ACL discipline: the page contains its sources' text, so it may only be visible
+    to readers who can see EVERY source — the published ACL is the intersection of
+    the source chunks' keys. When that intersection is empty (mixed audiences) the
+    approver must state the audience explicitly; publishing "public" by default
+    would widen access.
+
+    Freshness is the OLDEST source's freshness, not curation time — a page distilled
+    from stale sources must still trip the staleness warning.
+    """
     if page.status == "approved":
         return page
+
+    sources = await _source_chunks(session, page)
+    if acl_keys is None:
+        key_sets = [set(chunk.acl_keys or []) for chunk in sources]
+        computed = set.intersection(*key_sets) if key_sets else set()
+        if not computed:
+            raise ValueError(
+                "sources have no common ACL audience — pass acl_keys explicitly "
+                "to state who may read the approved page"
+            )
+        acl_keys = sorted(computed)
+    freshness_candidates = [
+        chunk.freshness_at for chunk in sources if chunk.freshness_at is not None
+    ]
+    freshness = min(freshness_candidates) if freshness_candidates else None
+
     page.status = "approved"
     page.version += 1
     page.approved_by = approver
     await session.flush()
-    # updated_at is server-generated; refresh before reading it (an expired-attribute
-    # access would attempt sync IO inside the async session).
-    await session.refresh(page)
+    # A STABLE source_ref: re-approval replaces the previous version's chunk via
+    # the (source_type, source_ref) upsert — superseded 0.95-authority text must
+    # not accumulate in retrieval. The version lives on the page row.
     await upsert_document(
         session,
         source_type="canonical",
-        source_ref=f"canonical://{page.topic}@{page.version}",
+        source_ref=f"canonical://{page.topic}",
         title=page.title,
         text=page.body,
-        acl_keys=["public"],
-        freshness_at=page.updated_at,
+        acl_keys=acl_keys,
+        freshness_at=freshness,
         authority=CANONICAL_AUTHORITY,
     )
     return page

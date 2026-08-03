@@ -12,7 +12,7 @@ import uuid
 from typing import Any
 
 from estimo_knowledge.db import Base
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,17 @@ class SyncRun(Base):
     """One (possibly checkpoint-resumed) sync execution of a connection."""
 
     __tablename__ = "sync_runs"
+    __table_args__ = (
+        Index("ix_sync_runs_connection_id", "connection_id"),
+        # Concurrency guard: at most one running sync per connection — every entry
+        # point (manual trigger, webhook, scheduler) inherits it via run_sync.
+        Index(
+            "uq_sync_runs_one_running",
+            "connection_id",
+            unique=True,
+            postgresql_where=text("status = 'running'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     connection_id: Mapped[uuid.UUID] = mapped_column(

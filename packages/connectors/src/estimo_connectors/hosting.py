@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -146,7 +147,18 @@ async def _gitlab_repos(
     return repos
 
 
-def verify_webhook(kind: str, headers: dict[str, str], body: bytes, secret: str) -> bool:
+# Signed GitLab deliveries carry a timestamp precisely so replays can be bounded.
+WEBHOOK_REPLAY_WINDOW_SECONDS = 300
+
+
+def verify_webhook(
+    kind: str,
+    headers: dict[str, str],
+    body: bytes,
+    secret: str,
+    *,
+    now: float | None = None,
+) -> bool:
     """Constant-time verification of a push-webhook delivery against the RAW bytes."""
     lowered = {key.lower(): value for key, value in headers.items()}
     if kind == "bitbucket":
@@ -158,6 +170,13 @@ def verify_webhook(kind: str, headers: dict[str, str], body: bytes, secret: str)
         if signature:
             webhook_id = lowered.get("webhook-id", "")
             timestamp = lowered.get("webhook-timestamp", "")
+            try:
+                delivered_at = float(timestamp)
+            except ValueError:
+                return False
+            reference = now if now is not None else time.time()
+            if abs(reference - delivered_at) > WEBHOOK_REPLAY_WINDOW_SECONDS:
+                return False  # a captured delivery must not replay forever
             message = f"{webhook_id}.{timestamp}.".encode() + body
             expected = base64.b64encode(
                 hmac.new(secret.encode(), message, hashlib.sha256).digest()

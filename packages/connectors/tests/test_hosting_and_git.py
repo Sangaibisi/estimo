@@ -49,8 +49,10 @@ class TestWebhookSignatures:
             "webhook-timestamp": "1754200000",
             "webhook-signature": f"v1,{signature}",
         }
-        assert verify_webhook("gitlab", headers, BODY, SECRET)
-        assert not verify_webhook("gitlab", {**headers, "webhook-timestamp": "999"}, BODY, SECRET)
+        assert verify_webhook("gitlab", headers, BODY, SECRET, now=1754200000.0)
+        assert not verify_webhook(
+            "gitlab", {**headers, "webhook-timestamp": "999"}, BODY, SECRET, now=1754200000.0
+        )
 
 
 class TestPushEvents:
