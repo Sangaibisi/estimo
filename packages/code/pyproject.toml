@@ -1,6 +1,6 @@
 [project]
 name = "estimo-code"
-version = "0.1.0"
+version = "0.2.0"
 description = "Estimo code shelf: tree-sitter symbol graph, repo map, module wikis, impact analysis"
 requires-python = ">=3.13"
 license = "Apache-2.0"

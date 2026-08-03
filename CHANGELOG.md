@@ -6,6 +6,56 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/) once code ships.
 Until the first code release, entries track documentation and foundation milestones.
 
+## [0.2.0](https://github.com/Sangaibisi/estimo/compare/v0.1.0...v0.2.0) (2026-08-03)
+
+
+### Added
+
+* **admin:** panel-managed runtime config, TR terminology, design parity ([0f34385](https://github.com/Sangaibisi/estimo/commit/0f343859e397dbb2328bff975b736ab7d14872cc))
+* **admin:** system config surface + visual identity layer ([ebba30a](https://github.com/Sangaibisi/estimo/commit/ebba30ac197e907d0d24818f7a55f53df6bee104))
+* **api:** filter canonical pages by the caller's audience (S11-7 complete) ([59fac29](https://github.com/Sangaibisi/estimo/commit/59fac299ca052650d7b509d55cf3d00f95718261))
+* **api:** S10 — OIDC auth, multi-tenant RLS, MCP server, Helm/BYOC packaging ([59a5dae](https://github.com/Sangaibisi/estimo/commit/59a5dae298d2801f3ba12f3d4c85449cfe7cb492))
+* **api:** S7 backend — estimate workflow with server-enforced independent-first ([95a5f56](https://github.com/Sangaibisi/estimo/commit/95a5f56ca627d2e0e4ea81cb9b60097e4f9800a1))
+* **calibrate:** S8 — calibration loop, actuals entry, honesty dashboards, opt-in Langfuse ([c6a4384](https://github.com/Sangaibisi/estimo/commit/c6a43845a2e2354f044b1fef01cd0238efdd4c28))
+* **code:** S5 — tree-sitter code shelf, impact analysis, module wikis ([8ddff49](https://github.com/Sangaibisi/estimo/commit/8ddff496f2fef15d6fbc8d20275bbbf5aba8af87))
+* **connectors:** S9 — live knowledge: Confluence crawl, Bitbucket-first git sync, curation ([b6fa6a2](https://github.com/Sangaibisi/estimo/commit/b6fa6a20c31892182bf190e32676b5a2ccbccb24))
+* **desk:** S12-1 design parity, with the reveal gate widened ([1465769](https://github.com/Sangaibisi/estimo/commit/1465769e7a2eb2879f6592030ded8afff047fda7))
+* **estimate:** capture team/domain attribution on actuals (part of S11-4) ([f8ca0d1](https://github.com/Sangaibisi/estimo/commit/f8ca0d1560fed44ef8e99165612ddc0000c3557e))
+* **estimate:** S6 — analog-grounded bands, conformal calibration, critic, BoE rendering ([a984265](https://github.com/Sangaibisi/estimo/commit/a984265ba8649bfeb18d11840ceb46cc88d373fb))
+* **fixtures:** S0 data foundation — Aurora universe, ledger schema, golden-set design, synthetic BRDs ([d82d9ad](https://github.com/Sangaibisi/estimo/commit/d82d9ad2a65e076a390e8c149e032a581933a2d9))
+* **knowledge:** give the chunk shelf a dense leg, so its vectors are read ([e09e149](https://github.com/Sangaibisi/estimo/commit/e09e149ad31718ede4f759e8119ad159879cf209))
+* **knowledge:** S3 — estimate ledger, Turkish hybrid retrieval, analogy cards ([b298d94](https://github.com/Sangaibisi/estimo/commit/b298d949ff254a40663cb52eff8ba1c540246713))
+* **knowledge:** write embeddings, so the dense leg finally has data (S11-8) ([b28053c](https://github.com/Sangaibisi/estimo/commit/b28053cbe9df16015498ab96b5d57a597b23065d))
+* **parse:** S2 — Turkish BRD structural parsing with anchor quarantine and ambiguity pre-score ([7bebb83](https://github.com/Sangaibisi/estimo/commit/7bebb83c8f6af1fee957464e8441a22140584773))
+* **pipeline:** S4 — LangGraph decomposition, ambiguity gate, clarification questions ([8baaab7](https://github.com/Sangaibisi/estimo/commit/8baaab7b69e717622a31b723a145e4e2752b7f53))
+* **reading-room:** S12-2 two-pane source view ([dccd33e](https://github.com/Sangaibisi/estimo/commit/dccd33e75385d286f12efe79ad895aa342df3d42))
+* S1 skeleton — uv workspace, domain models, gateway, api, containers, CI/CD ([7117696](https://github.com/Sangaibisi/estimo/commit/7117696ae5ca943f565909f4c9e2f8e9d3a2188e))
+* **web:** anonymized Delphi overlay on the estimate desk (S11-3) ([b7cdd20](https://github.com/Sangaibisi/estimo/commit/b7cdd20fc1117ada86dd557ee5ec4b6ee2907e33))
+* **web:** implement the delivered design system across the product UI ([59e57b2](https://github.com/Sangaibisi/estimo/commit/59e57b2d6b844f5ea7bc5fd2d999fc3e11275684))
+* **web:** S7 — estimation workspace UI with dockerized web service ([20d3c04](https://github.com/Sangaibisi/estimo/commit/20d3c04cb24392821b1593d40b9f5137e8870e2e))
+
+
+### Fixed
+
+* **api,web:** S7 adversarial review — 14 confirmed findings closed ([260de1f](https://github.com/Sangaibisi/estimo/commit/260de1f380dbb4be69710fa3dbdb8e1f1898f8ec))
+* **api:** S10 adversarial review — 10 confirmed findings closed ([267badf](https://github.com/Sangaibisi/estimo/commit/267badf1d415dbb7aa7cc7b92ae51d769abdfece))
+* **api:** the estimate desk is a read; the reveal belongs to the recording ([a92ce91](https://github.com/Sangaibisi/estimo/commit/a92ce919a440849d9fa9fb9d56db39ca9b1e88ce))
+* **auth:** stop the ACL pre-filter taking its permissions from the caller ([c209c45](https://github.com/Sangaibisi/estimo/commit/c209c450b1c27a097980917e2c8f299a6a46f7a1))
+* bind signer identity to the token, harden migration DDL and the Helm chart ([7b65716](https://github.com/Sangaibisi/estimo/commit/7b65716614a8d279d91ed4e523ffe6fc1dc20236))
+* **calibrate,api,web:** S8 adversarial review — 11 confirmed findings closed ([d92bc51](https://github.com/Sangaibisi/estimo/commit/d92bc514d10452de441c95a83cb38eabda3aa5a7))
+* close the two regressions the S11 review found in my own batch ([9ec88cb](https://github.com/Sangaibisi/estimo/commit/9ec88cb3f8b7bb32495aebe6a156ffff39bb21f3))
+* **connectors:** escape LIKE prefixes so pruning cannot cross connections ([e711102](https://github.com/Sangaibisi/estimo/commit/e711102b2e8b7fb8563a6f9ae64597112872147a))
+* **connectors:** prune superseded Confluence page versions ([8954bb8](https://github.com/Sangaibisi/estimo/commit/8954bb879aff894f6c080bdff8a50f6cdee22249))
+* **connectors:** S9 adversarial review — 28 confirmed findings closed ([6139fac](https://github.com/Sangaibisi/estimo/commit/6139face0def5785e6a5a7118502a87fb3c98d13))
+* **connectors:** stop the normalizer eating code samples and table rows ([d5fb229](https://github.com/Sangaibisi/estimo/commit/d5fb2291f3ba4bed9edccb783a24561849a8f3c7))
+* **deps:** close the five open advisories on the default branch ([4c70b94](https://github.com/Sangaibisi/estimo/commit/4c70b940ae4082173dd8f8550e7d50f50a37175b))
+* **knowledge:** estimo-embed can now do what its docstring claimed ([e9292fa](https://github.com/Sangaibisi/estimo/commit/e9292faaa99b77508bed5f15e2dd35eeea9ba329))
+* **parse:** correct python-docx typing in regression tests ([33be813](https://github.com/Sangaibisi/estimo/commit/33be813b617ba746b1b8648f6c1c91eb783915de))
+* **pipeline:** flatten nested answer-clearing conditional (SIM102) ([c63588e](https://github.com/Sangaibisi/estimo/commit/c63588ee3130b3d266a0023f9c6243378c6bd6d5))
+* ruff-format the repo guard test ([d3e96cd](https://github.com/Sangaibisi/estimo/commit/d3e96cd50de6f283c00b735183650cb06a17e3fd))
+* **test:** move the type-ignore to the argument it covers ([47fd9fd](https://github.com/Sangaibisi/estimo/commit/47fd9fd53317779a4d4e10fcb857b5076e978f4f))
+* **test:** RLS suite silently ran as superuser when the DB password differed ([2f99208](https://github.com/Sangaibisi/estimo/commit/2f99208ce2147b200895986acc9f0a59e6044425))
+
 ## [Unreleased]
 
 ### Added

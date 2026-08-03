@@ -1,6 +1,6 @@
 [project]
 name = "estimo-parse"
-version = "0.1.0"
+version = "0.2.0"
 description = "BRD ingestion: structural parsing, requirement segmentation, anchor quarantine, ambiguity pre-score"
 requires-python = ">=3.13"
 license = "Apache-2.0"

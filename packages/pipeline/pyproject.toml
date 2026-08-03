@@ -1,6 +1,6 @@
 [project]
 name = "estimo-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Estimo pipeline: parse -> decompose -> ambiguity gate -> questions (LangGraph)"
 requires-python = ">=3.13"
 license = "Apache-2.0"

@@ -1,6 +1,6 @@
 [project]
 name = "estimo-estimate"
-version = "0.1.0"
+version = "0.2.0"
 description = "Estimo estimation: analog-grounded three-point bands, calibration, critic, BoE rendering"
 requires-python = ">=3.13"
 license = "Apache-2.0"

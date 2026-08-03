@@ -1,6 +1,6 @@
 [project]
 name = "estimo-gateway"
-version = "0.1.0"
+version = "0.2.0"
 description = "The ONLY Estimo module that talks to the LLM endpoint (OpenAI-compatible, LiteLLM at deployments)"
 requires-python = ">=3.13"
 license = "Apache-2.0"

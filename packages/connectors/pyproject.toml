@@ -1,6 +1,6 @@
 [project]
 name = "estimo-connectors"
-version = "0.1.0"
+version = "0.2.0"
 description = "Estimo live-knowledge connectors: Confluence, Bitbucket-first git hosting, Jira"
 requires-python = ">=3.13"
 license = "Apache-2.0"

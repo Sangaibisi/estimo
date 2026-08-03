@@ -5,8 +5,8 @@ description: >-
   (optionally) a bundled Postgres+pgvector. BYOC-friendly: point at an external
   managed Postgres and your own OIDC IdP + LiteLLM gateway.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: 0.2.0
 home: https://github.com/Sangaibisi/estimo
 sources:
   - https://github.com/Sangaibisi/estimo
