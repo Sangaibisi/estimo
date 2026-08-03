@@ -73,9 +73,7 @@ class TestProviderSdkGuard:
             violations.extend(
                 f"{path}: {sdk}" for sdk in hits if not (in_gateway and sdk == "openai")
             )
-        assert not violations, (
-            "provider SDK imports violating ADR-0001: " + ", ".join(violations)
-        )
+        assert not violations, "provider SDK imports violating ADR-0001: " + ", ".join(violations)
 
 
 class TestOpenCorePathGuard:
