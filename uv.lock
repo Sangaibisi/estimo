@@ -589,7 +589,7 @@ wheels = [
 
 [[package]]
 name = "estimo"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -624,7 +624,7 @@ dev = [
 
 [[package]]
 name = "estimo-api"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "alembic" },
@@ -675,7 +675,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-code"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/code" }
 dependencies = [
     { name = "estimo-core" },
@@ -698,7 +698,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-connectors"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/connectors" }
 dependencies = [
     { name = "estimo-core" },
@@ -721,7 +721,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-core"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "cryptography" },
@@ -736,7 +736,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-estimate"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/estimate" }
 dependencies = [
     { name = "estimo-code" },
@@ -765,7 +765,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-gateway"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/gateway" }
 dependencies = [
     { name = "httpx" },
@@ -784,7 +784,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-knowledge"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/knowledge" }
 dependencies = [
     { name = "asyncpg" },
@@ -809,7 +809,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-parse"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/parse" }
 dependencies = [
     { name = "docling-slim", extra = ["convert-core", "format-docx", "format-pdf-pypdfium2"] },
@@ -828,7 +828,7 @@ requires-dist = [
 
 [[package]]
 name = "estimo-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/pipeline" }
 dependencies = [
     { name = "estimo-core" },
