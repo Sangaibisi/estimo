@@ -659,3 +659,36 @@ async def test_no_draft_derived_field_reaches_a_closed_row(client: httpx.AsyncCl
     for other in rows:
         if other["work_item"]["id"] != item_id:
             assert other["confidence"] is None and other["discovery_pd"] is None
+
+
+async def test_source_pane_serves_the_body_and_the_state_read_does_not(
+    client: httpx.AsyncClient,
+) -> None:
+    """S12-2: the Reading Room needs the document; every other stage does not.
+
+    The body is up to 120k characters and `GET /v1/estimates/{id}` is hit on every
+    stage change, so the two must not travel together — and the block refs must match
+    the requirement refs, because that identity is the only thing linking a row to its
+    paragraph.
+    """
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    estimate_id = summary["id"]
+
+    detail = await client.get(f"/v1/estimates/{estimate_id}")
+    assert detail.json()["state"]["parsed"]["blocks"] == [], "the body rode along on a state read"
+
+    source = await client.get(f"/v1/estimates/{estimate_id}/source")
+    assert source.status_code == 200
+    body = source.json()
+    assert body["available"] is True and body["truncated"] is False
+    blocks = body["blocks"]
+    assert blocks, "the parser produced no document body"
+
+    # The join that makes row↔paragraph highlighting possible.
+    block_refs = {block["source_ref"] for block in blocks}
+    refs = [req["source_ref"] for req in detail.json()["state"]["requirements"]]
+    assert refs and all(ref in block_refs for ref in refs), "a requirement points at no block"
+
+    # Anchors are quarantined from the MODEL, not from the reader (PRINCIPLES #5), so
+    # the source pane carries them; this fixture plants a budget anchor.
+    assert any(block["anchors"] for block in blocks), "no anchor survived into the body"

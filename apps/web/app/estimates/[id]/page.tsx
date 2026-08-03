@@ -8,7 +8,7 @@
  * reveal), status is shape+colour, every quantity is a range (never one number), and
  * exactly one primary action per region. */
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   api,
@@ -16,10 +16,11 @@ import {
   parseEffort,
   type ActualEntry,
   type DeskItem,
+  type DocBlock,
   type EstimateSummary,
   type HeldRequirement,
 } from "@/lib/api";
-import { detectLocale, t, type Locale } from "@/lib/i18n";
+import { detectLocale, issueSentence, t, type Locale } from "@/lib/i18n";
 import {
   BandHeader,
   Chip,
@@ -44,6 +45,7 @@ interface Question {
 interface Requirement {
   id: string;
   text: string;
+  source_ref?: string | null;
   ambiguity_score?: number | null;
   ambiguity_issues?: string[];
   anchors?: { type: string; snippet: string }[];
@@ -99,6 +101,10 @@ export default function EstimateWorkspace({
   const [estimator, setEstimator] = useState("");
   const [deskItems, setDeskItems] = useState<DeskItem[]>([]);
   const [held, setHeld] = useState<HeldRequirement[]>([]);
+  const [sourceBlocks, setSourceBlocks] = useState<DocBlock[]>([]);
+  const [sourceAvailable, setSourceAvailable] = useState(true);
+  const [sourceTruncated, setSourceTruncated] = useState(false);
+  const [sourceError, setSourceError] = useState(false);
   const [coneStage, setConeStage] = useState<string | null>(null);
   const [critic, setCritic] = useState<string[]>([]);
   const [fullySigned, setFullySigned] = useState(false);
@@ -129,6 +135,25 @@ export default function EstimateWorkspace({
     setHeld(desk.held);
     setConeStage(desk.cone_stage);
   }, [id, estimator]);
+
+  // The document body is fetched only when the Reading Room is actually open — it is
+  // the largest payload the API serves and every other stage ignores it.
+  useEffect(() => {
+    if (stage !== "reading" || sourceBlocks.length > 0) return;
+    api
+      .source(id)
+      .then((body) => {
+        setSourceBlocks(body.blocks);
+        setSourceAvailable(body.available);
+        setSourceTruncated(body.truncated);
+      })
+      .catch(() => {
+        // A fetch failure is not the same as "this BRD predates the source pane";
+        // telling the reader to re-upload a perfectly good document is bad advice.
+        setSourceAvailable(false);
+        setSourceError(true);
+      });
+  }, [stage, id, sourceBlocks.length]);
 
   useEffect(() => {
     if (stage === "boe" && fullySigned) {
@@ -290,115 +315,17 @@ export default function EstimateWorkspace({
 
         {/* ---------- 2 · Reading Room ---------- */}
         {stage === "reading" && (
-          <table className="dt">
-            <thead>
-              <tr>
-                <th style={{ width: 92 }}>{t(locale, "idHeader")}</th>
-                <th>{t(locale, "textHeader")}</th>
-                <th style={{ width: 210 }}>{t(locale, "ambiguity")}</th>
-                <th style={{ width: 250 }}>{t(locale, "anchorsShort")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.requirements.map((requirement) => {
-                const issues = requirement.ambiguity_issues ?? [];
-                const isBlocked = blocked.has(requirement.id);
-                return (
-                  <tr key={requirement.id}>
-                    <td>
-                      <Mn
-                        style={{
-                          color: isBlocked ? "var(--crit)" : "var(--ink2)",
-                        }}
-                      >
-                        {requirement.id}
-                      </Mn>
-                    </td>
-                    <td style={{ color: "var(--ink2)" }}>{requirement.text}</td>
-                    <td>
-                      {issues.length === 0 ? (
-                        <StatusChip status="ok">
-                          {t(locale, "clear")}
-                        </StatusChip>
-                      ) : (
-                        <div
-                          style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
-                        >
-                          {issues.slice(0, 2).map((issue) => (
-                            <StatusChip
-                              key={issue}
-                              status={isBlocked ? "crit" : "warn"}
-                            >
-                              {issue.split(":")[0]}
-                            </StatusChip>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {(requirement.anchors ?? []).length > 0 ? (
-                        // AnchorWarning: the design's quarantine pill — the SNIPPET
-                        // itself behind a dashed crit border, so the human sees
-                        // exactly what the model will not. No emoji (identity rule).
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 4,
-                          }}
-                        >
-                          {(requirement.anchors ?? []).map((anchor, index) => (
-                            <span
-                              key={index}
-                              title={t(locale, "anchorTooltip")}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                border: "1px dashed var(--crit)",
-                                background: "var(--crit-bg)",
-                                borderRadius: 4,
-                                padding: "2px 7px",
-                                fontSize: 11.5,
-                                color: "var(--ink2)",
-                                maxWidth: 230,
-                              }}
-                            >
-                              <span
-                                aria-hidden
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  flex: "none",
-                                  background: "var(--crit)",
-                                }}
-                              />
-                              <span
-                                style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {anchor.snippet}
-                              </span>
-                              <Mn
-                                style={{ color: "var(--crit)", flex: "none" }}
-                              >
-                                {t(locale, "quarantined")}
-                              </Mn>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <Mn style={{ color: "var(--mut)" }}>—</Mn>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <ReadingRoom
+            locale={locale}
+            requirements={state.requirements}
+            blockedIds={blocked}
+            blocks={sourceBlocks}
+            sourceAvailable={sourceAvailable}
+            sourceTruncated={sourceTruncated}
+            sourceError={sourceError}
+            openQuestionCount={openQuestions.length}
+            onGoToQuestions={() => setStage("questions")}
+          />
         )}
 
         {/* ---------- 3 · Question Board ---------- */}
@@ -1046,6 +973,418 @@ function ImpactMap({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- 2 · Reading Room ---------------- */
+
+/** The document beside its structured form. Selecting a row scrolls to and highlights
+ * the paragraph it came from; the two panes address each other through `source_ref`,
+ * the same string the parser stamps on both. */
+function ReadingRoom({
+  locale,
+  requirements,
+  blockedIds,
+  blocks,
+  sourceAvailable,
+  sourceTruncated,
+  sourceError,
+  openQuestionCount,
+  onGoToQuestions,
+}: {
+  locale: Locale;
+  requirements: Requirement[];
+  blockedIds: Set<string>;
+  blocks: DocBlock[];
+  sourceAvailable: boolean;
+  sourceTruncated: boolean;
+  sourceError: boolean;
+  openQuestionCount: number;
+  onGoToQuestions: () => void;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const selectedRef =
+    requirements.find((requirement) => requirement.id === selected)?.source_ref ?? null;
+
+  const paneRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedRef) return;
+    const pane = paneRef.current;
+    const target = document.getElementById(`src-${cssId(selectedRef)}`);
+    if (!pane || !target) return;
+    // The pane's OWN scrollTop, computed from the two rects — not scrollIntoView.
+    // Two reasons, both observed rather than assumed: `behavior: "smooth"` did
+    // nothing at all in one browser context (the row highlighted, the document never
+    // moved, and the visible half of the feature made it look like it worked), and
+    // scrollIntoView walks ancestors, so it can scroll the PAGE when the pane cannot
+    // take it. This moves one element and only that element.
+    const delta =
+      target.getBoundingClientRect().top -
+      pane.getBoundingClientRect().top -
+      pane.clientHeight / 2 +
+      target.clientHeight / 2;
+    pane.scrollTo({ top: pane.scrollTop + delta });
+    // `blocks.length` is a dependency on purpose: a row clicked while /source was
+    // still in flight would otherwise target an element that did not exist yet and
+    // never try again.
+  }, [selectedRef, blocks.length]);
+
+  const missingSource =
+    selectedRef !== null && blocks.length > 0 && !blocks.some((b) => b.source_ref === selectedRef);
+
+  // Ambiguity heat, by the same rule the rows are coloured with: blocked is critical,
+  // any remaining issue is partial, nothing is clear.
+  const heat = (requirement: Requirement): "ok" | "warn" | "crit" =>
+    blockedIds.has(requirement.id)
+      ? "crit"
+      : (requirement.ambiguity_issues ?? []).length > 0
+        ? "warn"
+        : "ok";
+  const counts = requirements.reduce(
+    (acc, requirement) => ({ ...acc, [heat(requirement)]: acc[heat(requirement)] + 1 }),
+    { ok: 0, warn: 0, crit: 0 },
+  );
+
+  return (
+    <div style={{ display: "flex", height: 560 }}>
+      {/* Source pane */}
+      <div
+        style={{
+          width: "47%",
+          minWidth: 0,
+          borderRight: "1px solid var(--line)",
+          background: "var(--surf2)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px 14px",
+            borderBottom: "1px solid var(--line)",
+          }}
+        >
+          <Lbl>
+            {t(locale, "sourcePane")} · {blocks.length}
+          </Lbl>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {missingSource && (
+              <StatusChip status="warn">{t(locale, "sourceRowMissing")}</StatusChip>
+            )}
+            {sourceTruncated && (
+              <StatusChip status="warn">{t(locale, "sourceTruncated")}</StatusChip>
+            )}
+          </div>
+        </div>
+        <div
+          ref={paneRef}
+          style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "18px 22px" }}
+        >
+          {!sourceAvailable || blocks.length === 0 ? (
+            <div className="ph" style={{ padding: "26px 20px", textWrap: "pretty" }}>
+              {sourceError ? t(locale, "sourceFailed") : t(locale, "sourceUnavailable")}
+            </div>
+          ) : (
+            <div
+              className="doc"
+              style={{
+                background: "var(--surf)",
+                border: "1px solid var(--line)",
+                borderRadius: "var(--r)",
+                padding: "24px 28px",
+                fontSize: 13.5,
+                lineHeight: 1.65,
+                color: "var(--ink2)",
+              }}
+            >
+              {blocks.map((block) => (
+                <SourceBlock
+                  key={block.index}
+                  locale={locale}
+                  block={block}
+                  highlighted={block.source_ref === selectedRef}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Requirements pane */}
+      <div style={{ width: "53%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 14px",
+            borderBottom: "1px solid var(--line)",
+          }}
+        >
+          <Lbl>
+            {t(locale, "requirementsCount").replace("{n}", String(requirements.length))}
+          </Lbl>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <StatusChip status="ok">
+              {t(locale, "ambClear")} {counts.ok}
+            </StatusChip>
+            <StatusChip status="warn">
+              {t(locale, "ambPartial")} {counts.warn}
+            </StatusChip>
+            <StatusChip status="crit">
+              {t(locale, "ambAmbiguous")} {counts.crit}
+            </StatusChip>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th style={{ width: 4, padding: 0 }} />
+                <th style={{ width: 88 }}>{t(locale, "idHeader")}</th>
+                <th>{t(locale, "textHeader")}</th>
+                <th style={{ width: 116 }}>{t(locale, "sourceWord")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requirements.map((requirement) => {
+                const status = heat(requirement);
+                const isSelected = selected === requirement.id;
+                return (
+                  <tr
+                    key={requirement.id}
+                    onClick={() => setSelected(isSelected ? null : requirement.id)}
+                    style={{
+                      cursor: "pointer",
+                      background: isSelected ? "var(--acc-bg)" : undefined,
+                      boxShadow: isSelected ? "inset 0 0 0 1px var(--acc-line)" : undefined,
+                    }}
+                  >
+                    <td
+                      style={{
+                        padding: 0,
+                        background:
+                          status === "ok"
+                            ? "var(--ok)"
+                            : status === "warn"
+                              ? "var(--warn)"
+                              : "var(--crit)",
+                      }}
+                    />
+                    <td>
+                      <Mn style={{ color: status === "crit" ? "var(--crit)" : "var(--ink2)" }}>
+                        {requirement.id}
+                      </Mn>
+                    </td>
+                    <td>
+                      <div style={{ color: "var(--ink2)", textWrap: "pretty" }}>
+                        {requirement.text}
+                      </div>
+                      {/* The WHOLE reason sentence, not the issue slug before the colon:
+                          "partial" tells the reader nothing they can act on. */}
+                      {(requirement.ambiguity_issues ?? []).map((issue) => (
+                        <div
+                          key={issue}
+                          style={{
+                            display: "flex",
+                            gap: 7,
+                            alignItems: "flex-start",
+                            marginTop: 6,
+                            fontSize: 12,
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 8,
+                              height: 8,
+                              marginTop: 4,
+                              flex: "none",
+                              background: status === "crit" ? "var(--crit)" : "var(--warn)",
+                              transform: status === "crit" ? undefined : "rotate(45deg)",
+                            }}
+                          />
+                          <span style={{ color: "var(--ink2)", textWrap: "pretty" }}>
+                            {issueSentence(locale, issue)}
+                          </span>
+                        </div>
+                      ))}
+                      {(requirement.anchors ?? []).map((anchor, index) => (
+                        <AnchorPill key={index} locale={locale} snippet={anchor.snippet} />
+                      ))}
+                    </td>
+                    <td>
+                      <Mn style={{ color: "var(--mut)" }}>
+                        {shortRef(requirement.source_ref)}
+                      </Mn>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 14,
+            padding: "11px 14px",
+            borderTop: "1px solid var(--line)",
+            background: "var(--surf2)",
+          }}
+        >
+          <span style={{ fontSize: 12.5, color: "var(--mut)", textWrap: "pretty" }}>
+            {t(locale, "selectRowHint")}
+          </span>
+          {openQuestionCount > 0 && (
+            <button type="button" className="btn p" onClick={onGoToQuestions}>
+              {t(locale, "sendToBoard").replace("{n}", String(openQuestionCount))}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A source_ref is free-form text ("block#12 @ 3 > 3.2"); this makes it usable as a
+ * DOM id without inventing a parallel identifier on the server. */
+function cssId(sourceRef: string): string {
+  return sourceRef.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+/** "block#12 @ 3.2 Kapsam" reads as machinery; the reader wants the heading. */
+function shortRef(sourceRef: string | null | undefined): string {
+  if (!sourceRef) return "—";
+  const trail = sourceRef.split(" @ ")[1];
+  if (trail && trail !== "(root)") return trail.split(" > ").slice(-1)[0].slice(0, 28);
+  // No heading trail: show the position, not "block#12 @ (root)". The ref is
+  // internal addressing and reads as a leak of the implementation.
+  const block = sourceRef.match(/block#(\d+)/);
+  return block ? `¶${block[1]}` : "—";
+}
+
+function AnchorPill({ locale, snippet }: { locale: Locale; snippet: string }) {
+  return (
+    <span
+      title={t(locale, "anchorTooltip")}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        border: "1px dashed var(--crit)",
+        background: "var(--crit-bg)",
+        borderRadius: 4,
+        padding: "2px 7px",
+        marginTop: 6,
+        marginRight: 6,
+        fontFamily: "var(--font-sans)",
+        fontSize: 11.5,
+        color: "var(--ink2)",
+      }}
+    >
+      <span aria-hidden style={{ width: 8, height: 8, flex: "none", background: "var(--crit)" }} />
+      {snippet}
+      <Mn style={{ color: "var(--crit)" }}>{t(locale, "quarantined")}</Mn>
+    </span>
+  );
+}
+
+function SourceBlock({
+  locale,
+  block,
+  highlighted,
+}: {
+  locale: Locale;
+  block: DocBlock;
+  highlighted: boolean;
+}) {
+  const mark = highlighted
+    ? {
+        background: "var(--acc-bg)",
+        boxShadow: "inset 3px 0 0 var(--acc)",
+        padding: "7px 10px",
+        borderRadius: "0 4px 4px 0",
+        color: "var(--ink)",
+      }
+    : {};
+  const id = `src-${cssId(block.source_ref)}`;
+
+  if (block.kind === "table") {
+    return (
+      <div id={id} style={{ margin: "10px 0", ...mark }}>
+        <table
+          className="dt"
+          style={{ fontFamily: "var(--font-sans)", fontSize: 12, tableLayout: "fixed" }}
+        >
+          <tbody>
+            {block.rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={cellIndex}
+                    style={{
+                      fontWeight: rowIndex === 0 ? 500 : undefined,
+                      color: rowIndex === 0 ? "var(--ink)" : "var(--ink2)",
+                      textWrap: "pretty",
+                    }}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <BlockAnchors locale={locale} block={block} />
+      </div>
+    );
+  }
+  if (block.kind === "title" || block.kind === "heading") {
+    return (
+      <div
+        id={id}
+        style={{
+          fontSize: block.kind === "title" ? 16 : 15,
+          fontWeight: 600,
+          color: "var(--ink)",
+          margin: "14px 0 8px",
+          ...mark,
+        }}
+      >
+        {block.text}
+        <BlockAnchors locale={locale} block={block} />
+      </div>
+    );
+  }
+  return (
+    <div id={id} style={{ margin: "0 0 10px", ...mark }}>
+      {block.kind === "list_item" ? `• ${block.text}` : block.text}
+      {block.text_truncated && <Mn style={{ color: "var(--mut)" }}> […]</Mn>}
+      <BlockAnchors locale={locale} block={block} />
+    </div>
+  );
+}
+
+function BlockAnchors({ locale, block }: { locale: Locale; block: DocBlock }) {
+  if (block.anchors.length === 0) return null;
+  return (
+    <div>
+      {block.anchors.map((anchor, index) => (
+        <div key={index}>
+          <AnchorPill locale={locale} snippet={anchor.snippet} />
+        </div>
+      ))}
     </div>
   );
 }

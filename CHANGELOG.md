@@ -9,6 +9,34 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-2 — the Reading Room shows the document again.** The BRD body now survives
+  the parse (`ParsedBrd.blocks`, capped at 120k characters with `body_truncated`
+  saying so) and is served by a dedicated `GET /v1/estimates/{id}/source`, so the
+  Reading Room can put the source beside its structured form the way the design
+  draws it: the document in serif on the left, requirements with an ambiguity heat
+  stripe on the right, and **selecting a row scrolls to and highlights the paragraph
+  it came from** — the two panes address each other through `source_ref`, the same
+  string the parser already stamped on both. Quarantined anchors are rendered in
+  place inside the document, not only in the table. Gate findings read as sentences
+  ("No acceptance criteria — there is no stated condition for calling this done.")
+  instead of raw slugs; the slug stays the contract and an unknown one falls back to
+  itself rather than vanishing. The body is fetched only when the Reading Room is
+  open and stripped from `GET /v1/estimates/{id}` — and from `_summary`, which was
+  otherwise validating a whole document per row on the estimates list.
+
+  Two properties of the body are guarded by tests because the first cut got both
+  wrong: the budget is counted in **serialized bytes** (charging block text alone
+  under-counted by 3.6x on this repo's own fixture and by two orders of magnitude on
+  a document of many short paragraphs, so a 12 KB `.docx` could have persisted an
+  18 MB row), and **a block a requirement points at is never dropped** (extraction
+  reads the whole document while the body was cut at a prefix, and a BRD keeps its
+  requirements at the END — so truncation orphaned exactly the rows the screen
+  exists for, and clicking one did nothing at all). A single oversized block is
+  clipped rather than ending the document. The pane's scroll is computed against the
+  container instead of `scrollIntoView`, after `behavior: "smooth"` was observed to
+  move nothing while the highlight still appeared — the visible half of the feature
+  made the broken half look fine.
+
 - **S12-1 — the Estimate Desk matches its design.** The desk now carries the
   design's full column set in its order: REQ ids linking a line back to the BRD,
   the mapping **Confidence** grade, a `+ discovery N pd` chip wherever weak

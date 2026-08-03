@@ -22,7 +22,7 @@ from estimo_core import AnchorFlag, Requirement
 from estimo_parse import ambiguity
 from estimo_parse.anchors import detect_anchors
 from estimo_parse.docx import Block, load_blocks
-from estimo_parse.models import ParsedBrd
+from estimo_parse.models import MAX_BLOCK_CHARS, MAX_BODY_BYTES, DocBlock, ParsedBrd
 
 _CODE_RE = re.compile(r"^\s*([A-ZÇĞİÖŞÜ]{1,5}-\d{1,4})\s*[:.\-–]\s*(.+)$", re.DOTALL)
 # Compared against the UPPERCASE capture directly (no IGNORECASE: the İ/i casefold trap).
@@ -215,6 +215,7 @@ def parse_brd(path: Path) -> ParsedBrd:
                 if point not in open_points:
                     open_points.append(point)
 
+    body, truncated = _document_body(blocks, requirements)
     return ParsedBrd(
         brd_ref=brd_ref,
         title=title,
@@ -225,4 +226,88 @@ def parse_brd(path: Path) -> ParsedBrd:
         open_points=tuple(open_points),
         headings=tuple(b.text for b in blocks if b.kind == "heading"),
         table_count=sum(1 for b in blocks if b.kind == "table"),
+        blocks=body,
+        body_truncated=truncated,
+    )
+
+
+def _document_body(
+    blocks: list[Block], requirements: list[Requirement]
+) -> tuple[tuple[DocBlock, ...], bool]:
+    """The source document, kept for the Reading Room, within a byte budget.
+
+    Blocks carry the SAME `source_ref` a requirement does, which is what lets a row
+    highlight its paragraph without inventing a second addressing scheme. Anchors are
+    attached per block so the source pane can quarantine them in place — the design
+    draws the snippet inside a crit pill exactly where it appears in the BRD.
+
+    Two properties the first cut got wrong and this one guarantees:
+
+    - **The budget is in serialized bytes**, because that is what the JSONB column
+      stores. Charging block text alone under-counted by 3.6x on this repo's own
+      fixture and by two orders of magnitude on a document of many short paragraphs.
+    - **A block a requirement points at is never dropped.** Extraction reads the whole
+      document while the body was cut at a prefix, so on any BRD past the budget the
+      rows most worth reading — a requirements section conventionally sits at the END
+      — pointed at blocks that were never persisted, and clicking them did nothing at
+      all: no scroll, no highlight, no message. Referenced blocks are therefore kept
+      regardless of the budget, and the rest fills the space that is left.
+    """
+    referenced = {req.source_ref for req in requirements if req.source_ref}
+    kept: list[DocBlock] = []
+    spent = 0
+    truncated = False
+
+    for block in blocks:
+        candidate = _doc_block(block)
+        cost = len(candidate.model_dump_json().encode())
+        must_keep = candidate.source_ref in referenced
+        if spent + cost > MAX_BODY_BYTES and not must_keep:
+            # Skip and keep walking: a single oversized table must not end the
+            # document, and later blocks may still be referenced.
+            truncated = True
+            continue
+        spent += cost
+        kept.append(candidate)
+
+    return tuple(kept), truncated
+
+
+def _doc_block(block: Block) -> DocBlock:
+    text = block.text
+    text_truncated = len(text) > MAX_BLOCK_CHARS
+    if text_truncated:
+        text = text[:MAX_BLOCK_CHARS]
+    rows = block.rows
+    if block.kind == "table":
+        # Clip the table the same way, cell by cell, so one huge matrix cannot
+        # dominate the budget while still showing its shape.
+        budget = MAX_BLOCK_CHARS
+        clipped: list[tuple[str, ...]] = []
+        for row in rows:
+            if budget <= 0:
+                text_truncated = True
+                break
+            cells = tuple(cell[:400] for cell in row)
+            budget -= sum(len(cell) for cell in cells)
+            clipped.append(cells)
+        rows = tuple(clipped)
+
+    texts = [cell for row in rows for cell in row] if block.kind == "table" else [text]
+    anchors: list[AnchorFlag] = []
+    for candidate in texts:
+        for anchor in detect_anchors(candidate):
+            if not any(a.snippet == anchor.snippet for a in anchors):
+                anchors.append(anchor)
+
+    return DocBlock(
+        index=block.index,
+        kind=block.kind,
+        text=text,
+        level=block.level,
+        heading_trail=block.heading_trail,
+        source_ref=_source_ref(block),
+        rows=rows,
+        text_truncated=text_truncated,
+        anchors=tuple(anchors),
     )

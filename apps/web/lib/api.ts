@@ -133,6 +133,13 @@ export const api = {
       `/v1/estimates/${id}/estimate`,
       { method: "POST" },
     ),
+  source: (id: string) =>
+    request<{
+      blocks: DocBlock[];
+      truncated: boolean;
+      available: boolean;
+      meta: Record<string, string>;
+    }>(`/v1/estimates/${id}/source`),
   desk: (id: string, estimator: string) =>
     request<{
       items: DeskItem[];
@@ -391,4 +398,20 @@ export interface LedgerEntry {
   deviation: number | null;
   origin: "product" | "imported";
   completed_at: string | null;
+}
+
+/** One rendered unit of the source BRD (Reading Room's left pane). `source_ref`
+ * matches the value a Requirement carries, which is how a row and its paragraph
+ * find each other. */
+export interface DocBlock {
+  index: number;
+  kind: "title" | "heading" | "paragraph" | "list_item" | "table";
+  text: string;
+  level: number;
+  heading_trail: string[];
+  source_ref: string;
+  rows: string[][];
+  /** This block's own text was clipped by the parser's per-block cap. */
+  text_truncated: boolean;
+  anchors: { type: string; snippet: string }[];
 }

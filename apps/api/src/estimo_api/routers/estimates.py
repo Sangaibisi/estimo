@@ -79,8 +79,22 @@ class EstimateSummary(BaseModel):
     has_boe: bool
 
 
+def _state_without_body(state: dict[str, Any]) -> dict[str, Any]:
+    """The pipeline state minus the persisted document body.
+
+    The body exists for one screen and is served by /source. Leaving it in means
+    every state read ships it — and, worse, VALIDATES it: `_summary` runs
+    `PipelineState.model_validate` per row, so a 50-estimate list page was parsing
+    fifty document bodies to count six integers.
+    """
+    parsed = state.get("parsed")
+    if isinstance(parsed, dict) and parsed.get("blocks"):
+        return {**state, "parsed": {**parsed, "blocks": []}}
+    return state
+
+
 def _summary(record: EstimateRecord) -> EstimateSummary:
-    state = PipelineState.model_validate(record.state)
+    state = PipelineState.model_validate(_state_without_body(record.state))
     answered = set(state.answers)
     return EstimateSummary(
         id=record.id,
@@ -187,12 +201,37 @@ async def get_estimate(estimate_id: uuid.UUID, session: SessionDep) -> dict[str,
     fully_signed = await _fully_signed(session, record)
     return {
         "summary": _summary(record).model_dump(mode="json"),
-        "state": record.state,
+        # The body is served by /source; this endpoint is hit on every stage change.
+        "state": _state_without_body(record.state),
         # Independent-first: the draft body (every line's band) leaves the desk's
         # per-estimator gate only after the whole draft is signed off.
         "boe": record.boe if fully_signed else None,
         "critic": record.critic or [],
         "fully_signed": fully_signed,
+    }
+
+
+@router.get("/{estimate_id}/source")
+async def estimate_source(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
+    """The BRD body, for the Reading Room's source pane.
+
+    Blocks carry the same `source_ref` requirements do, so the two panes can point at
+    each other. Anchors travel with their block: this is a HUMAN surface, and
+    PRINCIPLES #5 quarantines anchors from the model, not from the reader.
+
+    Estimates parsed before the body was persisted return an empty list; the pane says
+    so rather than rendering a blank document as if the BRD had no content.
+    """
+    record = await _get_record(session, estimate_id)
+    state = PipelineState.model_validate(record.state)
+    parsed = state.parsed
+    if parsed is None:
+        return {"blocks": [], "truncated": False, "available": False, "meta": {}}
+    return {
+        "blocks": [block.model_dump(mode="json") for block in parsed.blocks],
+        "truncated": parsed.body_truncated,
+        "available": bool(parsed.blocks),
+        "meta": parsed.meta,
     }
 
 

@@ -275,6 +275,20 @@ const dict = {
     coneApproved: "Approved scope",
     coneDetailed: "Detailed",
     coneNarrows: "Narrows once the open questions are answered.",
+    sourcePane: "Source",
+    sourceUnavailable:
+      "This BRD was parsed before the source pane existed — re-upload it to read the document here.",
+    sourceTruncated: "long document — some passages are not shown",
+    sourceFailed: "The source could not be loaded — try again.",
+    sourceRowMissing: "this row's passage is not in the shown extract",
+    requirementsCount: "Requirements · {n} extracted",
+    ambClear: "clear",
+    ambPartial: "partial",
+    ambAmbiguous: "ambiguous",
+    selectRowHint: "Select a row to highlight its paragraph — and back again.",
+    markClear: "Mark as clear",
+    sendToBoard: "Send {n} to Question Board",
+    tableBlock: "Table",
     reqHeader: "REQ",
     statusHeader: "Status",
     statusDraft: "draft",
@@ -592,6 +606,20 @@ const dict = {
     coneApproved: "Onaylı kapsam",
     coneDetailed: "Detaylı",
     coneNarrows: "Açık sorular yanıtlandığında daralır.",
+    sourcePane: "Kaynak",
+    sourceUnavailable:
+      "Bu BRD, kaynak paneli eklenmeden önce ayrıştırılmış — belgeyi burada okumak için yeniden yükleyin.",
+    sourceTruncated: "uzun belge — bazı bölümler gösterilmiyor",
+    sourceFailed: "Kaynak yüklenemedi — tekrar deneyin.",
+    sourceRowMissing: "bu satırın paragrafı gösterilen özette yok",
+    requirementsCount: "Gereksinimler · {n} çıkarıldı",
+    ambClear: "net",
+    ambPartial: "kısmi",
+    ambAmbiguous: "muğlak",
+    selectRowHint: "Paragrafını vurgulamak için bir satır seçin — ve geri.",
+    markClear: "Net olarak işaretle",
+    sendToBoard: "{n} soruyu panoya gönder",
+    tableBlock: "Tablo",
     reqHeader: "GRK",
     statusHeader: "Durum",
     statusDraft: "taslak",
@@ -649,6 +677,55 @@ const statusLabels: Record<Locale, Record<string, string>> = {
 
 export function statusLabel(locale: Locale, status: string): string {
   return statusLabels[locale][status] ?? status;
+}
+
+/** Ambiguity issue slugs → the reason sentence the design shows.
+ *
+ * The gate emits stable slugs (`missing-acceptance-criteria`, `vague-terms:x,y`);
+ * "partial" or a bare slug tells a reader nothing they can act on, and the design's
+ * Reading Room states the finding as a sentence. The mapping lives here because the
+ * slug is the contract and the prose is presentation — a new slug simply falls back
+ * to itself rather than disappearing.
+ */
+const issueSentences: Record<Locale, Record<string, string>> = {
+  en: {
+    "missing-acceptance-criteria":
+      "No acceptance criteria — there is no stated condition for calling this done.",
+    "implicit-acceptance-only":
+      "Acceptance is implied, never written down; the criterion has to be confirmed.",
+    "undefined-condition-outcome":
+      "A condition is stated but its outcome is not — the expected behaviour is missing.",
+    "vague-terms": "Vague wording that admits more than one reading.",
+    "unstructured-source":
+      "Extracted from prose rather than a numbered requirement, so the boundary is uncertain.",
+    "llm-gate-divergence":
+      "The rule gate and the model gate disagreed on this row — a human should settle it.",
+    "llm-output-unparseable":
+      "The model's gate answer could not be read; the rule score stands alone.",
+  },
+  tr: {
+    "missing-acceptance-criteria":
+      "Kabul kriteri yok — bunun tamamlandığını söyleyecek bir koşul yazılmamış.",
+    "implicit-acceptance-only":
+      "Kabul yalnızca ima edilmiş, yazılmamış; kriterin teyidi gerekiyor.",
+    "undefined-condition-outcome":
+      "Koşul yazılmış ama sonucu yazılmamış — beklenen davranış eksik.",
+    "vague-terms": "Birden fazla okumaya açık muğlak ifade.",
+    "unstructured-source":
+      "Numaralı bir gereksinimden değil düz metinden çıkarıldı; sınırı belirsiz.",
+    "llm-gate-divergence":
+      "Kural kapısı ile model kapısı bu satırda ayrıştı — insan karar vermeli.",
+    "llm-output-unparseable":
+      "Modelin kapı yanıtı okunamadı; yalnız kural skoru geçerli.",
+  },
+};
+
+/** A gate issue as a sentence. `vague-terms:uygulanabilir,farklı` keeps its detail. */
+export function issueSentence(locale: Locale, issue: string): string {
+  const [slug, detail] = issue.split(/:(.+)/);
+  const sentence = issueSentences[locale][slug];
+  if (!sentence) return issue;
+  return detail ? `${sentence} (${detail.split(",").join(", ")})` : sentence;
 }
 
 export type MessageKey = keyof (typeof dict)["en"];

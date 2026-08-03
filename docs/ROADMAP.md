@@ -468,9 +468,11 @@ Open, grouped (feasibility from the audit):
   holds the blocked ones side by side in the same table. Closing this means letting
   a draft be built over a partially-blocked BRD, which changes what "estimate of
   record" means; it is a pipeline decision, not a rendering one.
-- [ ] **S12-2 Reading Room (large):** the two-pane split view (serif source document
-  with inline highlights ↔ requirements), full ambiguity reason sentences, summary
-  chips, provenance column, re-read / mark-as-clear / send-to-board stage controls.
+- [ ] **S12-2 Reading Room (medium, remainder):** a "Re-read" control (re-run
+  extraction — no re-parse endpoint exists) and "Mark as clear" (a human override of
+  the gate, which needs an endpoint and a decision about whether an override is
+  auditable). The design also draws page-level source refs ("p4 §3.2 ¶1"); ours are
+  block+heading because the parser does not carry page numbers.
 - [ ] **S12-3 Question Board (medium):** Sent + Answered lanes (4-lane flow) with
   dispatch recording, per-question apply-to-line, compiled letter (heading + intro +
   closing) with matching copy text and .docx export, manual question creation.
