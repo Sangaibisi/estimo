@@ -165,28 +165,38 @@ produced end to end from a fixture BRD; the eval report includes the naive basel
 
 ---
 
-## S7 — Review UI & Independent-First Flow · `Status: 🟡 In progress`
+## S7 — Review UI & Independent-First Flow · `Status: 🟢 Done (2026-08-03)`
+
+> Exit gate verified 2026-08-03: full UI round trip on the `BRD-AUR-26-01` fixture —
+> upload → planted ambiguity surfaced as a question → answer applied (quality-gated) →
+> BoE build → independent band recorded → AI band revealed with delta + evidence chips →
+> line signed → Turkish `.docx` export. Post-review hardening: independent-first is
+> enforced across the whole API surface — the draft body and export unlock only at
+> full sign-off, and drafts are versioned so rebuilds never inherit reveals or
+> signatures. Residuals carried forward: anonymized Delphi aggregation view and
+> Langfuse event sink land with the S8 dashboards; document-level approval remains
+> line-level sign-off for now; estimator identity is self-declared until S10 authN/Z.
 
 **Goal:** The human layer: review, correct and sign the draft — without getting anchored.
 
 **Architecture slice:** `apps/web` (Next.js; `en` default locale, `tr` first localization; design system from the [UI-VISION.md](UI-VISION.md) output).
 
-- [ ] S7-1 Design system integration (token + component library from the Claude Design output)
-- [ ] S7-2 Workspace + BRD upload + pipeline status timeline
-- [ ] S7-3 Requirement/question board: item list, ambiguity highlights, question cards (copyable customer question-set output)
-- [ ] S7-4 **Independent-first Estimate Desk**: AI column hidden → enter your own estimate → reveal → delta display; anonymous multi-estimator (Delphi) mode
-- [ ] S7-5 Evidence chips: code/wiki/analogy references with hover/focus previews
-- [ ] S7-6 Line sign-off + document approval flow; BoE preview/`.docx` export
-- [ ] S7-7 Edit telemetry: per-section correction distance + anchoring delta capture (events to Langfuse)
-- [ ] S7-8 i18n foundation (`en` default locale, `tr` first localization)
-- [ ] S7-9 Web app containerization: multi-stage Dockerfile + compose service + `ghcr.io/sangaibisi/estimo-web` publish (ADR-0006)
+- [x] S7-1 Design system integration (token + component library from the Claude Design output)
+- [x] S7-2 Workspace + BRD upload + pipeline status timeline
+- [x] S7-3 Requirement/question board: item list, ambiguity highlights, question cards (copyable customer question-set output)
+- [x] S7-4 **Independent-first Estimate Desk**: AI column hidden → enter your own estimate → reveal → delta display; anonymous multi-estimator (Delphi) mode
+- [x] S7-5 Evidence chips: code/wiki/analogy references with hover/focus previews
+- [x] S7-6 Line sign-off + document approval flow; BoE preview/`.docx` export
+- [x] S7-7 Edit telemetry: per-section correction distance + anchoring delta capture (events to Langfuse)
+- [x] S7-8 i18n foundation (`en` default locale, `tr` first localization)
+- [x] S7-9 Web app containerization: multi-stage Dockerfile + compose service + `ghcr.io/sangaibisi/estimo-web` publish (ADR-0006)
 
 **Exit gate:** A full round trip of a BRD (upload → questions → answers → draft →
 independent-first review → sign-off → export) completes through the UI.
 
 ---
 
-## S8 — Calibration Loop & Dashboards · `Status: 🔵 Planned`
+## S8 — Calibration Loop & Dashboards · `Status: 🟡 In progress`
 
 **Goal:** Turn the product into a learning system: actuals flow in, intervals and analogy
 selection update, honesty dashboards open to everyone.

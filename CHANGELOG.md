@@ -9,6 +9,30 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S7 review UI** (`apps/web` + `apps/api` workflow endpoints): Next.js estimation
+  workspace — BRD upload, requirement/question board with quality-gated answers, the
+  **independent-first Estimate Desk** (the server keeps the AI band locked until the
+  estimator records their own three-point band; reveal shows the delta and evidence
+  chips; per-line sign-off), and Turkish BoE `.docx` export. `en` default locale with
+  `tr` as the first localization; design tokens from the S0 design-system output.
+- **S7 web containerization**: multi-stage `apps/web/Dockerfile` (standalone Next
+  output, non-root, healthcheck), compose `web` service, and CI publish of
+  `ghcr.io/sangaibisi/estimo-web` (multi-arch, SBOM + provenance). The browser-visible
+  API origin is injected at **runtime** from `ESTIMO_API_URL` — never baked into the
+  image at build time.
+
+### Security
+- **S7 review hardening** (adversarial review; 14 confirmed findings fixed):
+  independent-first now holds across the WHOLE API surface — `GET /{id}`, the build
+  response and the `.docx` export withhold the draft body until every line is signed,
+  and signing itself requires the signer's own revealed band. BoE drafts are
+  **versioned** (migration `0005`): reveals, sign-offs and anchoring telemetry are
+  bound to the draft they were recorded against, so a rebuild never inherits them,
+  and rebuilding over a live draft is refused. Also: upload size limit enforced while
+  streaming; `Content-Disposition` uses an ASCII slug + RFC 5987 `filename*` (no
+  header injection, no non-latin-1 500s); server-reserved telemetry kinds are not
+  forgeable; empty answers no longer close questions; `.dockerignore` patterns fixed
+  so nested env files and Node artifacts stay out of build contexts.
 - **S6 estimation** (`packages/estimate`): analog-grounded three-point bands with
   conformal-style calibration on the ledger's **analog-transfer** error (leave-one-out
   actual/analog-median quantiles — measured on the seed set: 80% interval coverage at
