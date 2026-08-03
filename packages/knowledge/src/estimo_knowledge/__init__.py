@@ -3,6 +3,7 @@
 from estimo_knowledge.analogy import AnalogyCard, find_analogs
 from estimo_knowledge.db import Base, KnowledgeChunk, LedgerEntryRow
 from estimo_knowledge.importer import ImportReport, import_seed, to_ledger_entry
+from estimo_knowledge.ingest import upsert_generated_chunks
 from estimo_knowledge.search import (
     hybrid_ledger_ids,
     lexical_chunk_ids,
@@ -23,4 +24,5 @@ __all__ = [
     "lexical_ledger_ids",
     "rrf_merge",
     "to_ledger_entry",
+    "upsert_generated_chunks",
 ]

@@ -19,6 +19,7 @@ estimo-api = { workspace = true }
 estimo-parse = { workspace = true }
 estimo-knowledge = { workspace = true }
 estimo-pipeline = { workspace = true }
+estimo-code = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -61,12 +62,13 @@ mypy_path = [
     "packages/parse/src",
     "packages/knowledge/src",
     "packages/pipeline/src",
+    "packages/code/src",
     "apps/api/tests",
 ]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["pgvector.*", "asgi_lifespan.*"]
+module = ["pgvector.*", "asgi_lifespan.*", "tree_sitter_java.*", "tree_sitter_typescript.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

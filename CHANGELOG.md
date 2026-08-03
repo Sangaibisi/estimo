@@ -9,6 +9,15 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S5 code shelf** (`packages/code`): tree-sitter symbol graph for Java/TypeScript
+  (indexer-agnostic store — SCIP loader slots in at the first real build chain), ranked
+  token-budgeted repo map, deterministic module wikis (purpose/interfaces/dependencies,
+  optional gateway refinement) ingested into the knowledge shelf at authority 0.7, and
+  the impact worker with a confidence ladder (symbol match HIGH → import neighborhood
+  MEDIUM → keyword-only LOW with an explicit discovery-effort suggestion). Turkish→
+  identifier synonym bridge (taksit→installment …); every impact claim carries a
+  validated `repo://…#L–L` evidence URI. Synthetic meridyen-mini fixture repo with
+  known change scenarios asserted in CI.
 - **S4 pipeline** (`packages/pipeline`): LangGraph state machine parse → ambiguity gate →
   clarification questions → decomposition, with an offline deterministic floor at every
   node (a down or misbehaving gateway degrades quality, never correctness). The gate

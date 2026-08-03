@@ -1,0 +1,18 @@
+[project]
+name = "estimo-code"
+version = "0.1.0"
+description = "Estimo code shelf: tree-sitter symbol graph, repo map, module wikis, impact analysis"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = [
+    "estimo-core",
+    "estimo-gateway",
+    "tree-sitter>=0.26,<0.27",
+    "tree-sitter-java>=0.23,<0.24",
+    "tree-sitter-typescript>=0.23,<0.24",
+    "pydantic>=2.13.4,<3",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

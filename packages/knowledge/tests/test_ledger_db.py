@@ -139,3 +139,19 @@ async def test_dense_leg_respects_dimension(seeded: AsyncSession) -> None:
     assert near == [target.id]
     other_dim = await dense_ledger_ids(seeded, [0.9, 0.1], limit=3)
     assert other_dim == []
+
+
+async def test_code_wiki_chunks_upsert_replaces(session: AsyncSession, clean_tables: None) -> None:
+    from estimo_knowledge import lexical_chunk_ids, upsert_generated_chunks
+
+    pages = [
+        (
+            "repo://meridyen-mini@fixture/billing-core",
+            "Module: billing-core",
+            "Taksit planı yaşam döngüsü ve fatura kalemi yazımı.",
+        )
+    ]
+    assert await upsert_generated_chunks(session, pages) == 1
+    assert await upsert_generated_chunks(session, pages) == 1  # re-ingest replaces
+    hits = await lexical_chunk_ids(session, "taksit planı", acl_keys=["public"])
+    assert len(hits) == 1

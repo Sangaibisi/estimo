@@ -121,4 +121,5 @@ class KnowledgeChunk(Base):
     __table_args__ = (
         Index("ix_knowledge_chunks_search_tsv", "search_tsv", postgresql_using="gin"),
         Index("ix_knowledge_chunks_acl_keys", "acl_keys", postgresql_using="gin"),
+        Index("uq_knowledge_chunks_source", "source_type", "source_ref", unique=True),
     )

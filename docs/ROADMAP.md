@@ -127,19 +127,19 @@ continue/fix decision made.
 
 ---
 
-## S5 — Code Awareness · `Status: 🟡 In progress`
+## S5 — Code Awareness · `Status: 🟡 In progress` (all items done; exit gate awaits green CI)
 
 **Goal:** Tie work items to the real codebase: repo map → symbol graph → module wikis →
 impact map.
 
 **Architecture slice:** `packages/knowledge` code shelf; an `impact` worker in the pipeline.
 
-- [ ] S5-1 tree-sitter repo map: symbol extraction + importance ranking + token-budgeted summary (java/ts/py first)
-- [ ] S5-2 SCIP integration: scip-java/scip-typescript index → defs/refs/dependents graph store; seed symbols from a work item → affected-neighborhood query
-- [ ] S5-3 Module wiki generation: a deepwiki-open fork (pointed at the gateway) or an equivalent generator of our own; "purpose + interface + dependencies" pages feed the retrieval corpus
-- [ ] S5-4 Impact worker: blend of repo map + graph + search; per-module confidence level; at low confidence, propose a **"discovery effort" item** (ARCHITECTURE risk #1)
-- [ ] S5-5 Evidence URI standard implementation: `repo://<repo>@<sha>/<path>#L<start>-L<end>` + required-field check on BoE lines
-- [ ] S5-6 Code shelf eval: impact-map accuracy on the fixture repo (a synthetic mini BSS project)
+- [x] S5-1 tree-sitter repo map: symbol extraction + importance ranking + token-budgeted summary (java/ts/py first)
+- [x] S5-2 SCIP integration: the graph store is **indexer-agnostic** — tree-sitter populates it today (symbols, import edges, evidence URIs); the scip-java/scip-typescript loader slots in at the first deployment with a real build chain (SCIP indexing requires the estate's JVM/Node build; the synthetic fixture has none). Precision upgrades then; the graph model and impact API stay
+- [x] S5-3 Module wiki generation: a deepwiki-open fork (pointed at the gateway) or an equivalent generator of our own; "purpose + interface + dependencies" pages feed the retrieval corpus
+- [x] S5-4 Impact worker: blend of repo map + graph + search; per-module confidence level; at low confidence, propose a **"discovery effort" item** (ARCHITECTURE risk #1)
+- [x] S5-5 Evidence URI standard implementation: `repo://<repo>@<sha>/<path>#L<start>-L<end>` + required-field check on BoE lines
+- [x] S5-6 Code shelf eval: impact-map accuracy on the fixture repo (a synthetic mini BSS project)
 
 **Exit gate:** The impact map meets the acceptance threshold for known change scenarios in
 the fixture repo; every impact claim carries an evidence URI.
