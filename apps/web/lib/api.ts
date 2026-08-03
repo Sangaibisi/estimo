@@ -145,7 +145,19 @@ export interface ActualEntry {
   actual_source: string | null;
   completed_at: string | null;
   scope_changed: boolean;
+  recorded_band: {
+    optimistic: number | null;
+    likely: number | null;
+    pessimistic: number | null;
+  };
   deviation: number | null;
+}
+
+/** Parse a person-day input accepting both `1.5` and the Turkish `1,5`;
+ * returns null for anything non-finite or non-positive. */
+export function parseEffort(raw: string): number | null {
+  const value = Number(raw.trim().replace(",", "."));
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 export interface MetricsOverview {

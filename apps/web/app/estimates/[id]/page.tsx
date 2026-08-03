@@ -4,7 +4,13 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type ActualEntry, type DeskItem, type EstimateSummary } from "@/lib/api";
+import {
+  api,
+  parseEffort,
+  type ActualEntry,
+  type DeskItem,
+  type EstimateSummary,
+} from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { RangeBar } from "@/components/RangeBar";
 import { EvidenceChip } from "@/components/EvidenceChip";
@@ -380,6 +386,9 @@ function ActualRow({
   const [effort, setEffort] = useState("");
   const [source, setSource] = useState("timesheet");
   const [scopeChanged, setScopeChanged] = useState(false);
+  const [revising, setRevising] = useState(false);
+  const parsedEffort = parseEffort(effort);
+  const showForm = !existing || revising;
 
   return (
     <div style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
@@ -387,7 +396,7 @@ function ActualRow({
       <span className="muted">
         {line.range.optimistic} / {line.range.likely} / {line.range.pessimistic} pd
       </span>
-      {existing ? (
+      {existing && !revising ? (
         <p style={{ margin: "6px 0 0" }}>
           {existing.actual_effort} pd{" "}
           <span className="chip">{existing.actual_source}</span>{" "}
@@ -399,10 +408,25 @@ function ActualRow({
           {existing.deviation !== null && !existing.scope_changed && (
             <span className="muted" style={{ marginLeft: 8 }}>
               ×{existing.deviation} {t(locale, "deviationLabel")}
+              {existing.recorded_band.likely !== null &&
+                existing.recorded_band.likely !== line.range.likely && (
+                  // The actual was recorded against an earlier draft's band —
+                  // show that band so the deviation reads honestly.
+                  <>
+                    {" "}
+                    (vs {existing.recorded_band.optimistic} /{" "}
+                    {existing.recorded_band.likely} / {existing.recorded_band.pessimistic}{" "}
+                    pd)
+                  </>
+                )}
             </span>
           )}
+          <button style={{ marginLeft: 8 }} disabled={busy} onClick={() => setRevising(true)}>
+            {t(locale, "revise")}
+          </button>
         </p>
-      ) : (
+      ) : null}
+      {showForm && (
         <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
           <input
             style={{ width: 90 }}
@@ -428,14 +452,16 @@ function ActualRow({
             {t(locale, "scopeChanged")}
           </label>
           <button
-            disabled={busy || !effort || Number(effort) <= 0}
-            onClick={() =>
+            disabled={busy || parsedEffort === null}
+            onClick={() => {
+              if (parsedEffort === null) return;
+              setRevising(false);
               onSave({
-                actual_effort: Number(effort),
+                actual_effort: parsedEffort,
                 actual_source: source,
                 scope_changed: scopeChanged,
-              })
-            }
+              });
+            }}
           >
             {t(locale, "save")}
           </button>
@@ -464,6 +490,14 @@ function DeskRow({
   const [o, setO] = useState("");
   const [l, setL] = useState("");
   const [p, setP] = useState("");
+  // Like parseEffort but 0 is a legal optimistic bound.
+  const parseBand = (raw: string): number | null => {
+    const value = Number(raw.trim().replace(",", "."));
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  };
+  const band = { o: parseBand(o), l: parseBand(l), p: parseBand(p) };
+  const bandValid =
+    band.o !== null && band.l !== null && band.p !== null && band.o <= band.l && band.l <= band.p;
 
   return (
     <div style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
@@ -486,14 +520,15 @@ function DeskRow({
               <input style={{ width: 56 }} placeholder="L" value={l} onChange={(e) => setL(e.target.value)} />
               <input style={{ width: 56 }} placeholder="P" value={p} onChange={(e) => setP(e.target.value)} />
               <button
-                disabled={busy || !o || !l || !p}
-                onClick={() =>
+                disabled={busy || !bandValid}
+                onClick={() => {
+                  if (!bandValid) return;
                   onRecord({
-                    optimistic: Number(o),
-                    likely: Number(l),
-                    pessimistic: Number(p),
-                  })
-                }
+                    optimistic: band.o as number,
+                    likely: band.l as number,
+                    pessimistic: band.p as number,
+                  });
+                }}
               >
                 {t(locale, "record")}
               </button>

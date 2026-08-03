@@ -115,9 +115,7 @@ class TestLoop:
         assert all(float(f.weight) == -1.0 for f in feedback)  # ln(30/8) clamps to -1
         assert all(f.reason == "band-missed-actual" for f in feedback)
 
-    async def test_scope_changed_stores_but_skips_feedback_and_snapshot(
-        self, seeded: AsyncSession
-    ) -> None:
+    async def test_scope_changed_stores_but_skips_feedback(self, seeded: AsyncSession) -> None:
         estimate_id = uuid.uuid4()
         analog_ids = await self._analog_ids(seeded)
         item = _item("WI-REQ-T-02")
@@ -139,9 +137,78 @@ class TestLoop:
         )
         assert stored is not None and stored.scope_changed is True
         assert list((await seeded.execute(select(AnalogFeedback))).scalars()) == []
-        assert list((await seeded.execute(select(CalibrationSnapshot))).scalars()) == []
-        # Scope-changed rows are excluded from the coverage window too.
+        # The snapshot still fires — the series must register exclusions too —
+        # but the excluded row contributes nothing to the coverage window.
+        snapshots = list((await seeded.execute(select(CalibrationSnapshot))).scalars())
+        assert len(snapshots) == 1
         assert await rolling_coverage(seeded) is None
+
+    async def test_scope_changed_revision_withdraws_feedback(self, seeded: AsyncSession) -> None:
+        """The designed honesty path: an actual first recorded normally, then
+        corrected to scope_changed, must stop influencing analog ranking."""
+        estimate_id = uuid.uuid4()
+        analog_ids = await self._analog_ids(seeded)
+        item = _item("WI-REQ-T-03")
+        line = _line(item.id, analog_ids)
+        await record_actual(
+            seeded,
+            estimate_id=estimate_id,
+            brd_ref="AUR-BRD-2026-079",
+            brd_title="Önce normal",
+            item=item,
+            line=line,
+            actual_effort=9,
+            actual_source="timesheet",
+        )
+        assert len(list((await seeded.execute(select(AnalogFeedback))).scalars())) == len(
+            analog_ids
+        )
+
+        await record_actual(
+            seeded,
+            estimate_id=estimate_id,
+            brd_ref="AUR-BRD-2026-079",
+            brd_title="Önce normal",
+            item=item,
+            line=line,
+            actual_effort=40,
+            actual_source="timesheet",
+            scope_changed=True,
+        )
+        seeded.expire_all()
+        assert list((await seeded.execute(select(AnalogFeedback))).scalars()) == []
+
+    async def test_rebuilt_line_with_new_analogs_drops_stale_feedback(
+        self, seeded: AsyncSession
+    ) -> None:
+        estimate_id = uuid.uuid4()
+        analog_ids = await self._analog_ids(seeded, count=4)
+        item = _item("WI-REQ-T-04")
+        await record_actual(
+            seeded,
+            estimate_id=estimate_id,
+            brd_ref="AUR-BRD-2026-080",
+            brd_title="Rebuild",
+            item=item,
+            line=_line(item.id, analog_ids[:2]),
+            actual_effort=9,
+            actual_source="timesheet",
+        )
+        # Re-record against a rebuilt line citing DIFFERENT analogs: the old
+        # analogs' weights must not outlive their evidence.
+        await record_actual(
+            seeded,
+            estimate_id=estimate_id,
+            brd_ref="AUR-BRD-2026-080",
+            brd_title="Rebuild",
+            item=item,
+            line=_line(item.id, analog_ids[2:]),
+            actual_effort=9,
+            actual_source="timesheet",
+        )
+        seeded.expire_all()
+        feedback = list((await seeded.execute(select(AnalogFeedback))).scalars())
+        assert {f.entry_id for f in feedback} == set(analog_ids[2:])
 
 
 def test_feedback_weight_shape() -> None:

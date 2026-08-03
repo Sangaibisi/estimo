@@ -25,7 +25,7 @@ import math
 import uuid
 
 from estimo_knowledge.db import AnalogFeedback, CalibrationSnapshot, LedgerEntryRow
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,10 +67,13 @@ async def record_actual(
     scope_changed: bool = False,
     estimated_at: dt.date | None = None,
 ) -> LedgerEntryRow:
-    """Upsert the ledger row for this line, then apply feedback + snapshot.
+    """Upsert the ledger row for this line, then re-derive feedback + snapshot.
 
-    Idempotent per (estimate, work item): re-recording revises the actual and the
-    feedback weights instead of stacking duplicates.
+    Idempotent per (estimate, work item): re-recording revises the actual and
+    REPLACES the feedback derived from the previous recording — including
+    withdrawing it entirely when the revision flips to scope_changed (an excluded
+    actual must stop influencing ranking) or when a rebuilt line cites different
+    analogs (stale weights on dropped analogs would outlive their evidence).
     """
     ref = origin_ref(estimate_id, item.id)
     row = await session.scalar(select(LedgerEntryRow).where(LedgerEntryRow.origin_ref == ref))
@@ -95,9 +98,14 @@ async def record_actual(
     row.scope_changed = scope_changed
     await session.flush()
 
+    # Withdraw feedback from any previous recording of this line before
+    # (conditionally) re-deriving it — see the docstring.
+    await session.execute(delete(AnalogFeedback).where(AnalogFeedback.origin_ref == ref))
     if not scope_changed:
         await _apply_feedback(session, ref, actual_effort, line)
-        await snapshot_calibration(session, trigger="actual-recorded")
+    # Snapshot unconditionally: a revision that EXCLUDES a row moves the
+    # calibration state too, and the series must register it.
+    await snapshot_calibration(session, trigger="actual-recorded")
     return row
 
 

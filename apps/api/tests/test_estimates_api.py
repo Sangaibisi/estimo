@@ -355,6 +355,39 @@ async def test_actuals_require_fully_signed_estimate(client: httpx.AsyncClient) 
     assert response.status_code == 409  # actuals attach to the signed estimate of record
 
 
+def test_telemetry_forwards_metadata_only() -> None:
+    """The privacy boundary is enforced at the forwarder, not assumed of callers:
+    free text (BRD/prompt bodies) must never leave the process."""
+    from estimo_api.telemetry import sanitize_metadata
+
+    clean = sanitize_metadata(
+        {
+            "work_item_id": "WI-G-01",
+            "actual_source": "timesheet",
+            "delta_likely": -2.1,
+            "scope_changed": True,
+            "text": "Müşteri, çağrı merkezi üzerinden konsolide fatura talebinde bulunabilmelidir.",
+            "estimator": "D. Aksoy",
+            "nested": {"anything": 1},
+        }
+    )
+    assert clean == {
+        "work_item_id": "WI-G-01",
+        "actual_source": "timesheet",
+        "delta_likely": -2.1,
+        "scope_changed": True,
+    }
+
+
+async def test_event_payload_size_capped(client: httpx.AsyncClient) -> None:
+    summary = await _upload(client, "BRD-AUR-26-04-bakiye-tasima.docx")
+    oversized = await client.post(
+        f"/v1/estimates/{summary['id']}/events",
+        json={"kind": "section-edit", "payload": {"blob": "x" * 5000}},
+    )
+    assert oversized.status_code == 422
+
+
 def test_telemetry_is_noop_without_config(monkeypatch: pytest.MonkeyPatch) -> None:
     from estimo_api import telemetry
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import json
 import re
 import tempfile
 import uuid
@@ -28,7 +29,7 @@ from estimo_knowledge import LedgerEntryRow
 from estimo_pipeline import PipelineState, resume_with_answers, run_brd
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -436,6 +437,13 @@ class EventIn(BaseModel):
     kind: str = Field(min_length=1, max_length=60)
     payload: dict[str, Any] | None = None
 
+    @field_validator("payload")
+    @classmethod
+    def _payload_bounded(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None and len(json.dumps(value)) > 4096:
+            raise ValueError("event payload exceeds 4 KB")
+        return value
+
 
 @router.post("/{estimate_id}/events", status_code=status.HTTP_201_CREATED)
 async def record_event(
@@ -479,18 +487,25 @@ async def record_actual_for_line(
         raise HTTPException(status_code=404, detail="estimate line not found")
     state = PipelineState.model_validate(record.state)
     item = next(item for item in state.work_items if item.id == payload.work_item_id)
-    await record_actual(
-        session,
-        estimate_id=estimate_id,
-        brd_ref=record.brd_ref,
-        brd_title=record.title,
-        item=item,
-        line=line,
-        actual_effort=payload.actual_effort,
-        actual_source=payload.actual_source,
-        completed_at=payload.completed_at,
-        scope_changed=payload.scope_changed,
-    )
+    try:
+        await record_actual(
+            session,
+            estimate_id=estimate_id,
+            brd_ref=record.brd_ref,
+            brd_title=record.title,
+            item=item,
+            line=line,
+            actual_effort=payload.actual_effort,
+            actual_source=payload.actual_source,
+            completed_at=payload.completed_at,
+            scope_changed=payload.scope_changed,
+        )
+    except IntegrityError as exc:
+        # Concurrent duplicate lost the check-then-insert race on origin_ref.
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="actual is being recorded concurrently; retry"
+        ) from exc
     deviation = round(payload.actual_effort / line.range.likely, 2) if line.range.likely else None
     session.add(
         UiEvent(
@@ -529,6 +544,13 @@ async def list_actuals(estimate_id: uuid.UUID, session: SessionDep) -> list[dict
                 "actual_source": row.actual_source,
                 "completed_at": row.completed_at.isoformat() if row.completed_at else None,
                 "scope_changed": row.scope_changed,
+                # The band the actual was recorded AGAINST — after a rebuild the
+                # current draft's band may differ; mixing the two fakes the deviation.
+                "recorded_band": {
+                    "optimistic": float(row.est_optimistic) if row.est_optimistic else None,
+                    "likely": likely,
+                    "pessimistic": float(row.est_pessimistic) if row.est_pessimistic else None,
+                },
                 "deviation": (round(actual / likely, 2) if actual is not None and likely else None),
             }
         )

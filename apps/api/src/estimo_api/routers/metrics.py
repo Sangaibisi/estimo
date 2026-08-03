@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from estimo_estimate import rolling_coverage, transfer_distribution
 from estimo_knowledge import CalibrationSnapshot, LedgerEntryRow
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api.db import get_session
@@ -49,19 +49,24 @@ async def _calibration(session: AsyncSession) -> dict[str, Any]:
         }
         for snap in reversed(snapshots)
     ]
-    # Live state (no snapshot yet before the first actual).
-    distribution = await transfer_distribution(session)
-    return {
-        "current": {
+    # The loop snapshots on every actual, so the latest snapshot IS the current
+    # state — recomputing transfer_distribution live would run one hybrid search
+    # per completed ledger row on every dashboard load. Compute live only before
+    # the first snapshot exists.
+    if series:
+        latest = series[-1]
+        current = {key: latest[key] for key in ("samples", "prior_based", "q10", "q50", "q90")}
+    else:
+        distribution = await transfer_distribution(session)
+        current = {
             "samples": distribution.samples,
             "prior_based": distribution.prior_based,
             "q10": distribution.q10,
             "q50": distribution.q50,
             "q90": distribution.q90,
-            "rolling_coverage": await rolling_coverage(session),
-        },
-        "series": series,
-    }
+        }
+    current["rolling_coverage"] = await rolling_coverage(session)
+    return {"current": current, "series": series}
 
 
 async def _product_accuracy(session: AsyncSession) -> dict[str, Any]:
@@ -142,9 +147,14 @@ async def _anchoring(session: AsyncSession) -> dict[str, Any]:
 
 
 async def _workflow(session: AsyncSession) -> dict[str, Any]:
+    # Answers presence is testable in SQL — pulling every estimate's full
+    # pipeline-state JSONB just for that would grow linearly with history.
+    has_answers = func.coalesce(EstimateRecord.state["answers"], func.jsonb_build_object()) != (
+        func.jsonb_build_object()
+    )
     records = (
         await session.execute(
-            select(EstimateRecord.status, EstimateRecord.boe_version, EstimateRecord.state)
+            select(EstimateRecord.status, EstimateRecord.boe_version, has_answers)
         )
     ).all()
     total = len(records)
@@ -156,7 +166,7 @@ async def _workflow(session: AsyncSession) -> dict[str, Any]:
             "rebuild_share": None,
         }
     wip = sum(1 for status, _, _ in records if status != "boe_draft")
-    revised = sum(1 for _, _, state in records if (state or {}).get("answers"))
+    revised = sum(1 for _, _, answered in records if answered)
     rebuilt = sum(1 for _, version, _ in records if (version or 0) > 1)
     return {
         "estimates": total,
