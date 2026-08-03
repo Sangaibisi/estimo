@@ -11,6 +11,13 @@ Identity: with OIDC configured the estimator/signer is taken from the validated
 token (`_bound_identity`), so the anchoring telemetry and the signature trail cannot
 be forged by a client-supplied name. In single-tenant (auth-disabled) mode the caller
 names themselves, which is the historical behaviour.
+
+The reveal — and the anchoring delta it measures — is emitted by POST /independent,
+the act that earns it, NOT by GET /desk. The desk is a pure read. Emitting it from a
+read meant a link prefetch, a crawler retry, or anyone passing a colleague's name in
+the query string could flip that colleague's row (bands are immutable, so
+irreversibly) and write an anchoring sample for a reveal that never happened to a
+person who never saw it.
 """
 
 from __future__ import annotations
@@ -278,6 +285,15 @@ async def record_independent(
         # Immutable by design: revising the independent value after seeing the draft
         # would defeat the anchoring telemetry.
         raise HTTPException(status_code=409, detail="independent estimate already recorded")
+    # Recording IS the reveal. The anchoring measurement belongs to this moment — the
+    # estimator has irrevocably committed a number (bands are immutable), so the AI
+    # band unlocks for them here. It used to be emitted from GET /desk, which made a
+    # read mutate state: a link prefetch, a crawler, or anyone passing a colleague's
+    # name in the query string could flip that colleague's un-revealed row forever and
+    # fabricate the anchoring delta PRINCIPLES #4 exists to measure honestly.
+    boe = BoeDocument.model_validate(record.boe)
+    line = next((ln for ln in boe.lines if ln.work_item_id == payload.work_item_id), None)
+    delta_likely = round(float(payload.likely) - line.range.likely, 1) if line is not None else None
     session.add(
         IndependentEstimate(
             estimate_id=estimate_id,
@@ -287,6 +303,7 @@ async def record_independent(
             optimistic=payload.optimistic,
             likely=payload.likely,
             pessimistic=payload.pessimistic,
+            revealed=line is not None,
         )
     )
     session.add(
@@ -296,6 +313,19 @@ async def record_independent(
             payload={"work_item_id": payload.work_item_id, "estimator": estimator},
         )
     )
+    if delta_likely is not None:
+        session.add(
+            UiEvent(
+                estimate_id=estimate_id,
+                kind="draft-revealed",
+                payload={
+                    "work_item_id": payload.work_item_id,
+                    "estimator": estimator,
+                    "delta_likely": delta_likely,
+                    "boe_version": record.boe_version,
+                },
+            )
+        )
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -308,6 +338,8 @@ async def record_independent(
     telemetry.emit_event(
         "independent-recorded", str(estimate_id), {"work_item_id": payload.work_item_id}
     )
+    if delta_likely is not None:
+        telemetry.emit_score("anchoring-delta-likely", float(delta_likely), str(estimate_id))
     return {"status": "recorded"}
 
 
@@ -363,25 +395,9 @@ async def estimate_desk(
         if independent is not None and line is not None:
             entry["ai"] = line.model_dump(mode="json")
             entry["delta_likely"] = round(float(independent.likely) - line.range.likely, 1)
-            if not independent.revealed:
-                independent.revealed = True
-                session.add(
-                    UiEvent(
-                        estimate_id=estimate_id,
-                        kind="draft-revealed",
-                        payload={
-                            "work_item_id": item.id,
-                            "estimator": estimator,
-                            "delta_likely": entry["delta_likely"],
-                            "boe_version": record.boe_version,
-                        },
-                    )
-                )
-                telemetry.emit_score(
-                    "anchoring-delta-likely", float(entry["delta_likely"]), str(estimate_id)
-                )
         items.append(entry)
-    await session.commit()
+    # Deliberately no writes and no commit: this is a read. The reveal and its
+    # anchoring telemetry are emitted by POST /independent, the act that earns them.
     return {"items": items, "has_boe": boe is not None}
 
 

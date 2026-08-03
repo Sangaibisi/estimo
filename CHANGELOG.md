@@ -170,6 +170,17 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Security
+- **`GET /v1/estimates/{id}/desk` no longer mutates.** It flipped the caller's
+  `revealed` flag, wrote a `draft-revealed` event and emitted the anchoring delta —
+  from a read. A link prefetch, a crawler, or anyone passing a colleague's name in the
+  `estimator` query string could therefore consume that colleague's un-revealed state
+  permanently (bands are immutable) and write an anchoring sample for a reveal that
+  never happened to a person who never saw it, corrupting the very measurement
+  PRINCIPLES #4 exists to produce. The reveal now belongs to `POST /independent`, the
+  deliberate act that earns it: committing your own number is the moment anchoring
+  protection ends, and the number recorded is identical. Guarded by a regression test
+  verified in both directions — it fails if recording stops emitting, and it fails if
+  reading starts.
 - **The ACL pre-filter no longer takes its permissions from the requester.**
   `POST /v1/canonical` passed the request body's `acl_keys` straight into
   `lexical_chunk_ids`, so any reviewer could name a restricted audience, have its text

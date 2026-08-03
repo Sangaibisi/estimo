@@ -441,3 +441,40 @@ async def test_exported_docx_names_its_signers(client: httpx.AsyncClient) -> Non
         document = archive.read("word/document.xml").decode("utf-8")
     assert "M. Yılmaz" in document, "the signer is missing from the exported document"
     assert "Delivery Manager" in document
+
+
+async def test_desk_is_a_pure_read_and_the_reveal_belongs_to_the_recording(
+    client: httpx.AsyncClient,
+) -> None:
+    """A GET must not mutate. The anchoring measurement is emitted by the act that
+    earns it — POST /independent — not by whoever happens to fetch the desk, which a
+    link prefetch or a colleague's name in the query string could trigger."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    desk = (
+        await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "A. Kaya"})
+    ).json()
+    item_id = desk["items"][0]["work_item"]["id"]
+
+    async def anchoring_samples() -> int:
+        overview = (await client.get("/v1/metrics/overview")).json()
+        return int(overview["anchoring"]["samples"])
+
+    before = await anchoring_samples()
+    # Fetching the desk many times, including under someone else's name, records nothing.
+    for name in ("A. Kaya", "B. Demir", "A. Kaya"):
+        assert (
+            await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": name})
+        ).status_code == 200
+    assert await anchoring_samples() == before, "a read created anchoring telemetry"
+
+    assert (await _record_band(client, estimate_id, item_id, "A. Kaya")).status_code == 201
+    after = await anchoring_samples()
+    assert after == before + 1, "recording a band must emit exactly one anchoring sample"
+
+    # And it stays exactly one however often the desk is read afterwards.
+    for _ in range(3):
+        await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "A. Kaya"})
+    assert await anchoring_samples() == after
