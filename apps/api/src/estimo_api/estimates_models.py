@@ -8,7 +8,16 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +33,11 @@ class EstimateRecord(Base):
     status: Mapped[str] = mapped_column(String(40))
     state: Mapped[dict[str, Any]] = mapped_column(JSONB)
     boe: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # Bumped on every build. Independent bands and signatures are stamped with the
+    # version they were recorded against, so a rebuilt draft never inherits reveals
+    # or sign-offs from a dead draft.
+    boe_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    critic: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -39,11 +53,21 @@ class IndependentEstimate(Base):
     item only after this row exists for the requesting estimator."""
 
     __tablename__ = "independent_estimates"
+    __table_args__ = (
+        UniqueConstraint(
+            "estimate_id",
+            "work_item_id",
+            "estimator",
+            "boe_version",
+            name="uq_independent_estimates_item_estimator_version",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     estimate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("estimates.id", ondelete="CASCADE"))
     work_item_id: Mapped[str] = mapped_column(String(120))
     estimator: Mapped[str] = mapped_column(String(120))
+    boe_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     optimistic: Mapped[float] = mapped_column(Numeric(8, 2))
     likely: Mapped[float] = mapped_column(Numeric(8, 2))
     pessimistic: Mapped[float] = mapped_column(Numeric(8, 2))
@@ -59,6 +83,7 @@ class LineSignature(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     estimate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("estimates.id", ondelete="CASCADE"))
     work_item_id: Mapped[str] = mapped_column(String(120))
+    boe_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     name: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(80))
     signed_at: Mapped[dt.datetime] = mapped_column(

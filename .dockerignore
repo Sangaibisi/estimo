@@ -12,8 +12,8 @@ htmlcov
 dist
 build
 **/*.egg-info
-.env
-.env.*
+**/.env
+**/.env.*
 !.env.example
 *.local
 *.log
@@ -25,4 +25,8 @@ compose*.yaml
 Dockerfile*
 .dockerignore
 .pre-commit-config.yaml
-node_modules
+# Unlike .gitignore, bare patterns match ONLY at the context root — the ** prefix is
+# required to keep nested Node artifacts (apps/web/*) out of the API build context.
+**/node_modules
+**/.next
+**/tsconfig.tsbuildinfo

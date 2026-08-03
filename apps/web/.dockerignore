@@ -3,3 +3,6 @@ node_modules
 tsconfig.tsbuildinfo
 Dockerfile
 .dockerignore
+# A dev env file would bake NEXT_PUBLIC_* values into the client bundle, defeating
+# the runtime-injection guarantee.
+.env*

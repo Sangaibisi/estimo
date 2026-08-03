@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type EstimateSummary } from "@/lib/api";
-import { detectLocale, setLocale, t, type Locale } from "@/lib/i18n";
+import { detectLocale, setLocale, statusLabel, t, type Locale } from "@/lib/i18n";
 
 const STATUS_COLOR: Record<string, string> = {
   awaiting_answers: "var(--crit)",
@@ -28,16 +28,19 @@ export default function WorkspacePage() {
   }, []);
   useEffect(refresh, [refresh]);
 
-  async function onUpload(fileList: FileList | null) {
-    if (!fileList?.length) return;
+  async function onUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    if (!input.files?.length) return;
     setUploading(true);
     setError(null);
     try {
-      await api.upload(fileList[0]);
+      await api.upload(input.files[0]);
       refresh();
     } catch (err) {
       setError(String(err));
     } finally {
+      // Reset so re-selecting the same file after a failure fires change again.
+      input.value = "";
       setUploading(false);
     }
   }
@@ -76,12 +79,7 @@ export default function WorkspacePage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <label>
           <strong>{t(locale, "upload")}</strong>{" "}
-          <input
-            type="file"
-            accept=".docx"
-            disabled={uploading}
-            onChange={(event) => onUpload(event.target.files)}
-          />
+          <input type="file" accept=".docx" disabled={uploading} onChange={onUpload} />
         </label>
         {uploading && <span className="muted"> {t(locale, "uploading")}</span>}
         {error && (
@@ -120,7 +118,7 @@ export default function WorkspacePage() {
                     className="chip"
                     style={{ color: STATUS_COLOR[estimate.status] ?? "var(--mut)" }}
                   >
-                    {estimate.status}
+                    {statusLabel(locale, estimate.status)}
                   </span>
                 </td>
                 <td>{estimate.requirements}</td>

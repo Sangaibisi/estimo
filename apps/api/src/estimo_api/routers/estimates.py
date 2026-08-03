@@ -1,18 +1,25 @@
 """Estimate workflow endpoints (S7 backend).
 
-Independent-first is SERVER-enforced (PRINCIPLES #4): the desk endpoint returns an
-item's AI band only after the requesting estimator has recorded their own band for it —
-the client cannot leak the draft early even if buggy. Anchors stay visible here
-(humans see them); only model boundaries redact.
+Independent-first is SERVER-enforced (PRINCIPLES #4) across the whole surface, not
+just the desk: AI bands are reachable only via the desk (per-estimator, after their
+own band exists) until every line of the current draft is signed — GET, the build
+response and the .docx export all withhold band content before full sign-off, and a
+signature itself requires the signer's revealed independent band. Anchors stay
+visible here (humans see them); only model boundaries redact.
+
+Known residual (S10 authN/Z): estimator identity is a self-declared name — separating
+estimators from each other needs real authentication and lands with S10.
 """
 
 from __future__ import annotations
 
 import io
+import re
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from estimo_estimate import estimate_state, render_boe_docx, review_boe
 from estimo_pipeline import PipelineState, resume_with_answers, run_brd
@@ -20,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api.db import get_session
@@ -36,6 +44,10 @@ router = APIRouter(prefix="/v1/estimates", tags=["estimates"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+# Kinds the server writes with integrity semantics; clients may not forge them.
+RESERVED_EVENT_KINDS = frozenset({"independent-recorded", "draft-revealed"})
 
 
 class EstimateSummary(BaseModel):
@@ -73,13 +85,39 @@ async def _get_record(session: AsyncSession, estimate_id: uuid.UUID) -> Estimate
     return record
 
 
+async def _signed_item_ids(session: AsyncSession, record: EstimateRecord) -> set[str]:
+    """Work items signed against the CURRENT draft version only."""
+    rows = await session.execute(
+        select(LineSignature.work_item_id).where(
+            LineSignature.estimate_id == record.id,
+            LineSignature.boe_version == record.boe_version,
+        )
+    )
+    return set(rows.scalars())
+
+
+async def _fully_signed(session: AsyncSession, record: EstimateRecord) -> bool:
+    if record.boe is None:
+        return False
+    boe = BoeDocument.model_validate(record.boe)
+    line_ids = {line.work_item_id for line in boe.lines}
+    return bool(line_ids) and line_ids <= await _signed_item_ids(session, record)
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_estimate(file: UploadFile, session: SessionDep) -> EstimateSummary:
     if not (file.filename or "").lower().endswith(".docx"):
         raise HTTPException(status_code=422, detail="a .docx BRD is required")
-    payload = await file.read()
-    if len(payload) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="BRD exceeds the 20 MB limit")
+    # Enforce the size limit while streaming — an unsized read() would materialise a
+    # multi-GB body in memory before the 413 is ever raised.
+    chunks: list[bytes] = []
+    received = 0
+    while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+        received += len(chunk)
+        if received > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="BRD exceeds the 20 MB limit")
+        chunks.append(chunk)
+    payload = b"".join(chunks)
     with tempfile.TemporaryDirectory() as tmp:
         brd_path = Path(tmp) / (Path(file.filename or "brd.docx").name)
         brd_path.write_bytes(payload)
@@ -87,9 +125,13 @@ async def create_estimate(file: UploadFile, session: SessionDep) -> EstimateSumm
             state = await run_brd(brd_path, thread_id=f"api-{uuid.uuid4()}")
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+    brd_ref = state.parsed.brd_ref if state.parsed else brd_path.stem
+    title = state.parsed.title if state.parsed else brd_path.stem
     record = EstimateRecord(
-        brd_ref=state.parsed.brd_ref if state.parsed else brd_path.stem,
-        title=state.parsed.title if state.parsed else brd_path.stem,
+        # Document-controlled text; clip to the column widths instead of 500ing
+        # after the whole pipeline already ran.
+        brd_ref=brd_ref[:120],
+        title=title[:300],
         status=state.status,
         state=state.model_dump(mode="json"),
     )
@@ -112,10 +154,15 @@ async def list_estimates(
 @router.get("/{estimate_id}")
 async def get_estimate(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
     record = await _get_record(session, estimate_id)
+    fully_signed = await _fully_signed(session, record)
     return {
         "summary": _summary(record).model_dump(mode="json"),
         "state": record.state,
-        "boe": record.boe,
+        # Independent-first: the draft body (every line's band) leaves the desk's
+        # per-estimator gate only after the whole draft is signed off.
+        "boe": record.boe if fully_signed else None,
+        "critic": record.critic or [],
+        "fully_signed": fully_signed,
     }
 
 
@@ -127,15 +174,20 @@ class AnswersIn(BaseModel):
 async def apply_answers(
     estimate_id: uuid.UUID, payload: AnswersIn, session: SessionDep
 ) -> EstimateSummary:
+    # An empty answer is "no answer" — merging it would silently close the question.
+    answers = {key: value for key, value in payload.answers.items() if value.strip()}
+    if not answers:
+        raise HTTPException(status_code=422, detail="no non-empty answers submitted")
     record = await _get_record(session, estimate_id)
     state = PipelineState.model_validate(record.state)
     try:
-        state = await resume_with_answers(state, payload.answers)
+        state = await resume_with_answers(state, answers)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     record.state = state.model_dump(mode="json")
     record.status = state.status
     record.boe = None  # answers invalidate any previous draft
+    record.critic = None
     await session.commit()
     await session.refresh(record)
     return _summary(record)
@@ -144,6 +196,11 @@ async def apply_answers(
 @router.post("/{estimate_id}/estimate")
 async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
     record = await _get_record(session, estimate_id)
+    if record.boe is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="a draft already exists; apply answers to invalidate it before rebuilding",
+        )
     state = PipelineState.model_validate(record.state)
     try:
         boe = await estimate_state(session, state)
@@ -153,9 +210,13 @@ async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, An
     # Computed fields (total) serialize but are rejected on re-validation
     # (extra="forbid") — persist the storable projection only.
     record.boe = boe.model_dump(mode="json", exclude={"total"})
+    record.boe_version += 1
+    record.critic = findings
     record.status = "boe_draft"
     await session.commit()
-    return {"boe": record.boe, "critic": findings}
+    # No draft body here (independent-first): bands are reachable only through the
+    # per-estimator desk gate until full sign-off.
+    return {"status": "boe_draft", "version": record.boe_version, "critic": findings}
 
 
 class IndependentIn(BaseModel):
@@ -173,6 +234,9 @@ async def record_independent(
     if not payload.optimistic <= payload.likely <= payload.pessimistic:
         raise HTTPException(status_code=422, detail="band must be ordered o <= l <= p")
     record = await _get_record(session, estimate_id)
+    if record.boe is None:
+        # Bands are stamped with the draft version they compare against.
+        raise HTTPException(status_code=409, detail="build the BoE draft first")
     state = PipelineState.model_validate(record.state)
     if payload.work_item_id not in {item.id for item in state.work_items}:
         raise HTTPException(status_code=404, detail="work item not found")
@@ -181,6 +245,7 @@ async def record_independent(
             IndependentEstimate.estimate_id == estimate_id,
             IndependentEstimate.work_item_id == payload.work_item_id,
             IndependentEstimate.estimator == payload.estimator,
+            IndependentEstimate.boe_version == record.boe_version,
         )
     )
     if existing is not None:
@@ -192,6 +257,7 @@ async def record_independent(
             estimate_id=estimate_id,
             work_item_id=payload.work_item_id,
             estimator=payload.estimator,
+            boe_version=record.boe_version,
             optimistic=payload.optimistic,
             likely=payload.likely,
             pessimistic=payload.pessimistic,
@@ -204,7 +270,15 @@ async def record_independent(
             payload={"work_item_id": payload.work_item_id, "estimator": payload.estimator},
         )
     )
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # Concurrent duplicate lost the check-then-insert race; same contract as the
+        # sequential path.
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="independent estimate already recorded"
+        ) from exc
     return {"status": "recorded"}
 
 
@@ -215,7 +289,7 @@ async def estimate_desk(
     estimator: Annotated[str, Query(min_length=1)],
 ) -> dict[str, Any]:
     """Independent-first desk: AI bands appear per item ONLY after the estimator's own
-    band exists for that item (server-enforced, PRINCIPLES #4)."""
+    band exists for that item against the CURRENT draft (server-enforced, PRINCIPLES #4)."""
     record = await _get_record(session, estimate_id)
     state = PipelineState.model_validate(record.state)
     boe = BoeDocument.model_validate(record.boe) if record.boe else None
@@ -228,18 +302,12 @@ async def estimate_desk(
                 select(IndependentEstimate).where(
                     IndependentEstimate.estimate_id == estimate_id,
                     IndependentEstimate.estimator == estimator,
+                    IndependentEstimate.boe_version == record.boe_version,
                 )
             )
         ).scalars()
     }
-    signatures = {
-        row.work_item_id
-        for row in (
-            await session.execute(
-                select(LineSignature).where(LineSignature.estimate_id == estimate_id)
-            )
-        ).scalars()
-    }
+    signatures = await _signed_item_ids(session, record)
 
     items: list[dict[str, Any]] = []
     for item in state.work_items:
@@ -256,7 +324,7 @@ async def estimate_desk(
                 if independent
                 else None
             ),
-            "signed": item.id in signatures,
+            "signed": line is not None and item.id in signatures,
             "ai": None,
             "delta_likely": None,
         }
@@ -273,6 +341,7 @@ async def estimate_desk(
                             "work_item_id": item.id,
                             "estimator": estimator,
                             "delta_likely": entry["delta_likely"],
+                            "boe_version": record.boe_version,
                         },
                     )
                 )
@@ -295,10 +364,25 @@ async def sign_line(estimate_id: uuid.UUID, payload: SignIn, session: SessionDep
     boe = BoeDocument.model_validate(record.boe)
     if payload.work_item_id not in {line.work_item_id for line in boe.lines}:
         raise HTTPException(status_code=404, detail="estimate line not found")
+    # A signature asserts the signer reviewed the line, which requires having gone
+    # through independent-first for it on the current draft.
+    reviewed = await session.scalar(
+        select(IndependentEstimate).where(
+            IndependentEstimate.estimate_id == estimate_id,
+            IndependentEstimate.work_item_id == payload.work_item_id,
+            IndependentEstimate.estimator == payload.name,
+            IndependentEstimate.boe_version == record.boe_version,
+        )
+    )
+    if reviewed is None:
+        raise HTTPException(
+            status_code=409, detail="record your independent band for this line before signing"
+        )
     session.add(
         LineSignature(
             estimate_id=estimate_id,
             work_item_id=payload.work_item_id,
+            boe_version=record.boe_version,
             name=payload.name,
             role=payload.role,
         )
@@ -312,15 +396,29 @@ async def download_boe(estimate_id: uuid.UUID, session: SessionDep) -> Streaming
     record = await _get_record(session, estimate_id)
     if record.boe is None:
         raise HTTPException(status_code=404, detail="no BoE draft")
+    if not await _fully_signed(session, record):
+        raise HTTPException(
+            status_code=409,
+            detail="the export contains every band — sign all lines to unlock it",
+        )
     boe = BoeDocument.model_validate(record.boe)
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "boe.docx"
         render_boe_docx(boe, out)
         content = out.read_bytes()
+    # brd_ref is document-controlled: ASCII-slug the plain filename (a raw Turkish /
+    # quoted value would 500 or allow header injection) and carry the real name in
+    # the RFC 5987 filename* parameter, percent-encoded.
+    safe_ref = re.sub(r"[^A-Za-z0-9._-]+", "_", record.brd_ref).strip("._-")[:80] or "estimate"
+    utf8_ref = quote(f"{record.brd_ref}-boe.docx", safe="")
     return StreamingResponse(
         io.BytesIO(content),
         media_type=("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-        headers={"Content-Disposition": f'attachment; filename="{record.brd_ref}-boe.docx"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{safe_ref}-boe.docx\"; filename*=UTF-8''{utf8_ref}"
+            )
+        },
     )
 
 
@@ -333,6 +431,10 @@ class EventIn(BaseModel):
 async def record_event(
     estimate_id: uuid.UUID, payload: EventIn, session: SessionDep
 ) -> dict[str, str]:
+    if payload.kind in RESERVED_EVENT_KINDS:
+        raise HTTPException(
+            status_code=422, detail=f"'{payload.kind}' is a server-reserved event kind"
+        )
     await _get_record(session, estimate_id)
     session.add(UiEvent(estimate_id=estimate_id, kind=payload.kind, payload=payload.payload))
     await session.commit()

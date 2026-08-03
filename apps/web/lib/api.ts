@@ -13,10 +13,13 @@ declare global {
 }
 
 export function apiBase(): string {
-  if (typeof window !== "undefined" && window.__ESTIMO_API__) {
-    return window.__ESTIMO_API__;
-  }
-  return process.env.NEXT_PUBLIC_ESTIMO_API ?? "http://localhost:8000";
+  const base =
+    (typeof window !== "undefined" && window.__ESTIMO_API__) ||
+    process.env.NEXT_PUBLIC_ESTIMO_API ||
+    "http://localhost:8000";
+  // Paths always start with "/" — a trailing slash in the configured origin would
+  // produce "//v1/…" and 404 every call.
+  return base.replace(/\/+$/, "");
 }
 
 export interface EstimateSummary {
@@ -74,9 +77,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listEstimates: () => request<EstimateSummary[]>("/v1/estimates"),
   getEstimate: (id: string) =>
-    request<{ summary: EstimateSummary; state: Record<string, unknown>; boe: Record<string, unknown> | null }>(
-      `/v1/estimates/${id}`,
-    ),
+    request<{
+      summary: EstimateSummary;
+      state: Record<string, unknown>;
+      boe: Record<string, unknown> | null;
+      critic: string[];
+      fully_signed: boolean;
+    }>(`/v1/estimates/${id}`),
   upload: (file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -88,7 +95,7 @@ export const api = {
       body: JSON.stringify({ answers }),
     }),
   buildBoe: (id: string) =>
-    request<{ boe: Record<string, unknown>; critic: string[] }>(
+    request<{ status: string; version: number; critic: string[] }>(
       `/v1/estimates/${id}/estimate`,
       { method: "POST" },
     ),

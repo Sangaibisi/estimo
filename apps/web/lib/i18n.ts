@@ -39,6 +39,9 @@ const dict = {
     copyQuestions: "Copy customer question set",
     anchors: "Quarantined anchors (visible to humans, hidden from models)",
     ambiguity: "Ambiguity",
+    idHeader: "ID",
+    textHeader: "Text",
+    signAllFirst: "The export contains every band — sign all lines on the desk to unlock it.",
   },
   tr: {
     appTitle: "Estimo",
@@ -76,8 +79,28 @@ const dict = {
     copyQuestions: "Müşteri soru setini kopyala",
     anchors: "Karantinadaki çıpalar (insana görünür, modele kapalı)",
     ambiguity: "Muğlaklık",
+    idHeader: "ID",
+    textHeader: "Metin",
+    signAllFirst: "Dışa aktarım tüm bantları içerir — açmak için masadaki tüm satırları imzalayın.",
   },
 } as const;
+
+const statusLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    awaiting_answers: "Awaiting answers",
+    ready_for_estimation: "Ready for estimation",
+    boe_draft: "BoE draft",
+  },
+  tr: {
+    awaiting_answers: "Yanıt bekliyor",
+    ready_for_estimation: "Tahmine hazır",
+    boe_draft: "BoE taslağı",
+  },
+};
+
+export function statusLabel(locale: Locale, status: string): string {
+  return statusLabels[locale][status] ?? status;
+}
 
 export type MessageKey = keyof (typeof dict)["en"];
 

@@ -47,6 +47,7 @@ export default function EstimateDetail({
   const [estimator, setEstimator] = useState("");
   const [deskItems, setDeskItems] = useState<DeskItem[]>([]);
   const [critic, setCritic] = useState<string[]>([]);
+  const [fullySigned, setFullySigned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +57,8 @@ export default function EstimateDetail({
     const detail = await api.getEstimate(id);
     setSummary(detail.summary);
     setState(detail.state as unknown as StateShape);
+    setCritic(detail.critic);
+    setFullySigned(detail.fully_signed);
   }, [id]);
 
   useEffect(() => {
@@ -86,6 +89,10 @@ export default function EstimateDetail({
 
   const blocked = new Set(state.blocked_ids);
   const openQuestions = state.questions.filter((q) => !(q.id in state.answers));
+  // An empty answer is "no answer" — submitting it would silently close the question.
+  const filledAnswers = Object.fromEntries(
+    Object.entries(answers).filter(([, value]) => value.trim()),
+  );
   const maxBand = Math.max(
     1,
     ...deskItems.flatMap((item) => [
@@ -132,8 +139,8 @@ export default function EstimateDetail({
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Text</th>
+                <th>{t(locale, "idHeader")}</th>
+                <th>{t(locale, "textHeader")}</th>
                 <th>{t(locale, "ambiguity")}</th>
               </tr>
             </thead>
@@ -144,7 +151,7 @@ export default function EstimateDetail({
                     {requirement.id}
                     {blocked.has(requirement.id) && (
                       <span className="chip" style={{ color: "var(--crit)", marginLeft: 6 }}>
-                        blocked
+                        {t(locale, "blocked")}
                       </span>
                     )}
                   </td>
@@ -187,10 +194,12 @@ export default function EstimateDetail({
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 className="primary"
-                disabled={busy}
+                disabled={busy || Object.keys(filledAnswers).length === 0}
                 onClick={() =>
                   run(async () => {
-                    await api.applyAnswers(id, answers);
+                    await api.applyAnswers(id, filledAnswers);
+                    setAnswers({});
+                    setDeskItems([]); // scope may have changed; desk reloads on demand
                     await refresh();
                   })
                 }
@@ -265,6 +274,7 @@ export default function EstimateDetail({
                     role: "Reviewer",
                   });
                   await loadDesk();
+                  await refresh(); // the last signature unlocks the BoE export
                 })
               }
             />
@@ -276,9 +286,13 @@ export default function EstimateDetail({
         <div className="card">
           {summary.has_boe ? (
             <>
-              <p>
-                <a href={api.boeDocxUrl(id)}>{t(locale, "downloadDocx")}</a>
-              </p>
+              {fullySigned ? (
+                <p>
+                  <a href={api.boeDocxUrl(id)}>{t(locale, "downloadDocx")}</a>
+                </p>
+              ) : (
+                <p className="muted">{t(locale, "signAllFirst")}</p>
+              )}
               {critic.length > 0 && (
                 <>
                   <h3>{t(locale, "critic")}</h3>
