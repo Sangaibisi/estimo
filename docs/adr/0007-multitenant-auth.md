@@ -62,8 +62,17 @@ Both were web-verified against current (2026) practice before implementation.
   over TCP with a password (scram); it is not the trust-socket owner. Verify the app-role
   connection with `-h` (TCP), never the unix socket, or a false "it works" hides the
   isolation gap.
-- **Known residuals (follow-ups, flagged in code):** the web SPA does not yet run an
-  OIDC login flow (it assumes single-tenant/open mode); the connector **webhook receiver**
-  looks a connection up by its opaque UUID across tenants and so needs an elevated
-  (owner) connection in a multi-tenant deployment. Neither blocks single-tenant or the
-  S10 exit gate; both are documented at their call sites.
+- **Unique keys are tenant-composite.** RLS restricts row *visibility*, but Postgres
+  evaluates unique indexes across all rows regardless of policy — a global unique key
+  would let one tenant's write collide with (or, via `ON CONFLICT`, overwrite) another
+  tenant's row and would leak existence. Migration `0010` makes every such key composite
+  with `tenant_id` (`connections.name`, `canonical_pages.topic`,
+  `knowledge_chunks(source_type, source_ref)`, `ledger_entries.origin_ref`).
+- **Cross-tenant system paths** (the startup interrupted-run janitor and the webhook
+  receiver's connection lookup by opaque UUID) use an optional owner connection
+  (`ESTIMO_OWNER_DATABASE_URL`); unset, they fall back to the app connection, which is
+  correct in single-tenant. The sync trigger additionally self-heals orphaned `running`
+  rows older than an hour, so a crash can never wedge a tenant's syncs.
+- **Known residual (follow-up, flagged in code):** the web SPA does not yet run an OIDC
+  login flow (it assumes single-tenant/open mode). It does not block single-tenant use
+  or the S10 exit gate.

@@ -34,6 +34,9 @@ from estimo_gateway import GatewayClient
 logger = logging.getLogger("estimo.connectors.sync")
 
 CHECKPOINT_EVERY = 25  # pages between checkpoint commits
+# A 'running' row older than this is treated as orphaned (crashed process) and swept
+# on the next trigger, so a stuck row never wedges a tenant's syncs indefinitely.
+STALE_RUNNING_AFTER = dt.timedelta(hours=1)
 
 _PATH_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -49,12 +52,20 @@ def _workdir_name(connection: Connection) -> str:
     return f"{slug}-{str(connection.id)[:8]}"
 
 
-async def sweep_interrupted_runs(session: AsyncSession) -> int:
-    """Startup janitor: a killed container leaves runs `running` forever, which
-    would 409-block every future sync of those connections."""
+async def sweep_interrupted_runs(
+    session: AsyncSession, *, older_than: dt.timedelta | None = None
+) -> int:
+    """Mark `running` runs as failed. A killed container leaves them running forever,
+    which would 409-block future syncs. `older_than` limits the sweep to clearly
+    orphaned rows (used by the per-tenant self-heal on trigger); None sweeps all
+    (startup janitor, run as a system/owner session across tenants)."""
+    predicate = SyncRun.status == "running"
+    if older_than is not None:
+        cutoff = dt.datetime.now(dt.UTC) - older_than
+        predicate = predicate & (SyncRun.started_at < cutoff)
     result = await session.execute(
         update(SyncRun)
-        .where(SyncRun.status == "running")
+        .where(predicate)
         .values(
             status="failed",
             error="interrupted (process restarted mid-sync)",

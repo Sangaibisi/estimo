@@ -82,7 +82,9 @@ async def upsert_document(
         authority=authority,
     )
     stmt = stmt.on_conflict_do_update(
-        index_elements=["source_type", "source_ref"],
+        # Matches the composite unique index; tenant_id is auto-set by the row default
+        # (the current-tenant GUC), so the conflict target stays within the tenant.
+        index_elements=["tenant_id", "source_type", "source_ref"],
         set_={
             "title": stmt.excluded.title,
             "text": stmt.excluded.text,

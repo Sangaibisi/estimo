@@ -9,6 +9,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from estimo_api.db import build_engine, build_sessionmaker
 from estimo_api.mcp_server import build_mcp
@@ -25,15 +26,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     engine = build_engine(app_settings)
     sessionmaker = build_sessionmaker(engine)
+    # System (owner) sessionmaker for cross-tenant maintenance paths — falls back to
+    # the app connection when no owner URL is configured (single-tenant).
+    system_engine = (
+        create_async_engine(str(app_settings.owner_database_url), pool_pre_ping=True)
+        if app_settings.owner_database_url
+        else None
+    )
+    system_sessionmaker = (
+        build_sessionmaker(system_engine) if system_engine is not None else sessionmaker
+    )
     # MCP is a Starlette sub-app (streamable HTTP); build it now so it mounts before
     # the server starts, and thread its lifespan through the API's.
-    mcp_app = build_mcp(sessionmaker).http_app(path="/")
+    mcp_app = build_mcp(sessionmaker, app_settings.auth).http_app(path="/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = app_settings
         app.state.engine = engine
         app.state.sessionmaker = sessionmaker
+        app.state.system_sessionmaker = system_sessionmaker
         app.state.oidc_verifier = None
         if app_settings.auth.enabled:
             from estimo_api.auth import OidcVerifier
@@ -49,7 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from estimo_connectors.sync import sweep_interrupted_runs
 
         try:
-            async with sessionmaker() as session:
+            async with system_sessionmaker() as session:
                 swept = await sweep_interrupted_runs(session)
             if swept:
                 logging.getLogger("estimo.api").warning(
@@ -67,6 +79,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 yield
             finally:
                 await engine.dispose()
+                if system_engine is not None:
+                    await system_engine.dispose()
 
     app = FastAPI(title="Estimo API", lifespan=lifespan)
     app.add_middleware(

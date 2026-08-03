@@ -23,21 +23,29 @@ helm install estimo infra/helm/estimo \
   --set web.apiUrl=https://estimo.example.com/api
 ```
 
-BYO managed Postgres and your own IdP:
+BYO managed Postgres and your own IdP (multi-tenant — note the **two** URLs):
 
 ```bash
 helm install estimo infra/helm/estimo \
   --set postgres.bundled=false \
-  --set database.existingSecret=estimo-db \
+  --set database.url='postgresql+asyncpg://estimo_app:<pw>@db:5432/estimo' \
+  --set database.migrationUrl='postgresql+asyncpg://estimo:<owner-pw>@db:5432/estimo' \
+  --set database.appRolePassword='<pw>' \
   --set auth.issuer=https://idp.example/realms/acme \
   --set auth.audience=estimo-api \
   --set gateway.baseUrl=https://litellm.internal/v1 \
   --set gateway.existingSecret=estimo-gateway
 ```
 
-The chart runs the Alembic migration as a `pre-install`/`pre-upgrade` hook (owner role),
-then rolls out the API and web deployments. Secret material (DB password, gateway API
-key, app-role password) belongs in `existingSecret`s, never in `values.yaml`.
+`database.url` is what the API runs as (**`estimo_app`** — NOSUPERUSER, so RLS binds);
+`database.migrationUrl` is the owner that runs Alembic (needs `CREATE ROLE` and bypasses
+RLS by design). The migration runs as an **init container** on the API pod, so it works
+with the bundled StatefulSet too. Optionally set `database.ownerUrl` to give the
+cross-tenant system paths (startup janitor, webhook lookup) an RLS-exempt connection.
+
+Secret material (DB passwords, gateway API key) belongs in `existingSecret`s, never in
+`values.yaml`. The bundled Postgres password is generated once and **reused across
+upgrades** (a regenerated password would break auth against the persisted volume).
 
 ## 3. Multi-tenant (SaaS)
 
@@ -75,5 +83,8 @@ an estimator; sign-off needs a signing authority; connectors/admin need an admin
 ## Model Context Protocol (MCP)
 
 The API mounts an MCP server at `/mcp` (streamable HTTP) exposing read tools
-(`list_estimates`, `get_estimate_lines`, `get_decomposition`). It shares the API's
-tenant isolation and, when configured, its OIDC auth.
+(`list_estimates`, `get_estimate_lines`, `get_decomposition`). When OIDC is configured
+the endpoint is an OAuth2 **resource server** validating the same bearer tokens as the
+REST API, and each tool pins the caller's tenant from the token before querying — so
+MCP clients see exactly their own tenant's data. With auth disabled it runs open on the
+default tenant, matching the REST API.

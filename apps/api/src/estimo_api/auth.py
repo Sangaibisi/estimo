@@ -6,11 +6,13 @@ and a dotted tenant-claim path. No provider SDK is involved — PyJWT validates 
 bearer JWT against the IdP's JWKS (fetched from the discovery document).
 
 Web-verified hardening (2026):
-- python-jose is banned (abandoned); PyJWT + PyJWKClient is the maintained choice.
+- python-jose is banned (abandoned); PyJWT + PyJWKClient is the maintained choice
+  (PyJWKClient caches the JWKS and refreshes on key rotation; the pinned PyJWT no
+  longer wipes its cache on a failed refresh — bug #1162 is fixed upstream).
 - Algorithms are pinned to an asymmetric allow-list (never HS*/none — alg-confusion).
 - iss/aud/exp/sub are required and validated; small leeway for clock skew.
-- PyJWKClient bug #1162: a failed JWKS refresh can wipe the good cache and turn an
-  IdP blip into a permanent outage — the verifier keeps a last-known-good fallback.
+- The role claim is normalized (list OR space-delimited string) so a bare-string
+  claim is never iterated per-character.
 
 Auth is OPT-IN: with no issuer configured the API runs open in single-tenant mode
 (the historical behavior). This module never logs token contents.
@@ -42,6 +44,27 @@ def tenant_to_uuid(raw: str) -> str:
         return str(uuid.UUID(raw))
     except ValueError:
         return str(uuid.uuid5(_TENANT_NAMESPACE, raw))
+
+
+def _as_role_list(claim: Any) -> list[str]:
+    """Normalize a role claim to a list of strings. IdPs emit roles as a JSON list
+    (Keycloak) OR a space-delimited string (OIDC `scope`); a bare string must not be
+    iterated per-character (which would silently deny every role)."""
+    if claim is None:
+        return []
+    if isinstance(claim, str):
+        return claim.split()
+    if isinstance(claim, list | tuple | set | frozenset):
+        return [str(role) for role in claim]
+    return []
+
+
+def discover_jwks_uri(issuer: str) -> tuple[str, str]:
+    """Return (canonical_issuer, jwks_uri) from the OIDC discovery document."""
+    response = httpx.get(f"{issuer.rstrip('/')}/.well-known/openid-configuration", timeout=10.0)
+    response.raise_for_status()
+    document = response.json()
+    return document["issuer"], document["jwks_uri"]
 
 
 class AuthSettings(BaseModel):
@@ -82,24 +105,11 @@ class OidcVerifier:
 
     def __init__(self, settings: AuthSettings) -> None:
         self.settings = settings
-        discovery = httpx.get(
-            f"{settings.issuer.rstrip('/')}/.well-known/openid-configuration", timeout=10.0
-        )
-        discovery.raise_for_status()
-        document = discovery.json()
-        self.issuer = document["issuer"]
-        self._jwks = PyJWKClient(
-            document["jwks_uri"], cache_jwk_set=True, lifespan=settings.jwks_ttl_seconds
-        )
+        self.issuer, jwks_uri = discover_jwks_uri(settings.issuer)
+        self._jwks = PyJWKClient(jwks_uri, cache_jwk_set=True, lifespan=settings.jwks_ttl_seconds)
 
     def _signing_key(self, token: str) -> Any:
-        try:
-            return self._jwks.get_signing_key_from_jwt(token).key
-        except jwt.PyJWKClientError:
-            # Bug #1162: a failed refresh can clear the cache. Retry once against the
-            # retained set before surfacing an auth failure.
-            logger.warning("JWKS refresh failed; retrying against cached keys")
-            return self._jwks.get_signing_key_from_jwt(token).key
+        return self._jwks.get_signing_key_from_jwt(token).key
 
     def verify(self, token: str) -> Principal:
         try:
@@ -122,11 +132,11 @@ class OidcVerifier:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"token has no tenant claim at {self.settings.tenant_claim!r}",
             )
-        roles = _pluck(claims, self.settings.role_claim) or []
+        roles = _as_role_list(_pluck(claims, self.settings.role_claim))
         return Principal(
             subject=str(claims["sub"]),
             tenant=tenant_to_uuid(tenant),
-            roles=frozenset(str(role) for role in roles),
+            roles=frozenset(roles),
         )
 
 

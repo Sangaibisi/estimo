@@ -12,7 +12,17 @@ import uuid
 from typing import Any
 
 from estimo_knowledge.db import Base, TenantScoped
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,10 +33,12 @@ class Connection(TenantScoped, Base):
     """One configured external source (Admin → Connections)."""
 
     __tablename__ = "connections"
+    # Unique PER TENANT — a global unique name would collide/leak across tenants.
+    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_connections_tenant_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     kind: Mapped[str] = mapped_column(String(20))
-    name: Mapped[str] = mapped_column(String(120), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
     base_url: Mapped[str] = mapped_column(String(500))
     # Non-secret coordinates: space keys, workspace/repo slugs, JQL, branch, …
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -81,9 +93,12 @@ class CanonicalPage(TenantScoped, Base):
     never do — curation is a human gate, not a suggestion."""
 
     __tablename__ = "canonical_pages"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "topic", name="uq_canonical_pages_tenant_topic"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    topic: Mapped[str] = mapped_column(String(200), unique=True)
+    topic: Mapped[str] = mapped_column(String(200))
     title: Mapped[str] = mapped_column(String(300))
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="draft")

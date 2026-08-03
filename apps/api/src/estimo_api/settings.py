@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     )
 
     database_url: PostgresDsn
+    # Optional owner/RLS-exempt URL for SYSTEM paths that must cross tenants: the
+    # startup interrupted-run janitor and the webhook receiver's connection lookup.
+    # Unset => those paths use the main connection (correct in single-tenant; in
+    # multi-tenant they degrade to the app role's own-tenant view, documented).
+    owner_database_url: PostgresDsn | None = None
     gateway: GatewayConfig
     # OIDC auth (ESTIMO_AUTH__ISSUER, …). Empty issuer => single-tenant open mode.
     auth: AuthSettings = Field(default_factory=AuthSettings)

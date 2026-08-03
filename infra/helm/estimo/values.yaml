@@ -26,10 +26,18 @@ web:
     requests: { cpu: "100m", memory: "256Mi" }
     limits: { cpu: "500m", memory: "512Mi" }
 
-# Database. Multi-tenant deployments MUST use the NOSUPERUSER estimo_app role (ADR-0007).
+# Database. Multi-tenant deployments MUST set url to the NOSUPERUSER estimo_app role
+# (a superuser bypasses RLS — ADR-0007) and migrationUrl to the owner role.
 database:
-  # Full asyncpg URL. Leave empty to build it from the bundled Postgres below.
+  # API runtime URL. Empty => built from the bundled Postgres (owner; single-tenant).
   url: ""
+  # Owner URL migrations run with (CREATE ROLE / bypass RLS). Empty => same as url
+  # (bundled owner). In multi-tenant BYO, set this to the owner while url = estimo_app.
+  migrationUrl: ""
+  # Owner URL for cross-tenant SYSTEM paths (startup janitor, webhook lookup). Optional.
+  ownerUrl: ""
+  # Password the migration assigns to the estimo_app role (multi-tenant).
+  appRolePassword: ""
   existingSecret: ""          # secret with key ESTIMO_DATABASE_URL (preferred)
 
 postgres:

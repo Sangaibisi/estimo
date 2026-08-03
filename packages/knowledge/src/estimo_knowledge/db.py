@@ -27,8 +27,8 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
-from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -107,7 +107,8 @@ class LedgerEntryRow(TenantScoped, Base):
 
     __table_args__ = (
         Index("ix_ledger_entries_search_tsv", "search_tsv", postgresql_using="gin"),
-        Index("uq_ledger_entries_origin_ref", "origin_ref", unique=True),
+        # Unique PER TENANT — an origin_ref is only meaningful within a tenant.
+        Index("uq_ledger_entries_origin_ref", "tenant_id", "origin_ref", unique=True),
     )
 
 
@@ -195,5 +196,12 @@ class KnowledgeChunk(TenantScoped, Base):
     __table_args__ = (
         Index("ix_knowledge_chunks_search_tsv", "search_tsv", postgresql_using="gin"),
         Index("ix_knowledge_chunks_acl_keys", "acl_keys", postgresql_using="gin"),
-        Index("uq_knowledge_chunks_source", "source_type", "source_ref", unique=True),
+        # Unique PER TENANT and the ON CONFLICT target for chunk upserts.
+        Index(
+            "uq_knowledge_chunks_source",
+            "tenant_id",
+            "source_type",
+            "source_ref",
+            unique=True,
+        ),
     )

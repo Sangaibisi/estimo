@@ -83,6 +83,18 @@ Until the first code release, entries track documentation and foundation milesto
   image at build time.
 
 ### Security
+- **S10 review hardening** (adversarial review; 10 confirmed findings fixed): the MCP
+  endpoint is now an OAuth2 resource server (FastMCP `JWTVerifier`) that pins the
+  caller's tenant from the validated token — it was reachable unauthenticated and read
+  the default tenant. Unique keys on tenant tables are composite with `tenant_id`
+  (migration `0010`) so one tenant's write can no longer collide with, overwrite, or
+  probe another's. Helm: the API/migration split onto the right DB roles (RLS was
+  bypassed by connecting as the owner), the migration moved to an init container (the
+  hook ran before the bundled Postgres existed), and the bundled password is reused
+  across upgrades instead of regenerated. Cross-tenant system paths take an optional
+  owner connection; the sync trigger self-heals orphaned `running` rows. Role claims
+  accept a space-delimited string (a bare string was iterated per character, silently
+  denying every role).
 - **S9 review hardening** (adversarial review; 28 confirmed findings fixed): the ACL
   pre-filter provably never widens — Confluence connections require explicit
   `space_keys`, read restrictions resolve by walking ancestors (inheritance), and

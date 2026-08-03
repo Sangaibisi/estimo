@@ -26,7 +26,11 @@ from estimo_connectors import (
     run_sync,
     verify_webhook,
 )
-from estimo_connectors.sync import SyncAlreadyRunningError
+from estimo_connectors.sync import (
+    STALE_RUNNING_AFTER,
+    SyncAlreadyRunningError,
+    sweep_interrupted_runs,
+)
 from estimo_knowledge import is_stale
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -190,6 +194,10 @@ async def trigger_sync(
     connection = await session.get(Connection, connection_id)
     if connection is None:
         raise HTTPException(status_code=404, detail="connection not found")
+    # Self-heal: an orphaned 'running' row (crashed process) is swept here — visible
+    # to this tenant under RLS — so a stuck row never wedges syncs, even without the
+    # startup janitor (which is a system/owner path in multi-tenant).
+    await sweep_interrupted_runs(session, older_than=STALE_RUNNING_AFTER)
     running = await session.scalar(
         select(SyncRun).where(SyncRun.connection_id == connection_id, SyncRun.status == "running")
     )
@@ -237,13 +245,13 @@ async def receive_webhook(
     re-index is scheduled. Verified by HMAC, NOT by a bearer token — the external git
     host has no user identity — so this route does not use the auth'd session.
 
-    Multi-tenant note (S10): the connection is looked up by its opaque UUID across
-    tenants, which requires an owner/RLS-exempt DB connection. In a multi-tenant
-    deployment running as the `estimo_app` role, wire this route to an elevated
-    session (follow-up); single-tenant deployments work as-is.
+    Multi-tenant (S10): the connection is looked up by its opaque UUID across tenants,
+    which requires an RLS-exempt connection — the SYSTEM sessionmaker (the owner URL
+    when `ESTIMO_OWNER_DATABASE_URL` is set; otherwise the app connection, correct in
+    single-tenant). The background sync is then pinned to the connection's own tenant.
     """
-    sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
-    async with sessionmaker() as session:
+    system_sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.system_sessionmaker
+    async with system_sessionmaker() as session:
         connection = await session.get(Connection, connection_id)
         if connection is None:
             raise HTTPException(status_code=404, detail="connection not found")
@@ -260,9 +268,10 @@ async def receive_webhook(
         if configured_branch and branches and configured_branch not in branches:
             return {"status": "ignored"}  # push to a branch we do not index
         tenant = str(connection.tenant_id)
+    # The sync itself runs as the app role, pinned to the connection's own tenant.
     background.add_task(
         _run_sync_bg,
-        sessionmaker,
+        request.app.state.sessionmaker,
         connection_id,
         request.app.state.settings,
         tenant,

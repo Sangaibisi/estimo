@@ -1,8 +1,11 @@
 """Estimo MCP server (S10-5): read-only tools over the existing service layer.
 
-Mounted into the FastAPI app at /mcp over streamable HTTP (FastMCP 3.x). The tools
-reuse the same tenant-scoped session path as the REST API, so RLS isolation and (when
-configured) OIDC auth apply identically — an MCP client sees only its tenant's data.
+Mounted into the FastAPI app at /mcp over streamable HTTP (FastMCP 3.x). When OIDC is
+configured the MCP endpoint is an OAuth2 resource server (FastMCP `JWTVerifier`) that
+validates the same bearer tokens as the REST API; each tool pins the caller's tenant
+from the token BEFORE querying, so RLS isolation applies identically. With auth
+disabled the tools run open on the DEFAULT_TENANT (single-tenant mode), matching the
+REST API.
 
 Tools are strictly READ: query estimates, pull an estimate's evidence-linked BoE
 lines, and fetch a work-item decomposition. No tool mutates state.
@@ -15,18 +18,44 @@ from typing import Any
 
 from estimo_pipeline import PipelineState
 from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+from fastmcp.server.dependencies import get_access_token
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from estimo_api.auth import AuthSettings, _pluck, discover_jwks_uri, tenant_to_uuid
 from estimo_api.estimates_models import EstimateRecord
-from estimo_api.tenancy import bind_tenant_guc
+from estimo_api.tenancy import DEFAULT_TENANT, bind_tenant_guc, set_current_tenant
 from estimo_core import BoeDocument
 
 
-def build_mcp(sessionmaker: async_sessionmaker[Any]) -> FastMCP:
-    mcp: FastMCP = FastMCP(name="estimo")
+def build_mcp(sessionmaker: async_sessionmaker[Any], auth: AuthSettings) -> FastMCP:
+    verifier = None
+    if auth.enabled:
+        issuer, jwks_uri = discover_jwks_uri(auth.issuer)
+        verifier = JWTVerifier(
+            jwks_uri=jwks_uri,
+            issuer=issuer,
+            audience=auth.audience,
+            algorithm=auth.algorithms[0] if auth.algorithms else "RS256",
+        )
+    mcp: FastMCP = FastMCP(name="estimo", auth=verifier)
+
+    def _pin_tenant() -> None:
+        # Scope the query to the caller's tenant from the validated token; without
+        # auth every call runs single-tenant on the default tenant.
+        if not auth.enabled:
+            set_current_tenant(DEFAULT_TENANT)
+            return
+        token = get_access_token()
+        claims = getattr(token, "claims", None) or {}
+        tenant = _pluck(claims, auth.tenant_claim)
+        set_current_tenant(
+            tenant_to_uuid(tenant) if isinstance(tenant, str) and tenant else DEFAULT_TENANT
+        )
 
     async def _session() -> Any:
+        _pin_tenant()
         session = sessionmaker()
         bind_tenant_guc(session)
         return session

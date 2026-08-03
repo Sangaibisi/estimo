@@ -15,11 +15,35 @@ spec:
         app.kubernetes.io/name: estimo
         app.kubernetes.io/component: api
     spec:
-      # migrate → api ordering: the migration Job runs alembic to head first.
       initContainers:
-        - name: wait-migrate
+        {{- if .Values.postgres.bundled }}
+        - name: wait-postgres
           image: busybox:1.37
           command: ["sh", "-c", "until nc -z {{ .Release.Name }}-postgres 5432; do sleep 2; done"]
+        {{- end }}
+        # Migrations run here (not a pre-install hook) so they work with the bundled
+        # StatefulSet, which does not exist yet when hooks fire. Owner role (CREATE
+        # ROLE / bypass RLS); the API itself connects as estimo_app in multi-tenant.
+        - name: migrate
+          image: "{{ .Values.image.registry }}/{{ .Values.image.apiRepository }}:{{ include "estimo.imageTag" . }}"
+          command: ["alembic", "-c", "/app/apps/api/alembic.ini", "upgrade", "head"]
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-env
+          env:
+            {{- if .Values.postgres.bundled }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.auth.existingSecret | default (printf "%s-postgres" .Release.Name) }}
+                  key: POSTGRES_PASSWORD
+            {{- end }}
+            - name: ESTIMO_DATABASE_URL
+              value: {{ include "estimo.migrationDatabaseUrl" . | quote }}
+            {{- with .Values.database.appRolePassword }}
+            - name: ESTIMO_APP_ROLE_PASSWORD
+              value: {{ . | quote }}
+            {{- end }}
       containers:
         - name: api
           image: "{{ .Values.image.registry }}/{{ .Values.image.apiRepository }}:{{ include "estimo.imageTag" . }}"
@@ -38,7 +62,11 @@ spec:
                   key: POSTGRES_PASSWORD
             {{- end }}
             - name: ESTIMO_DATABASE_URL
-              value: {{ include "estimo.databaseUrl" . | quote }}
+              value: {{ include "estimo.apiDatabaseUrl" . | quote }}
+            {{- if .Values.database.ownerUrl }}
+            - name: ESTIMO_OWNER_DATABASE_URL
+              value: {{ .Values.database.ownerUrl | quote }}
+            {{- end }}
             - name: ESTIMO_REPOS_DIR
               value: /data/repos
           volumeMounts:
@@ -83,27 +111,3 @@ spec:
   resources:
     requests:
       storage: {{ .Values.api.reposStorage.size }}
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {{ .Release.Name }}-migrate
-  labels: {{- include "estimo.labels" . | nindent 4 }}
-  annotations:
-    # Run migrations before the app rolls out. Migrations use the OWNER role (bypass
-    # RLS by design); the API connects as estimo_app in multi-tenant mode (ADR-0007).
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": before-hook-creation
-spec:
-  backoffLimit: 3
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: migrate
-          image: "{{ .Values.image.registry }}/{{ .Values.image.apiRepository }}:{{ include "estimo.imageTag" . }}"
-          command: ["alembic", "-c", "/app/apps/api/alembic.ini", "upgrade", "head"]
-          envFrom:
-            - secretRef:
-                name: {{ .Release.Name }}-env

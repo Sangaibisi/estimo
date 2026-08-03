@@ -70,6 +70,13 @@ def _stub_oidc(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(OidcVerifier, "__init__", fake_init)
 
+    # The MCP server also resolves the JWKS at startup; stub both to avoid a network
+    # call to the fake issuer (the REST tests don't exercise /mcp auth itself).
+    import estimo_api.mcp_server as mcp_module
+
+    monkeypatch.setattr(mcp_module, "discover_jwks_uri", lambda issuer: (ISSUER, f"{ISSUER}/jwks"))
+    monkeypatch.setattr(mcp_module, "JWTVerifier", lambda **kwargs: None)
+
 
 @pytest.fixture
 async def client(
@@ -166,3 +173,26 @@ def test_hs256_token_rejected_alg_confusion(auth_settings: AuthSettings) -> None
 
     with pytest.raises(Exception):  # noqa: B017
         verifier.verify(forged)
+
+
+def test_role_claim_accepts_space_delimited_string(auth_settings: AuthSettings) -> None:
+    """A space-delimited role/scope string must map to distinct roles, not chars."""
+    from estimo_api.auth import _as_role_list
+
+    assert set(_as_role_list("estimator reviewer")) == {"estimator", "reviewer"}
+    assert _as_role_list(["admin"]) == ["admin"]
+    assert _as_role_list(None) == []
+    assert _as_role_list(42) == []  # non-iterable, non-string → empty, never a crash
+
+
+def test_tenant_string_folds_to_stable_uuid() -> None:
+    from estimo_api.auth import tenant_to_uuid
+
+    a = tenant_to_uuid("acme")
+    b = tenant_to_uuid("acme")
+    c = tenant_to_uuid("globex")
+    assert a == b and a != c
+    # A real UUID passes through unchanged.
+    assert tenant_to_uuid("11111111-1111-1111-1111-111111111111") == (
+        "11111111-1111-1111-1111-111111111111"
+    )

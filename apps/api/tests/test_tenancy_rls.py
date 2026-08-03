@@ -115,3 +115,38 @@ async def test_app_role_cannot_bypass_rls(app_sessionmaker, clean_tables) -> Non
         set_current_tenant(DEFAULT_TENANT)
         refs = list((await session.execute(text("SELECT brd_ref FROM estimates"))).scalars())
         assert "AUR-A-2" not in refs
+
+
+async def test_cross_tenant_same_name_does_not_collide(  # type: ignore[no-untyped-def]
+    app_sessionmaker, clean_tables
+) -> None:
+    """A global unique key would let tenant B's insert collide with tenant A's row
+    (DoS + existence oracle). Composite (tenant_id, name) keys must allow the same
+    connection name in two tenants."""
+    import uuid as _uuid
+
+    from estimo_api.tenancy import set_current_tenant
+
+    maker = app_sessionmaker
+
+    async def _add_connection(tenant: str) -> None:
+        set_current_tenant(tenant)
+        async with maker() as session:
+            bind_tenant_guc(session)
+            await session.execute(
+                text(
+                    "INSERT INTO connections (id, kind, name, base_url, config) "
+                    "VALUES (:id, 'git', 'shared-name', 'https://x', '{}'::jsonb)"
+                ),
+                {"id": _uuid.uuid4()},
+            )
+            await session.commit()
+
+    await _add_connection(TENANT_A)
+    await _add_connection(TENANT_B)  # same name, different tenant → no IntegrityError
+
+    set_current_tenant(TENANT_A)
+    async with maker() as session:
+        bind_tenant_guc(session)
+        count = await session.scalar(text("SELECT count(*) FROM connections"))
+        assert count == 1  # each tenant still sees only its own

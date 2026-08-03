@@ -1,4 +1,13 @@
-{{- if .Values.postgres.bundled }}
+{{- if and .Values.postgres.bundled (not .Values.postgres.auth.existingSecret) }}
+{{- /* Reuse the existing password on upgrade — regenerating it would break auth
+       (the PVC keeps the original, honored only on first init). */ -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (printf "%s-postgres" .Release.Name)) -}}
+{{- $pw := "" -}}
+{{- if $existing -}}
+{{-   $pw = index $existing.data "POSTGRES_PASSWORD" | b64dec -}}
+{{- else -}}
+{{-   $pw = randAlphaNum 24 -}}
+{{- end -}}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -6,9 +15,10 @@ metadata:
   labels: {{- include "estimo.labels" . | nindent 4 }}
 type: Opaque
 stringData:
-  # A generated password; override with postgres.auth.existingSecret in production.
-  POSTGRES_PASSWORD: {{ randAlphaNum 24 | quote }}
+  POSTGRES_PASSWORD: {{ $pw | quote }}
 ---
+{{- end }}
+{{- if .Values.postgres.bundled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
