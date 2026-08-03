@@ -1,0 +1,25 @@
+[project]
+name = "estimo-estimate"
+version = "0.1.0"
+description = "Estimo estimation: analog-grounded three-point bands, calibration, critic, BoE rendering"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = [
+    "estimo-core",
+    "estimo-gateway",
+    "estimo-knowledge",
+    "estimo-parse",
+    "estimo-pipeline",
+    "estimo-code",
+    "python-docx>=1.2,<2",
+    "pydantic>=2.13.4,<3",
+    "sqlalchemy[asyncio]>=2.0.51,<2.1",
+]
+
+[project.scripts]
+estimo-boe = "estimo_estimate.cli:main"
+estimo-effort-eval = "estimo_estimate.evals:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

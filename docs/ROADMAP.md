@@ -146,19 +146,19 @@ the fixture repo; every impact claim carries an evidence URI.
 
 ---
 
-## S6 — Effort Bands & Calibration v1 · `Status: 🟡 In progress`
+## S6 — Effort Bands & Calibration v1 · `Status: 🟡 In progress` (all items done; exit gate awaits green CI)
 
 **Goal:** Analogy-based three-point bands + assumption/risk registers + the BoE document.
 
 **Architecture slice:** `packages/calibrate`, `packages/pipeline` effort nodes, BoE render.
 
-- [ ] S6-1 Analog few-shot selector: item-similar history from the ledger (SSBSE-2023 finding: selection quality matters more than model quality)
-- [ ] S6-2 Three-point generation: analog distribution + LLM reasoning; sampling variance instead of verbal confidence (PRINCIPLES #6)
-- [ ] S6-3 Conformal/quantile intervals: coverage-targeted widening using the seed set error distribution; small-item base-cost rule (PRINCIPLES #10)
-- [ ] S6-4 Assumption & risk generator: per-item + document-wide register; cone stage label
-- [ ] S6-5 Critic/consistency pass: cross-item conflicts, sum consistency, rejection of evidence-free lines; judge ≠ generator
-- [ ] S6-6 BoE `.docx` render: template-parameterized (logo/header), signature blocks, provenance appendices; TR number formatting
-- [ ] S6-7 Effort eval: golden set MAE/MdAE + interval coverage + naive-baseline delta report
+- [x] S6-1 Analog few-shot selector: item-similar history from the ledger (SSBSE-2023 finding: selection quality matters more than model quality)
+- [x] S6-2 Three-point generation: analog distribution + LLM reasoning; sampling variance instead of verbal confidence (PRINCIPLES #6)
+- [x] S6-3 Conformal/quantile intervals: bands calibrated on the ledger's **analog-transfer** error distribution (leave-one-out actual/analog-median ratios — measured: calibrating on per-entry estimate deviation gave 7% coverage, transfer quantiles give 80% at nominal 80%); cold-start priors below 8 samples, always labeled; small-item overhead floor (PRINCIPLES #10)
+- [x] S6-4 Assumption & risk generator: per-item + document-wide register; cone stage label
+- [x] S6-5 Critic/consistency pass: cross-item conflicts, sum consistency, rejection of evidence-free lines; judge ≠ generator
+- [x] S6-6 BoE `.docx` render: template-parameterized (logo/header), signature blocks, provenance appendices; TR number formatting
+- [x] S6-7 Effort eval: golden set MAE/MdAE + interval coverage + naive-baseline delta report
 
 **Exit gate:** A three-point BoE `.docx` with evidence links and assumptions/risks is
 produced end to end from a fixture BRD; the eval report includes the naive baseline.

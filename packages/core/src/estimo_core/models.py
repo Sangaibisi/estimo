@@ -24,6 +24,7 @@ _EVIDENCE_SCHEMES: dict[str, str] = {
     "wiki": "wiki",
     "ledger": "ledger",
     "answer": "answer",
+    "note": "note",
 }
 
 
@@ -32,6 +33,8 @@ class EvidenceKind(StrEnum):
     WIKI = "wiki"
     LEDGER = "ledger"
     ANSWER = "answer"
+    # Non-resolvable annotation (e.g. note://no-analogs) — keeps ledger:// = UUID ids only.
+    NOTE = "note"
 
 
 class ConeStage(StrEnum):
@@ -56,7 +59,7 @@ class EvidenceRef(EstimoModel):
     """A provenance link carried by every estimate line (PRINCIPLES #2).
 
     URI schemes: repo://<repo>@<sha>/<path>#L<a>-L<b> · wiki://<pageId>@<version> ·
-    ledger://<entryId> · answer://<questionId>
+    ledger://<entryId> · answer://<questionId> · note://<slug> (annotation, non-resolvable)
     """
 
     uri: str = Field(min_length=1)

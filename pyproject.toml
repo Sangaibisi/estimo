@@ -20,6 +20,7 @@ estimo-parse = { workspace = true }
 estimo-knowledge = { workspace = true }
 estimo-pipeline = { workspace = true }
 estimo-code = { workspace = true }
+estimo-estimate = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -63,6 +64,7 @@ mypy_path = [
     "packages/knowledge/src",
     "packages/pipeline/src",
     "packages/code/src",
+    "packages/estimate/src",
     "apps/api/tests",
 ]
 exclude = ["alembic/"]

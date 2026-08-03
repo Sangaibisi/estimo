@@ -1,0 +1,231 @@
+"""The estimator: pipeline state + ledger (+ optional code graph, gateway) → BoE draft.
+
+Evidence discipline is structural: every line carries ledger:// analog references, plus
+repo:// impact evidence and answer:// references when available — an evidence-less
+EstimateLine cannot even be constructed (core model, PRINCIPLES #2). Items without
+usable analogs are NOT estimated with invented numbers: they get a needs-expert line
+flag via LOW confidence, a discovery risk, and the widest prior band only when the
+maintainer explicitly allows fallback.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+
+from estimo_code import CodeGraph, impact_for
+from estimo_knowledge import find_analogs
+from estimo_parse import DATA_SYSTEM, fence, redact_anchors
+from estimo_pipeline import PipelineState
+from estimo_pipeline.prompts import Prompt
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from estimo_core import (
+    AssumptionRisk,
+    BoeDocument,
+    ConeStage,
+    Confidence,
+    EstimateLine,
+    EvidenceRef,
+    ThreePoint,
+)
+from estimo_estimate.bands import BandResult, band_from_analogs
+from estimo_estimate.calibration import ErrorDistribution, transfer_distribution
+from estimo_estimate.prompts import load_estimate_prompt
+from estimo_gateway import GatewayClient, GatewayError
+
+logger = logging.getLogger("estimo.estimate")
+
+
+async def _llm_adjust_likely(
+    client: GatewayClient,
+    prompt: Prompt,
+    item_text: str,
+    band: BandResult,
+) -> tuple[float, str | None]:
+    """LLM may nudge likely WITHIN the band; anything else degrades to the draft."""
+    try:
+        result = await client.complete(
+            "estimate",
+            [
+                {"role": "system", "content": DATA_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{prompt.text}\nBand: optimistic={band.range.optimistic} "
+                        f"likely={band.range.likely} pessimistic={band.range.pessimistic}\n"
+                        f"Work item:\n{fence(redact_anchors(item_text))}"
+                    ),
+                },
+            ],
+            temperature=0.0,
+            max_tokens=200,
+        )
+        payload = json.loads(result.text)
+        if not isinstance(payload, dict):
+            raise TypeError("expected JSON object")
+        likely = float(payload["likely"])
+        rationale = str(payload.get("rationale", "")).strip() or None
+        if band.range.optimistic <= likely <= band.range.pessimistic:
+            return round(likely, 1), rationale
+        logger.warning("llm likely %.1f outside band — draft kept", likely)
+    except (GatewayError, json.JSONDecodeError, TypeError, KeyError, ValueError) as exc:
+        logger.warning("estimate refinement degraded: %s", exc)
+    return band.range.likely, None
+
+
+def _cone_stage(state: PipelineState) -> ConeStage:
+    reqs = state.requirements
+    if not reqs:
+        return ConeStage.CONCEPT
+    if any(r.extraction == "heuristic" for r in reqs) or state.blocked_ids:
+        return ConeStage.CONCEPT
+    if all(r.acceptance_criteria for r in reqs):
+        return ConeStage.APPROVED_SCOPE
+    return ConeStage.CONCEPT
+
+
+async def estimate_state(
+    session: AsyncSession,
+    state: PipelineState,
+    *,
+    graph: CodeGraph | None = None,
+    client: GatewayClient | None = None,
+    analog_limit: int = 5,
+) -> BoeDocument:
+    if state.status != "ready_for_estimation":
+        msg = (
+            f"state is {state.status!r}; only 'ready_for_estimation' states are estimated "
+            "(PRINCIPLES #3 — open questions first)"
+        )
+        raise ValueError(msg)
+
+    prompt = load_estimate_prompt()
+    distribution: ErrorDistribution = await transfer_distribution(session)
+    answered = {q.requirement_id: q for q in state.questions if q.id in state.answers}
+
+    lines: list[EstimateLine] = []
+    global_assumptions: list[AssumptionRisk] = []
+    global_risks: list[AssumptionRisk] = []
+
+    if distribution.prior_based:
+        global_assumptions.append(
+            AssumptionRisk(
+                kind="assumption",
+                text=(
+                    "Bant genişlikleri kurum tarihçesi yetersiz olduğu için literatür "
+                    f"öncüllerine dayanır (örnek sayısı: {distribution.samples})."
+                ),
+            )
+        )
+
+    for item in state.work_items:
+        # Redact at query construction: every downstream boundary (embed, lexical
+        # FTS, impact keywords, chat) must see quarantined text (PRINCIPLES #5).
+        query = redact_anchors(f"{item.title} {item.description or ''}")
+        analogs = await find_analogs(session, query, client=client, limit=analog_limit)
+        band = band_from_analogs(analogs, distribution)
+
+        evidence: list[EvidenceRef] = [
+            EvidenceRef.from_uri(f"ledger://{card.entry_id}", label=card.item_title)
+            for card in analogs[:3]
+        ]
+        assumptions: list[AssumptionRisk] = []
+        risks: list[AssumptionRisk] = []
+
+        if graph is not None:
+            impacts = impact_for(graph, query)
+            for impact in impacts[:4]:
+                evidence.extend(
+                    EvidenceRef.from_uri(uri, label=f"{impact.module} ({impact.confidence})")
+                    for uri in impact.evidence_uris[:2]
+                )
+                if impact.discovery_suggested:
+                    risks.append(
+                        AssumptionRisk(
+                            kind="risk",
+                            text=(
+                                f"{impact.module} etkisi yalnız anahtar-kelime sinyaline "
+                                "dayanıyor; teknik keşif önerilir."
+                            ),
+                            contingency_pd=round((band.range.likely if band else 1.0) * 0.3, 1),
+                        )
+                    )
+
+        for req_id in item.requirement_ids:
+            if req_id in answered:
+                question = answered[req_id]
+                evidence.append(
+                    EvidenceRef.from_uri(f"answer://{question.id}", label="müşteri cevabı")
+                )
+                assumptions.append(
+                    AssumptionRisk(
+                        kind="assumption",
+                        text=f"Müşteri cevabı esas alındı: {state.answers[question.id][:200]}",
+                    )
+                )
+
+        if band is None:
+            # No usable analogs: never invent a number silently (PRINCIPLES #7 spirit).
+            prior_band = ThreePoint(optimistic=1.0, likely=3.0, pessimistic=8.0)
+            lines.append(
+                EstimateLine(
+                    work_item_id=item.id,
+                    range=prior_band,
+                    confidence=Confidence.LOW,
+                    evidence=tuple(evidence)
+                    or (
+                        EvidenceRef.from_uri(
+                            "note://no-analogs", label="analog bulunamadı — literatür öncülü"
+                        ),
+                    ),
+                    assumptions=tuple(assumptions),
+                    risks=(
+                        *risks,
+                        AssumptionRisk(
+                            kind="risk",
+                            text=(
+                                "Defterde benzer iş bulunamadı; bant geniş literatür "
+                                "öncülüdür — uzman değerlendirmesi şarttır."
+                            ),
+                            contingency_pd=4.0,
+                        ),
+                    ),
+                    basis_note="no-analog prior band",
+                )
+            )
+            continue
+
+        likely = band.range.likely
+        rationale: str | None = None
+        if client is not None:
+            likely, rationale = await _llm_adjust_likely(client, prompt, query, band)
+        final_range = ThreePoint(
+            optimistic=min(band.range.optimistic, likely),
+            likely=likely,
+            pessimistic=max(band.range.pessimistic, likely),
+        )
+        lines.append(
+            EstimateLine(
+                work_item_id=item.id,
+                range=final_range,
+                confidence=band.confidence,
+                evidence=tuple(evidence),
+                assumptions=tuple(assumptions),
+                risks=tuple(risks),
+                basis_note=band.basis + (f"; LLM: {rationale}" if rationale else ""),
+            )
+        )
+
+    return BoeDocument(
+        brd_ref=state.parsed.brd_ref if state.parsed else state.source_path,
+        title=state.parsed.title if state.parsed else state.source_path,
+        cone_stage=_cone_stage(state),
+        lines=tuple(lines),
+        questions=tuple(
+            q.model_copy(update={"status": "applied"}) if q.id in state.answers else q
+            for q in state.questions
+        ),
+        global_assumptions=tuple(global_assumptions),
+        global_risks=tuple(global_risks),
+    )

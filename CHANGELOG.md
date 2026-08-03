@@ -9,6 +9,19 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S6 estimation** (`packages/estimate`): analog-grounded three-point bands with
+  conformal-style calibration on the ledger's **analog-transfer** error (leave-one-out
+  actual/analog-median quantiles — measured on the seed set: 80% interval coverage at
+  nominal 80% vs 7% with the naive deviation model; MAE at parity with the raw analog
+  median). Cold-start priors below 8 samples (always labeled), small-item overhead
+  floors, expert-recall down-weighting. The estimator refuses non-ready states
+  (PRINCIPLES #3), attaches ledger://+repo://+answer:// evidence to every line,
+  converts LOW-confidence impacts into discovery risks with contingency, and lets the
+  gateway nudge likely only WITHIN the band (anchors redacted, PRINCIPLES #5).
+  Deterministic critic (gate-leak, duplicates, spread sanity, missing cold-start
+  assumption), locale-aware BoE `.docx` renderer (full professional anatomy, TR
+  number formatting), `estimo-boe` and `estimo-effort-eval` CLIs, LOO eval report in
+  `evals/reports/2026-08-03-s6-loo-eval.md`.
 - **S5 code shelf** (`packages/code`): tree-sitter symbol graph for Java/TypeScript
   (indexer-agnostic store — SCIP loader slots in at the first real build chain), ranked
   token-budgeted repo map, deterministic module wikis (purpose/interfaces/dependencies,

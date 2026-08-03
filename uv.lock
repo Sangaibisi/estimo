@@ -19,6 +19,7 @@ members = [
     "estimo-api",
     "estimo-code",
     "estimo-core",
+    "estimo-estimate",
     "estimo-gateway",
     "estimo-knowledge",
     "estimo-parse",
@@ -448,6 +449,35 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2.13.4,<3" }]
+
+[[package]]
+name = "estimo-estimate"
+version = "0.1.0"
+source = { editable = "packages/estimate" }
+dependencies = [
+    { name = "estimo-code" },
+    { name = "estimo-core" },
+    { name = "estimo-gateway" },
+    { name = "estimo-knowledge" },
+    { name = "estimo-parse" },
+    { name = "estimo-pipeline" },
+    { name = "pydantic" },
+    { name = "python-docx" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estimo-code", editable = "packages/code" },
+    { name = "estimo-core", editable = "packages/core" },
+    { name = "estimo-gateway", editable = "packages/gateway" },
+    { name = "estimo-knowledge", editable = "packages/knowledge" },
+    { name = "estimo-parse", editable = "packages/parse" },
+    { name = "estimo-pipeline", editable = "packages/pipeline" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
+    { name = "python-docx", specifier = ">=1.2,<2" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51,<2.1" },
+]
 
 [[package]]
 name = "estimo-gateway"
