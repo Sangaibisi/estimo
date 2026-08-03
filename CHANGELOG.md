@@ -215,6 +215,19 @@ Until the first code release, entries track documentation and foundation milesto
   AGENTS.md golden rules and ARCHITECTURE.md.
 
 ### Fixed
+- **Confluence code macros no longer lose text.** CDATA bodies were inlined *before* the
+  tag-stripping pass, so everything between a `<` and the next `>` inside a code sample
+  was deleted: a rule reading `if (tutar < 100 AND adet > 2)` was indexed as
+  `if (tutar 2)`. In a telco BSS wiki that is exactly where the business rules are
+  written. CDATA is now held behind sentinels through the whole pipeline and restored
+  after entity-unescaping, since a sample's `&amp;` is literal source rather than an
+  entity to resolve.
+- **Confluence tables keep their rows together.** Storage format wraps cell content in
+  `<p>`, so the generic block pass gave every cell its own line and a field table lost
+  the association between a field and its type — `musteri_no` and `VARCHAR(20)` on
+  separate lines, unsearchable as a pair and meaningless to a human reading the
+  retrieved text. Cells are flattened before that pass and `</tr>` is again the only row
+  boundary.
 - **Adversarial review of the S11 batch: 36 findings raised, 7 survived refutation, two
   of them regressions this same batch introduced.**
 - `restricting_audiences([])` returned `{public}`, conflating "every source is public"

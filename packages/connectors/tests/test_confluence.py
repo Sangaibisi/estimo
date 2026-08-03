@@ -52,6 +52,35 @@ def _no_restrictions() -> dict[str, object]:
 
 
 class TestStorageToText:
+    def test_code_macro_keeps_comparison_operators(self) -> None:
+        """CDATA was inlined BEFORE the tag pass, so everything between a `<` and the
+        next `>` inside a code sample was deleted: `if (tutar < 100 AND adet > 2)`
+        arrived as `if (tutar 2)`. In a telco BSS wiki that is where the rules live."""
+        rule = "if (tutar < 100 AND adet > 2) { indirim(); }"
+        text = storage_to_text(
+            "<p>Kural:</p><ac:structured-macro ac:name='code'><ac:plain-text-body>"
+            f"<![CDATA[{rule}]]></ac:plain-text-body></ac:structured-macro>"
+        )
+        assert rule in text, f"the tag-stripper ate part of the code sample: {text!r}"
+
+    def test_code_macro_text_is_not_entity_unescaped(self) -> None:
+        """A code sample's `&amp;` is literal source, not an entity to resolve."""
+        text = storage_to_text("<ac:plain-text-body><![CDATA[a &amp; b]]></ac:plain-text-body>")
+        assert "a &amp; b" in text
+
+    def test_table_row_keeps_its_cells_together(self) -> None:
+        """Confluence wraps cell content in <p>, so the generic block pass put every
+        cell on its own line and a field table lost the field-to-type association —
+        `musteri_no` and `VARCHAR(20)` unsearchable as a pair, and meaningless to read."""
+        text = storage_to_text(
+            "<table><tbody>"
+            "<tr><th><p>Alan</p></th><th><p>Tip</p></th></tr>"
+            "<tr><td><p>musteri_no</p></td><td><p>VARCHAR(20)</p></td></tr>"
+            "</tbody></table>"
+        )
+        rows = text.splitlines()
+        assert rows == ["Alan · Tip", "musteri_no · VARCHAR(20)"], rows
+
     def test_strips_markup_and_unescapes(self) -> None:
         text = storage_to_text("<h1>Başlık</h1><p>a &amp; b</p><br/><ul><li>madde</li></ul>")
         assert "Başlık" in text and "a & b" in text and "madde" in text

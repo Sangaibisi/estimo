@@ -322,13 +322,25 @@ that overstate the build. Each names what blocked it.
   resolved through the `default` profile; fail-open with a recorded signal). Whether a real
   cross-encoder improves Turkish ranking is NOT measurable here — same blocker as the S3-2
   shoot-out — so the wiring may ship, but no quality claim may.
-- [ ] S11-2 Contextual chunk headers (S3-3) — **blocked on two preconditions that turned
-  up while scoping it**: there is no chunker (a Confluence page becomes ONE
-  `knowledge_chunks` row, so a "section header" has no section to describe), and nothing
-  writes chunk embeddings (S11-8), so a header added before embedding would be read by
-  nobody. Structure-aware chunking must land first; the header is a no-op without it,
-  because the Turkish tsvector already indexes `title || text` and the Confluence lane
-  already prefixes the space key onto the title.
+- [ ] S11-2 Contextual chunk headers / structure-aware chunking — **deliberately held,
+  with the reason measured rather than assumed.** A five-surface impact sweep split this
+  into three pieces:
+  - **C1 — normalizer structure. DONE**, and shipped on its own because two of its parts
+    were live bugs under the current one-row model: CDATA was inlined before the tag
+    pass (so `if (tutar < 100 AND adet > 2)` reached the index as `if (tutar 2)`), and
+    Confluence's `<p>`-wrapped table cells each became their own line, destroying the
+    field-to-type association a field table exists to carry.
+  - **C2 — the split itself. HELD.** `lexical_chunk_ids` has exactly ONE production
+    caller (`generate_candidate`); the chunk shelf feeds no desk, no estimator, no MCP
+    tool, no API endpoint. So splitting buys better source selection for canonical
+    *drafts* — a surface with a human reviewer in front of it — against a prune
+    restructure, a `title` column migration, a forced full re-crawl on every future
+    chunker tweak, and a higher rate of unapprovable drafts. **Gate: a second consumer of
+    the chunk shelf, or the S8-5 pilot with a live embedding endpoint to measure
+    against.** The blocking defect is pinned by a `strict=True` xfail
+    (`test_a_multi_chunk_page_keeps_all_of_its_chunks`) that fails today and will error
+    the suite the moment someone fixes the prune without removing the marker.
+  - **C3 — canonical source diversity, counters, UI breadth label.** Follows C2.
 - [x] S11-3 Anonymized Delphi aggregation view (S7-4) — the desk carries a per-item
   `delphi` block behind two server-side gates: the requester must have recorded their
   own band for that item (independent-first is not bypassable through the panel), and

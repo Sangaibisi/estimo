@@ -456,3 +456,77 @@ async def test_prefix_prune_does_not_reach_across_connections(clean: AsyncSessio
     assert survivors == {"repo://axb@sha1/billing"}, (
         f"pruning connection a_b reached into another connection: {survivors}"
     )
+
+
+@pytest.mark.xfail(
+    reason=(
+        "S11-2 precondition, not yet built. The Confluence prune runs INSIDE the "
+        "per-document loop and excludes only the ref just written, so once a page "
+        "yields more than one chunk each upsert deletes its own earlier siblings and "
+        "only the LAST section of every page survives — reported as a successful crawl. "
+        "This test is written now, against today's code, so the blocker cannot ship "
+        "quietly when someone picks the chunker up without the impact sweep behind them."
+    ),
+    strict=True,
+)
+async def test_a_multi_chunk_page_keeps_all_of_its_chunks(clean: AsyncSession) -> None:
+    session = clean
+    from estimo_knowledge import KnowledgeChunk, lexical_chunk_ids
+
+    connection = Connection(
+        kind="confluence",
+        name="aurora-chunked",
+        base_url="https://example.invalid",
+        secret_env="ESTIMO_SECRET_TEST",
+        acl_keys=["public"],
+        config={"email": "a@b.c", "space_keys": ["AUR"]},
+    )
+    session.add(connection)
+    await session.commit()
+
+    class ChunkedConnector:
+        """One page split into four sections, the shape the chunker will emit."""
+
+        async def crawl(self, checkpoint: dict[str, object]) -> AsyncIterator[Any]:
+            from estimo_connectors import SourceDocument
+
+            sections = [
+                ("Giriş", "Sarmasik kapsam tanimi ve amaci."),  # distinctive: FIRST only
+                ("Kapsam", "Taksitlendirme kapsami."),
+                ("Kurallar", "Taksitlendirme kurallari."),
+                ("Ekler", "Taksitlendirme ekleri."),
+            ]
+            for index, (heading, body) in enumerate(sections):
+                yield SourceDocument(
+                    source_type="confluence",
+                    source_ref=f"wiki://88@1#{index}",
+                    title=f"[AUR] Taksitlendirme › {heading}",
+                    text=body,
+                    freshness_at=None,
+                    authority=0.5,
+                    acl_keys=("public",),
+                )
+
+        async def aclose(self) -> None:
+            return None
+
+    import estimo_connectors.sync as sync_module
+
+    os.environ["ESTIMO_SECRET_TEST"] = "token"
+    original = sync_module.ConfluenceConnector  # type: ignore[attr-defined]
+    try:
+        sync_module.ConfluenceConnector = lambda **kw: ChunkedConnector()  # type: ignore[assignment,attr-defined]
+        run = await run_sync(session, connection)
+        assert run.status == "succeeded", run.error
+    finally:
+        sync_module.ConfluenceConnector = original  # type: ignore[attr-defined]
+        os.environ.pop("ESTIMO_SECRET_TEST", None)
+
+    refs = {row.source_ref for row in (await session.execute(select(KnowledgeChunk))).scalars()}
+    assert refs == {f"wiki://88@1#{i}" for i in range(4)}, f"siblings were pruned: {refs}"
+
+    # A row count cannot fake this: the distinctive term is in the FIRST section only,
+    # which is exactly the row a per-document prune destroys.
+    assert await lexical_chunk_ids(session, "sarmasik", acl_keys=["public"]), (
+        "the head of the page is no longer retrievable"
+    )

@@ -47,22 +47,56 @@ _SPACE_KEY = re.compile(r"^[A-Za-z0-9_~.-]+$")
 _CDATA = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.DOTALL)
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"[ \t ]+")
+# A table cell and the block tags that may wrap its content. Confluence storage format
+# wraps cell text in <p>, so cells must be flattened BEFORE the generic block pass.
+_CELL = re.compile(r"<(td|th)\b[^>]*>(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
+_CELL_INNER = re.compile(r"</?(p|div|br|h[1-6])\s*/?>", re.IGNORECASE)
+# Sentinels: characters that cannot appear in XHTML text, so they survive the tag pass
+# and cannot be forged by page content.
+_CELL_SEP = "\x01"
+_CDATA_MARK = "\x02{}\x03"
+_TRAILING_SEP = re.compile(r"(?:\s*·)+\s*$|^\s*(?:·\s*)+")
 
 
 def storage_to_text(storage_html: str) -> str:
     """Confluence storage format (XHTML) → plain text, dependency-free.
 
-    CDATA bodies (code/noformat macros) are unwrapped FIRST — the tag-stripper
-    would otherwise swallow them wholesale. Block tags become newlines; entities
-    unescape; whitespace collapses.
+    Two orderings here are load-bearing, and both were wrong before:
+
+    CDATA bodies (code/noformat macros) are held OUT of the pipeline behind sentinels
+    rather than inlined up front. Inlining first fed their contents to the tag-stripper,
+    so a rule reading `if (tutar < 100 AND adet > 2)` became `if (tutar 2)` — everything
+    between a `<` and the next `>` deleted. In a telco BSS wiki that is precisely where
+    the business rules are written.
+
+    Table cells are flattened BEFORE the generic block pass. Confluence wraps cell
+    content in `<p>`, so the generic pass turned every cell into its own line and a
+    field table lost the association between a field and its type: `musteri_no` and
+    `VARCHAR(20)` ended up on separate lines, unsearchable as a pair and meaningless to
+    a human reading the retrieved text. Cells now join with a separator and `</tr>`
+    remains the only row boundary.
     """
-    text = _CDATA.sub(lambda match: match.group(1), storage_html)
+    held: list[str] = []
+
+    def _hold(match: re.Match[str]) -> str:
+        held.append(match.group(1))
+        return _CDATA_MARK.format(len(held) - 1)
+
+    text = _CDATA.sub(_hold, storage_html)
+    text = _CELL.sub(lambda m: f"{_CELL_INNER.sub(' ', m.group(2))}{_CELL_SEP}", text)
     text = re.sub(r"</(p|h[1-6]|li|tr|div|table)>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<(br|hr)\s*/?>", "\n", text, flags=re.IGNORECASE)
     text = _TAG.sub(" ", text)
     text = unescape(text)
+    # Restore AFTER unescape: a code sample's `&amp;` is literal text, and unescaping it
+    # would silently rewrite the sample.
+    for index, body in enumerate(held):
+        text = text.replace(_CDATA_MARK.format(index), body)
+    text = text.replace(_CELL_SEP, " · ")
     text = _WS.sub(" ", text)
-    return "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    # A trailing cell separator on every row, and rows that were only empty cells.
+    lines = (_TRAILING_SEP.sub("", line).strip() for line in text.splitlines())
+    return "\n".join(line for line in lines if line)
 
 
 def _parse_when(value: str | None) -> datetime | None:
