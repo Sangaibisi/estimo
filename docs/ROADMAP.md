@@ -438,23 +438,36 @@ UI found **99 verified gaps** (144 raw claims, deduped/refuted down). The design
 richer than the implementation; this sprint tracks closing it honestly instead of
 letting the design doc overstate the product.
 
-Shipped in the first pass (2026-08-04): desk **Confidence** column, desk **A/R column +
-expandable assumptions/risks panel**, anchor **quarantine pills** (snippet + dashed crit
-border, replacing the emoji count chip), workspace **labeled stage strip** + stage
-derivation fix (BoE rows showed one stage behind; 0-vs-— distinction), ledger
-**DeviationBadge graded against the range** (within / above·+% / below), ledger
-**AnalogCard match grid** with actual-effort ticks that may sit outside the band, BoE
-**assumption register + risks & contingency sections on screen**, BoE **draft visible
-before signatures** (export stays gated), dead duplicate components removed.
+**This list is live: a line is DELETED when it ships, not ticked.** What shipped and
+why is recorded in `CHANGELOG.md`; keeping a growing "done" section here would mean
+re-reading history on every pass. The design HTML itself is never edited — it is the
+source of truth (docs/design/README.md), and a design the code has caught up with is
+still the specification the code must keep matching.
 
-Still open, grouped (feasibility from the audit):
+Open, grouped (feasibility from the audit):
 
-- [ ] **S12-1 Desk (medium):** ConeBadge (cone-of-uncertainty stage), Delta as
-  range-relationship chips (intersect/disjoint) instead of a bare signed number,
-  blocked requirements as held rows, explicit reveal controls (per-row + reveal-all),
-  rationale capture, per-row Status column, sticky footer + signature progress bar +
-  post-reveal total, weak-evidence/discovery chips, evidence per-kind aggregation,
-  REQ-id column, drag-to-set range input.
+- [ ] **S12-1 Desk (medium):** explicit reveal controls — the design has a per-row
+  "Reveal draft" button (disabled until your band is entered) and a footer
+  "Reveal all drafts" producing a deliberate State A → State B flip; today recording
+  a band IS the reveal. Moving the reveal is a behavioural change to the anchoring
+  measurement (the delta is captured at record time), so it needs its own decision.
+  Also: drag-to-set range input ("type, or drag the bar" — the wireframe's
+  5–10s-per-item fast path), and a "Skip this item" control.
+- [ ] **S12-1a Confidence in the closed state (needs an estimator change, not a UI
+  one).** The design shows the mapping-confidence grade on State A rows, and it was
+  shipped that way for one review cycle until an audit showed it is INVERTIBLE: the
+  estimator's no-analog branch pins band 1/3/8 pd, confidence LOW and contingency
+  4.0 pd together, so the grade on a closed row *is* the band; the analog branch
+  derives the contingency as 30% of likely. Showing either before the reveal
+  corrupts the very anchoring measurement PRINCIPLES #4 protects. Prerequisite:
+  decouple the grade from the band in `packages/estimate` (e.g. a confidence signal
+  computed from evidence coverage alone, and a prior band that is not a constant).
+- [ ] **S12-1b Held rows only appear before a draft exists.** `decompose` skips
+  blocked requirements and `estimate_state` refuses to build while any remain, so a
+  desk WITH a draft never has held rows — the design prices the clear items and
+  holds the blocked ones side by side in the same table. Closing this means letting
+  a draft be built over a partially-blocked BRD, which changes what "estimate of
+  record" means; it is a pipeline decision, not a rendering one.
 - [ ] **S12-2 Reading Room (large):** the two-pane split view (serif source document
   with inline highlights ↔ requirements), full ambiguity reason sentences, summary
   chips, provenance column, re-read / mark-as-clear / send-to-board stage controls.

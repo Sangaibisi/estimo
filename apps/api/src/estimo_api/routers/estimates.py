@@ -255,6 +255,9 @@ class IndependentIn(BaseModel):
     optimistic: float = Field(ge=0)
     likely: float = Field(ge=0)
     pessimistic: float = Field(ge=0)
+    # Optional, and only capturable HERE: after the draft is revealed any rationale
+    # is a rationalization of the delta, not the reasoning that produced the band.
+    rationale: str | None = Field(default=None, max_length=2000)
 
 
 @router.post("/{estimate_id}/independent", status_code=status.HTTP_201_CREATED)
@@ -305,6 +308,7 @@ async def record_independent(
             optimistic=payload.optimistic,
             likely=payload.likely,
             pessimistic=payload.pessimistic,
+            rationale=(payload.rationale or "").strip() or None,
             revealed=line is not None,
         )
     )
@@ -427,7 +431,18 @@ async def estimate_desk(
     estimator: Annotated[str, Query(min_length=1)],
 ) -> dict[str, Any]:
     """Independent-first desk: AI bands appear per item ONLY after the estimator's own
-    band exists for that item against the CURRENT draft (server-enforced, PRINCIPLES #4)."""
+    band exists for that item against the CURRENT draft (server-enforced, PRINCIPLES #4).
+
+    The gate covers every DRAFT-DERIVED field, not just the band. The design draws a
+    confidence grade and a discovery chip in the closed state, and both were shipped
+    that way for one review cycle — until an audit showed the estimator's own pipeline
+    makes them invertible: the no-analog branch pins the band at 1/3/8 pd, confidence
+    at LOW and the contingency at 4.0 pd together, so "low" or "4 pd" on a closed row
+    IS the band, and the analog branch derives the contingency as 30% of likely, which
+    divides straight back out. A grade is only safe to show when it is not a proxy for
+    a number; here it is one, so it waits for the reveal like everything else. Closing
+    the gap for real means decoupling the grade from the band in the estimator
+    (ROADMAP S12-1), not loosening this endpoint."""
     estimator = _bound_identity(request, principal, estimator)
     record = await _get_record(session, estimate_id)
     state = PipelineState.model_validate(record.state)
@@ -467,20 +482,48 @@ async def estimate_desk(
                 if independent
                 else None
             ),
+            "rationale": independent.rationale if independent else None,
             "signed": line is not None and item.id in signatures,
             # Recomputed per item: a panel counted per ESTIMATE would open an item that
             # only two people actually estimated.
             "delphi": _delphi_block(panel[item.id], has_own=independent is not None),
+            # NOTHING draft-derived travels before the reveal — see the note below.
+            "confidence": None,
+            "discovery_pd": None,
             "ai": None,
             "delta_likely": None,
         }
         if independent is not None and line is not None:
             entry["ai"] = line.model_dump(mode="json")
+            entry["confidence"] = line.confidence.value
+            entry["discovery_pd"] = (
+                round(sum(risk.contingency_pd or 0 for risk in line.risks), 1) or None
+            )
             entry["delta_likely"] = round(float(independent.likely) - line.range.likely, 1)
         items.append(entry)
-    # Deliberately no writes and no commit: this is a read. The reveal and its
-    # anchoring telemetry are emitted by POST /independent, the act that earns them.
-    return {"items": items, "has_boe": boe is not None}
+
+    # Blocked requirements are drawn on the desk as HELD rows. Leaving them off made
+    # the desk look complete while a requirement sat unpriced behind an open question:
+    # "no line item without evidence" is a promise the desk has to show, not hide.
+    work_item_requirements = {req for item in state.work_items for req in item.requirement_ids}
+    held = [
+        {
+            "requirement_id": requirement.id,
+            "text": requirement.text,
+            "reason": (requirement.ambiguity_issues or ["blocked"])[0],
+        }
+        for requirement in state.requirements
+        if requirement.id in set(state.blocked_ids) and requirement.id not in work_item_requirements
+    ]
+    return {
+        "items": items,
+        "has_boe": boe is not None,
+        "held": held,
+        # Cone-of-uncertainty stage the draft was issued at (PRINCIPLES #1). The desk
+        # footer shows it because a ±4x concept-stage band is a different promise from
+        # a ±1.25x detailed one, and the reader must be told which they are looking at.
+        "cone_stage": boe.cone_stage.value if boe else None,
+    }
 
 
 class SignIn(BaseModel):

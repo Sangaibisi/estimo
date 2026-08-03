@@ -53,6 +53,17 @@ uv run ruff format . && uv run ruff check . && uv run mypy apps packages
 uv run pytest                      # db-marked tests need ESTIMO_TEST_DATABASE_URL
 ```
 
+> **`ESTIMO_TEST_DATABASE_URL` must point at a throwaway database.** The db-marked
+> suite runs `alembic upgrade head` against it and TRUNCATES the tenant tables
+> between tests. Pointing it at the compose stack's own database — the obvious
+> shortcut, since that Postgres is already running — silently wipes whatever you
+> were looking at in the UI. Create a second database on the same server instead:
+>
+> ```bash
+> docker compose exec db createdb -U estimo estimo_test
+> export ESTIMO_TEST_DATABASE_URL=postgresql+asyncpg://estimo:change-me@localhost:5433/estimo_test
+> ```
+
 The web app is a separate npm project under `apps/web` (it is excluded from the uv
 workspace on purpose):
 

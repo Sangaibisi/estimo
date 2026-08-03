@@ -618,3 +618,44 @@ async def test_actual_carries_team_and_domain_attribution(client: httpx.AsyncCli
     assert attribution["product_rows"] >= 1
     assert attribution["with_team"] >= 1
     assert "billing-core" in attribution["teams"]
+
+
+async def test_no_draft_derived_field_reaches_a_closed_row(client: httpx.AsyncClient) -> None:
+    """PRINCIPLES #4 covers every draft-derived field, not just the band.
+
+    Confidence and the discovery contingency shipped in the closed state for one review
+    cycle because the design draws them there. They are INVERTIBLE against our own
+    estimator: the no-analog branch pins band 1/3/8 pd, confidence LOW and contingency
+    4.0 pd together, so either value on a closed row reconstructs the band exactly; the
+    analog branch derives the contingency as 30% of likely, which divides back out. The
+    gate therefore withholds them until the row is revealed.
+    """
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    desk = await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "D. Aksoy"})
+    assert desk.status_code == 200
+    items = desk.json()["items"]
+    assert items, "fixture produced no work items — the assertions below would be vacuous"
+    for entry in items:
+        assert entry["ai"] is None
+        assert entry["confidence"] is None, "a closed row disclosed the draft's confidence grade"
+        assert entry["discovery_pd"] is None, "a closed row disclosed a draft-derived pd number"
+    # …and they arrive, agreeing with the line, the moment the estimator commits.
+    item_id = str(items[0]["work_item"]["id"])
+    assert (await _record_band(client, estimate_id, item_id, "D. Aksoy")).status_code == 201
+    revealed = await client.get(
+        f"/v1/estimates/{estimate_id}/desk", params={"estimator": "D. Aksoy"}
+    )
+    rows = revealed.json()["items"]
+    entry = next(row for row in rows if row["work_item"]["id"] == item_id)
+    assert entry["ai"] is not None
+    assert entry["confidence"] == entry["ai"]["confidence"]
+    contingency = sum(risk["contingency_pd"] or 0 for risk in entry["ai"]["risks"])
+    assert entry["discovery_pd"] == (round(contingency, 1) or None)
+    # The OTHER rows are still closed, and still disclose nothing — a reveal is
+    # per item, so one recorded band must not open the whole desk.
+    for other in rows:
+        if other["work_item"]["id"] != item_id:
+            assert other["confidence"] is None and other["discovery_pd"] is None

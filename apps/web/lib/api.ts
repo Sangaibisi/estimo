@@ -40,6 +40,21 @@ export interface ThreePoint {
   pessimistic: number;
 }
 
+export interface HeldRequirement {
+  requirement_id: string;
+  text: string;
+  reason: string;
+}
+
+/** Cone-of-uncertainty stage a draft was issued at, and the band it promises
+ * (PRINCIPLES #1 / McConnell). Concept-stage numbers are a different claim from
+ * detailed-stage ones, so the desk says which it is showing. */
+export const CONE_MULTIPLIER: Record<string, string> = {
+  concept: "±4x",
+  approved_scope: "±1.6x",
+  detailed: "±1.25x",
+};
+
 export interface DeskItem {
   work_item: {
     id: string;
@@ -49,6 +64,9 @@ export interface DeskItem {
     requirement_ids: string[];
   };
   independent: ThreePoint | null;
+  rationale: string | null;
+  confidence: string | null;
+  discovery_pd: number | null;
   signed: boolean;
   delphi: {
     // "you_first" and "below_threshold" carry no band-shaped value at all — with two
@@ -116,12 +134,19 @@ export const api = {
       { method: "POST" },
     ),
   desk: (id: string, estimator: string) =>
-    request<{ items: DeskItem[]; has_boe: boolean }>(
-      `/v1/estimates/${id}/desk?estimator=${encodeURIComponent(estimator)}`,
-    ),
+    request<{
+      items: DeskItem[];
+      has_boe: boolean;
+      held: HeldRequirement[];
+      cone_stage: string | null;
+    }>(`/v1/estimates/${id}/desk?estimator=${encodeURIComponent(estimator)}`),
   recordIndependent: (
     id: string,
-    payload: { work_item_id: string; estimator: string } & ThreePoint,
+    payload: {
+      work_item_id: string;
+      estimator: string;
+      rationale?: string;
+    } & ThreePoint,
   ) =>
     request<{ status: string }>(`/v1/estimates/${id}/independent`, {
       method: "POST",

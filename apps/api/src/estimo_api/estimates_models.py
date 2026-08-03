@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -72,6 +73,9 @@ class IndependentEstimate(TenantScoped, Base):
     optimistic: Mapped[float] = mapped_column(Numeric(8, 2))
     likely: Mapped[float] = mapped_column(Numeric(8, 2))
     pessimistic: Mapped[float] = mapped_column(Numeric(8, 2))
+    # Why this band, in the estimator's words. Optional, captured at entry — the delta
+    # to the draft records how far apart the two were, never what the human knew.
+    rationale: Mapped[str | None] = mapped_column(Text, default=None)
     revealed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

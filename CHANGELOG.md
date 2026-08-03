@@ -9,6 +9,26 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-1 — the Estimate Desk matches its design.** The desk now carries the
+  design's full column set in its order: REQ ids linking a line back to the BRD,
+  the mapping **Confidence** grade, a `+ discovery N pd` chip wherever weak
+  evidence bought contingency, the delta as a range-**relationship** chip (ranges
+  intersect / disjoint — discuss) with the signed number secondary, per-row Status,
+  and evidence aggregated per kind with counts instead of silently truncating after
+  three. Confidence and the discovery chip appear **after** the reveal, not in the
+  closed state the design draws them in: an audit found them invertible against our
+  own estimator (the no-analog branch pins band, grade and contingency together),
+  so showing them early would hand over the band and corrupt the anchoring
+  measurement. The gate now covers every draft-derived field, pinned by a test that
+  fails if any of them reaches a closed row (ROADMAP S12-1a). **Blocked
+  requirements appear as held rows**: leaving them off made the desk look complete
+  while a requirement sat unpriced behind an open question. An optional
+  **rationale** is captured at entry (migration 0012) and shown in the expanded
+  row — the only record of *why* a band was what it was; it is capturable only
+  before the reveal, after which any rationale is a rationalization of the delta.
+  The sticky footer adds the **ConeBadge** (concept ±4x / approved scope ±1.6x /
+  detailed ±1.25x — PRINCIPLES #1), a signature progress bar, and switches from
+  "your subtotal" to the estimate of record once every item is revealed.
 - **Design parity, first pass (S12).** A 12-auditor sweep against the delivered
   design found 99 verified gaps; the highest-value small ones shipped: desk
   Confidence column and A/R column with an expandable assumptions/risks panel
