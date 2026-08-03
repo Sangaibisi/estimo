@@ -10,6 +10,7 @@ from estimo_knowledge.db import Base as KnowledgeBase
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import estimo_api.estimates_models  # noqa: F401 - registers workflow tables on ApiBase
 from estimo_api.models import Base as ApiBase
 
 config = context.config

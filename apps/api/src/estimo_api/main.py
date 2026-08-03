@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from estimo_api.db import build_engine, build_sessionmaker
-from estimo_api.routers import health, runs
+from estimo_api.routers import estimates, health, runs
 from estimo_api.settings import Settings
 
 
@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Estimo API", lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(runs.router)
+    app.include_router(estimates.router)
     return app
 
 
