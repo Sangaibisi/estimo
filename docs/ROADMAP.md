@@ -15,12 +15,25 @@ file answers "what, in which order, and is it done".
 
 ## Status (2026-08-03)
 
-**Every sprint S0–S10 is engineering-complete and CI-green.** What remains is
-maintainer-owned and cannot be produced from synthetic data or without customer
+**S0–S10 are built and CI-green: the flow runs end to end**, from a Turkish BRD upload
+through the question gate, independent-first desk and line-by-line signature to an
+exported `.docx`. Two kinds of work remain, and they are different in kind.
+
+*Engineering, deferred rather than done* — seven items S3–S10 scoped but did not deliver,
+now collected in **[S11](#s11--carried-forward--status--not-started)** instead of hiding
+inside a ticked box: the rerank slot, contextual chunk headers, Delphi aggregation,
+team/domain curves, the OAuth repo picker, the docs site, and per-user canonical ACL
+filtering. Each names what blocks it.
+
+*Maintainer-owned* — cannot be produced from synthetic data or without customer
 credentials: the F1 blinded evaluation's human/hybrid arms (S4), the dogfood pilot and
 its F2→F3 decision report (S8-5), a real Confluence/Bitbucket tenant sync (S9), and the
 second external installation + security review (S10 exit gate). Each is marked 🧑 in its
 sprint.
+
+One caveat worth stating plainly: **the calibration numbers come from a 15-row synthetic
+seed ledger.** They demonstrate that the mechanism works, not that it is accurate on real
+delivery data — that is exactly what the S8 pilot is for.
 
 ## Phase map
 
