@@ -490,10 +490,15 @@ Open, grouped (feasibility from the audit):
   and discards them — `AnalogyCard` exposes only an ordinal rank), and a wiki
   freshness chip that states the age ("updated 8 months ago") rather than only
   flagging staleness.
-- [ ] **S12-5 BoE (large):** version history + diff, two-role signature flow
-  (Reviewer → Signing authority) with row-scoped batch signing, in-document signature
-  block, contents rail, O/L/P columns + paper framing, provenance appendix on screen,
-  scope & exclusions section (needs a model field), archival PDF.
+- [ ] **S12-5 BoE (small, remainder):** an **archival PDF** export (the `.docx`
+  renderer exists; PDF needs a new rendering dependency, which is an ADR-0005
+  decision, not a wiring job); a **scope & exclusions** section (`BoeDocument` has no
+  such field — the pipeline would have to produce it); the design's **row-scoped
+  batch panel ON the BoE screen** (the `/sign-rows` endpoint exists and the desk
+  signs rows today, but our server withholds the document until every row is signed,
+  so on the BoE screen there is nothing left to batch — moving the panel there means
+  moving the document gate); and the **paper framing** of the document card
+  (shadowed page, ruled header with customer · version · date).
 - [ ] **S12-6 Ledger (medium):** seed-set import wizard + error queue, similarity
   percentages (needs retrieval to surface scores), team/domain filters, Delivered/Team
   columns, BoE cross-links, 'Range that day' header.

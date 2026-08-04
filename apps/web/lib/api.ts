@@ -160,6 +160,18 @@ export const api = {
     request<QuestionLetter>(
       `/v1/estimates/${id}/questions/letter?ids=${encodeURIComponent(ids.join(","))}&locale=${locale}`,
     ),
+  signRows: (id: string, work_item_ids: string[], name: string, role = "Reviewer") =>
+    request<{ signed: number; already_signed: number }>(
+      `/v1/estimates/${id}/sign-rows`,
+      { method: "POST", body: JSON.stringify({ work_item_ids, name, role }) },
+    ),
+  signDocument: (id: string, name: string) =>
+    request<{ status: string }>(`/v1/estimates/${id}/sign-document`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  boeVersions: (id: string) =>
+    request<BoeVersions>(`/v1/estimates/${id}/versions`),
   impact: (id: string, module?: string) =>
     request<ImpactMapData>(
       `/v1/estimates/${id}/impact${module ? `?module=${encodeURIComponent(module)}` : ""}`,
@@ -492,4 +504,34 @@ export interface ImpactMapData {
       rank: number;
     }[];
   } | null;
+}
+
+export interface BoeVersions {
+  current: number;
+  /** Who signed the CURRENT version — the document's signature page names people,
+   * not roles with the word "Signed" under them. */
+  reviewers: string[];
+  authority: { name: string; signed_at: string } | null;
+  versions: {
+    version: number;
+    created_at: string;
+    note: string | null;
+    lines: number;
+    critic_findings: number;
+    authority_signed: boolean;
+  }[];
+  /** WHICH lines changed and in which direction — never by how much. A diff that
+   * printed the numbers would be a reveal with extra steps (PRINCIPLES #4). */
+  /** Diffs touching a version nobody signed are withheld: direction alone tells an
+   * estimator which way the draft moved before they record their own band. */
+  diffs_withheld: number;
+  diffs: {
+    from: number;
+    to: number;
+    added: string[];
+    removed: string[];
+    widened: string[];
+    narrowed: string[];
+    shifted: string[];
+  }[];
 }

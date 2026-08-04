@@ -19,10 +19,17 @@ import {
   type DocBlock,
   type EstimateSummary,
   type HeldRequirement,
+  type BoeVersions,
   type ImpactMapData,
   type QuestionLetter,
 } from "@/lib/api";
-import { detectLocale, issueSentence, t, type Locale } from "@/lib/i18n";
+import {
+  detectLocale,
+  issueSentence,
+  t,
+  type Locale,
+  type MessageKey,
+} from "@/lib/i18n";
 import {
   BandHeader,
   Chip,
@@ -83,12 +90,14 @@ interface RegisterEntry {
 interface BoeLineShape {
   work_item_id: string;
   range: { optimistic: number; likely: number; pessimistic: number };
+  evidence?: { uri: string; kind: string; label?: string | null }[];
   assumptions?: RegisterEntry[];
   risks?: RegisterEntry[];
 }
 
 interface BoeDocShape {
   lines?: BoeLineShape[];
+  cone_stage?: string;
   global_assumptions?: RegisterEntry[];
   global_risks?: RegisterEntry[];
 }
@@ -645,6 +654,7 @@ export default function EstimateWorkspace({
         {stage === "boe" && (
           <BoePreview
             locale={locale}
+            id={id}
             summary={summary}
             fullySigned={fullySigned}
             critic={critic}
@@ -659,6 +669,7 @@ export default function EstimateWorkspace({
                 setActuals(await api.listActuals(id));
               })
             }
+            onSigned={refresh}
           />
         )}
       </div>
@@ -2492,10 +2503,20 @@ function DeskRow({
   );
 }
 
+/** A stored note is a stable key; a locale that has no string for it falls back to
+ * the key rather than showing nothing. */
+function versionNote(locale: Locale, note: string | null): string {
+  if (!note) return "—";
+  const key = `note-${note}` as MessageKey;
+  const translated = t(locale, key);
+  return translated === undefined ? note : translated;
+}
+
 /* ---------------- BoE preview & signature ---------------- */
 
 function BoePreview({
   locale,
+  id,
   summary,
   fullySigned,
   critic,
@@ -2505,8 +2526,10 @@ function BoePreview({
   downloadUrl,
   busy,
   onRecordActual,
+  onSigned,
 }: {
   locale: Locale;
+  id: string;
   summary: EstimateSummary;
   fullySigned: boolean;
   critic: string[];
@@ -2522,9 +2545,25 @@ function BoePreview({
     scope_changed: boolean;
     team?: string;
   }) => void;
+  onSigned: () => Promise<void>;
 }) {
   const [effort, setEffort] = useState<Record<string, string>>({});
   const [team, setTeam] = useState<Record<string, string>>({});
+  const [versions, setVersions] = useState<BoeVersions | null>(null);
+  const [authority, setAuthority] = useState("");
+  const [signError, setSignError] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
+  // Read from the CURRENT-version signer, not from a snapshot row: an estimate that
+  // predates the version table has no row for its own current version, and the flag
+  // would have read false forever on exactly the estimates a deployment already has.
+  const authoritySigned = Boolean(versions?.authority);
+
+  useEffect(() => {
+    api
+      .boeVersions(id)
+      .then(setVersions)
+      .catch(() => setVersions(null));
+  }, [id, fullySigned]);
   const titleOf = (workItemId: string) =>
     workItems.find((item) => item.id === workItemId)?.title ?? workItemId;
 
@@ -2557,8 +2596,98 @@ function BoePreview({
     { optimistic: 0, likely: 0, pessimistic: 0 },
   );
 
+  const sections: { key: string; label: MessageKey; present: boolean }[] = [
+    { key: "scope", label: "secScope", present: false },
+    { key: "lines", label: "secLines", present: boeLines.length > 0 },
+    { key: "assumptions", label: "secAssumptions", present: allAssumptions.length > 0 },
+    { key: "risks", label: "secRisks", present: allRisks.length > 0 },
+    // The cone stage is rendered in the rail itself, so it has no in-document
+    // anchor to jump to; it is listed as present because the reader can see it.
+    { key: "cone", label: "secCone", present: false },
+    { key: "provenance", label: "secProvenance", present: boeLines.length > 0 },
+    { key: "signature", label: "secSignature", present: fullySigned },
+  ];
+
   return (
     <div style={{ display: "flex" }}>
+      {/* Contents rail — the document's seven sections, with the ones this estimate
+          does not carry shown as absent rather than silently omitted. */}
+      <div
+        style={{
+          width: 210,
+          flex: "none",
+          borderRight: "1px solid var(--line)",
+          background: "var(--surf2)",
+          padding: "14px 12px",
+        }}
+      >
+        <Lbl>{t(locale, "contentsRail")}</Lbl>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            marginTop: 8,
+            fontSize: 13,
+          }}
+        >
+          {sections.map((section) => (
+            <a
+              key={section.key}
+              href={section.present ? `#boe-${section.key}` : undefined}
+              className="rail-i"
+              style={{
+                color: section.present ? undefined : "var(--mut)",
+                cursor: section.present ? "pointer" : "default",
+              }}
+              title={
+                section.present
+                  ? undefined
+                  : section.key === "scope"
+                    ? t(locale, "scopeSectionMissing")
+                    : t(locale, "sectionAbsent")
+              }
+            >
+              {t(locale, section.label)}
+            </a>
+          ))}
+        </div>
+        {boeDoc?.cone_stage && (
+          <div
+            style={{
+              marginTop: 16,
+              borderTop: "1px solid var(--line)",
+              paddingTop: 12,
+            }}
+          >
+            <Lbl>{t(locale, "coneStage")}</Lbl>
+            <div style={{ marginTop: 7 }}>
+              <Chip style={{ color: "var(--crit)", borderColor: "var(--crit)" }}>
+                {t(
+                  locale,
+                  boeDoc.cone_stage === "detailed"
+                    ? "coneDetailed"
+                    : boeDoc.cone_stage === "approved_scope"
+                      ? "coneApproved"
+                      : "coneConcept",
+                )}{" "}
+                · {CONE_MULTIPLIER[boeDoc.cone_stage] ?? "—"}
+              </Chip>
+            </div>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--mut)",
+                marginTop: 7,
+                textWrap: "pretty",
+              }}
+            >
+              {t(locale, "coneNarrows")}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div
         className="doc"
         style={{ flex: 1, minWidth: 0, padding: "16px 20px" }}
@@ -2605,11 +2734,13 @@ function BoePreview({
           </p>
         ) : (
           <>
-            <table className="dt" style={{ marginTop: 14 }}>
+            <table id="boe-lines" className="dt" style={{ marginTop: 14 }}>
               <thead>
                 <tr>
                   <th>{t(locale, "lineItem")}</th>
-                  <th style={{ width: 200 }}>{t(locale, "range")}</th>
+                  <th style={{ width: 62, textAlign: "right" }}>O</th>
+                  <th style={{ width: 62, textAlign: "right" }}>L</th>
+                  <th style={{ width: 62, textAlign: "right" }}>P</th>
                   <th style={{ width: 160 }}>{t(locale, "actualEffort")}</th>
                 </tr>
               </thead>
@@ -2628,10 +2759,11 @@ function BoePreview({
                           </Mn>
                         </div>
                       </td>
-                      <td className="num">
-                        {line.range.optimistic} / {line.range.likely} /{" "}
-                        {line.range.pessimistic} pd
+                      <td className="num">{line.range.optimistic}</td>
+                      <td className="num" style={{ fontWeight: 600 }}>
+                        {line.range.likely}
                       </td>
+                      <td className="num">{line.range.pessimistic}</td>
                       <td style={{ fontFamily: "var(--font-sans)" }}>
                         {recorded ? (
                           <div
@@ -2740,7 +2872,7 @@ function BoePreview({
 
             {/* 3 · Assumption register — on screen, same content the .docx renders. */}
             {allAssumptions.length > 0 && (
-              <div style={{ marginTop: 20 }}>
+              <div id="boe-assumptions" style={{ marginTop: 20 }}>
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}
                 >
@@ -2777,7 +2909,7 @@ function BoePreview({
 
             {/* 4 · Risks & contingency */}
             {allRisks.length > 0 && (
-              <div style={{ marginTop: 18 }}>
+              <div id="boe-risks" style={{ marginTop: 18 }}>
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}
                 >
@@ -2819,6 +2951,109 @@ function BoePreview({
                 </ul>
               </div>
             )}
+
+            {/* 6 · Provenance appendix — every line cites what it was built on. The
+                .docx has carried this since S6; the screen did not, which is exactly
+                the screen/artifact divergence the design forbids. */}
+            {boeLines.length > 0 && (
+              <div id="boe-provenance" style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+                  {t(locale, "secProvenance")}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--mut)",
+                    marginTop: 5,
+                    textWrap: "pretty",
+                  }}
+                >
+                  {t(locale, "provenanceIntro")}
+                </div>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
+                  {boeLines.map((line) => (
+                    <li
+                      key={line.work_item_id}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "baseline",
+                        fontSize: 12.5,
+                        color: "var(--ink2)",
+                        marginBottom: 5,
+                        textWrap: "pretty",
+                      }}
+                    >
+                      <Mn style={{ color: "var(--mut)", flex: "none" }}>
+                        {line.work_item_id}
+                      </Mn>
+                      <span style={{ flex: 1 }}>{titleOf(line.work_item_id)}</span>
+                      <span style={{ display: "flex", gap: 4, flex: "none" }}>
+                        {Object.entries(
+                          (line.evidence ?? []).reduce<Record<string, number>>(
+                            (acc, ref) => {
+                              acc[ref.kind] = (acc[ref.kind] ?? 0) + 1;
+                              return acc;
+                            },
+                            {},
+                          ),
+                        ).map(([kind, count]) => (
+                          <EvidenceChip key={kind} kind={kind} label={String(count)} />
+                        ))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 7 · Signature page, inside the document — a signature that only lives
+                in a side panel is not part of the artifact the customer receives. */}
+            {fullySigned && (
+              <div
+                id="boe-signature"
+                style={{
+                  borderTop: "1px solid var(--line2)",
+                  marginTop: 18,
+                  paddingTop: 13,
+                  display: "flex",
+                  gap: 34,
+                  fontFamily: "var(--font-sans)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <Lbl>{t(locale, "reviewer")}</Lbl>
+                  <div style={{ fontSize: 13, marginTop: 5 }}>
+                    {versions?.reviewers.length
+                      ? versions.reviewers.join(", ")
+                      : t(locale, "signed")}
+                  </div>
+                  <Mn style={{ color: "var(--mut)" }}>
+                    {boeLines.length} {t(locale, "items").toLowerCase()}
+                  </Mn>
+                </div>
+                <div>
+                  <Lbl>{t(locale, "roleSigning")}</Lbl>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      marginTop: 5,
+                      color: versions?.authority ? undefined : "var(--mut)",
+                    }}
+                  >
+                    {versions?.authority
+                      ? versions.authority.name
+                      : t(locale, "pendingAuthority")}
+                  </div>
+                  {versions?.authority && (
+                    <Mn style={{ color: "var(--mut)" }}>
+                      {new Date(versions.authority.signed_at).toLocaleDateString(locale)}
+                    </Mn>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -2832,16 +3067,192 @@ function BoePreview({
           background: "var(--surf2)",
         }}
       >
-        <Lbl>{t(locale, "exportSection")}</Lbl>
-        <div style={{ marginTop: 10 }}>
-          {fullySigned ? (
-            <a className="btn p" href={downloadUrl}>
-              {t(locale, "downloadDocx")}
-            </a>
-          ) : (
-            <StatusChip status="warn">{t(locale, "notSignedYet")}</StatusChip>
-          )}
+        {/* Signature flow — two roles, in order. A reviewer signs the rows they
+            reviewed on the desk; the authority signs the scope once, and only after
+            every row carries a reviewer's name, so they endorse a document that was
+            actually read line by line. */}
+        <Lbl>{t(locale, "signatureFlow")}</Lbl>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 9,
+            flexWrap: "wrap",
+          }}
+        >
+          <StatusChip status={fullySigned ? "ok" : "warn"}>
+            {t(locale, "reviewer")}
+          </StatusChip>
+          <span style={{ color: "var(--mut)" }}>&rarr;</span>
+          <StatusChip status={authoritySigned ? "ok" : "warn"}>
+            {t(locale, "roleSigning")}
+          </StatusChip>
         </div>
+
+        {fullySigned && !authoritySigned && (
+          <div style={{ marginTop: 11 }}>
+            <input
+              style={{ width: "100%" }}
+              placeholder={t(locale, "estimatorName")}
+              value={authority}
+              onChange={(event) => setAuthority(event.target.value)}
+            />
+            <button
+              type="button"
+              className="btn p"
+              style={{ marginTop: 7, width: "100%", justifyContent: "center" }}
+              disabled={busy || signing || !authority.trim()}
+              onClick={async () => {
+                setSigning(true);
+                setSignError(null);
+                try {
+                  await api.signDocument(id, authority.trim());
+                  setVersions(await api.boeVersions(id));
+                  await onSigned();
+                } catch (err) {
+                  setSignError(String(err));
+                } finally {
+                  setSigning(false);
+                }
+              }}
+            >
+              {t(locale, "authoritySigns")}
+            </button>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--mut)",
+                marginTop: 7,
+                textWrap: "pretty",
+              }}
+            >
+              {t(locale, "signScopeHint")}
+            </div>
+          </div>
+        )}
+        {signError && (
+          <div role="alert" style={{ color: "var(--crit)", fontSize: 12, marginTop: 8 }}>
+            {signError}
+          </div>
+        )}
+        {authoritySigned && versions && (
+          <div style={{ marginTop: 11 }}>
+            <StatusChip status="ok">
+              {t(locale, "signedConfirmation").replace("{n}", String(versions.current))}
+            </StatusChip>
+          </div>
+        )}
+
+        <div style={{ marginTop: 18 }}>
+          <Lbl>{t(locale, "exportSection")}</Lbl>
+          <div style={{ marginTop: 10 }}>
+            {fullySigned ? (
+              <a className="btn p" href={downloadUrl}>
+                {t(locale, "downloadDocx")}
+              </a>
+            ) : (
+              <StatusChip status="warn">{t(locale, "notSignedYet")}</StatusChip>
+            )}
+          </div>
+        </div>
+
+        {/* Version history and what changed between versions. The diff names WHICH
+            lines moved and in which direction, never by how much — printing the
+            numbers would be a reveal with extra steps. */}
+        {versions && versions.versions.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <Lbl>{t(locale, "versionHistory")}</Lbl>
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+              }}
+            >
+              {versions.versions.map((entry) => (
+                <div key={entry.version} style={{ fontSize: 12.5 }}>
+                  <span
+                    style={{
+                      color:
+                        entry.version === versions.current
+                          ? "var(--ink)"
+                          : "var(--ink2)",
+                      fontWeight:
+                        entry.version === versions.current ? 500 : undefined,
+                    }}
+                  >
+                    v{entry.version}
+                  </span>{" "}
+                  <span style={{ color: "var(--mut)" }}>
+                    {versionNote(locale, entry.note)} · {entry.lines}{" "}
+                    {t(locale, "items").toLowerCase()}
+                  </span>
+                  {entry.authority_signed && (
+                    <StatusChip status="ok" style={{ marginLeft: 6 }}>
+                      {t(locale, "signed")}
+                    </StatusChip>
+                  )}
+                </div>
+              ))}
+            </div>
+            {versions.diffs.map((diff) => {
+              const parts: string[] = [];
+              if (diff.added.length)
+                parts.push(`${t(locale, "diffAdded")} ${diff.added.length}`);
+              if (diff.removed.length)
+                parts.push(`${t(locale, "diffRemoved")} ${diff.removed.length}`);
+              if (diff.widened.length)
+                parts.push(`${t(locale, "diffWidened")} ${diff.widened.length}`);
+              if (diff.narrowed.length)
+                parts.push(`${t(locale, "diffNarrowed")} ${diff.narrowed.length}`);
+              if (diff.shifted.length)
+                parts.push(`${t(locale, "diffShifted")} ${diff.shifted.length}`);
+              return (
+                <div
+                  key={`${diff.from}-${diff.to}`}
+                  style={{
+                    marginTop: 8,
+                    fontSize: 12,
+                    color: "var(--ink2)",
+                    textWrap: "pretty",
+                  }}
+                >
+                  <Mn style={{ color: "var(--mut)" }}>
+                    v{diff.from} &rarr; v{diff.to}
+                  </Mn>{" "}
+                  {parts.length ? parts.join(" · ") : t(locale, "noChange")}
+                </div>
+              );
+            })}
+            {versions.diffs_withheld > 0 && (
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "var(--mut)",
+                  textWrap: "pretty",
+                }}
+              >
+                {t(locale, "diffsWithheld").replace(
+                  "{n}",
+                  String(versions.diffs_withheld),
+                )}
+              </div>
+            )}
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 11.5,
+                color: "var(--mut)",
+                textWrap: "pretty",
+              }}
+            >
+              {t(locale, "afterSigningBody")}
+            </div>
+          </div>
+        )}
 
         {critic.length > 0 && (
           <div style={{ marginTop: 18 }}>

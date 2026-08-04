@@ -9,6 +9,37 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-5 — the BoE keeps its versions, and two roles sign it.** `record.boe` was
+  overwritten on every rebuild and `boe_version` was a bare counter, so the document
+  a customer had been shown could not be reconstructed and the design's
+  "Diff v2 → v3" had nothing to diff. Every build is now frozen into `boe_versions`
+  (migration 0014, which also backfills the current draft of every existing
+  estimate). Signing became the design's two-step flow: a reviewer signs the rows
+  they reviewed — in one batch that is refused **whole** if any row is not eligible,
+  because a partly-applied signature leaves the signer unsure what their name covers
+  — and a signing authority then signs the scope once, allowed only after every line
+  carries a reviewer's name. The authority's signature now reaches the exported
+  `.docx`, which previously named every reviewer and not the person who authorised
+  the document. The screen gains the contents rail, O/L/P columns with the likely
+  emphasised, the **provenance appendix** (the `.docx` had carried it since S6; the
+  screen had not, which is exactly the artifact/screen divergence the design
+  forbids), and an in-document signature page naming its signers.
+
+  **The diff is gated.** The first cut served every adjacent pair — including the one
+  ending at the current *unsigned* draft — behind a docstring claiming band content
+  was withheld, and the test asserted only that the words "optimistic"/"pessimistic"
+  were absent: a false green that checked magnitudes while the direction signal
+  walked out. A line's three points all scale with the same analog median, so
+  "widened" on a **named** work item tells an estimator which way the draft moved
+  before they record their own band — the inference the desk refuses to allow, which
+  is why it withholds even the confidence grade. A diff is now served only between
+  versions that were **both fully signed** (both documents were legitimately
+  exportable), and the response says how many diffs are being withheld rather than
+  letting an empty list read as "nothing changed". Also fixed: `sign-rows` deduped
+  across *all* signers, so a second reviewer got a success response and their name
+  never appeared; `line_signatures` gained the uniqueness constraint that was
+  missing; and a raced rebuild answers 409 instead of 500.
+
 - **S12-4 — the Impact Map is a map again.** The design's graph view ships: a
   dotted canvas with module cards laid out deterministically (a ring ordered by
   weight, so the same estimate always draws the same picture — a force simulation

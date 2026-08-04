@@ -94,11 +94,74 @@ class IndependentEstimate(TenantScoped, Base):
 
 class LineSignature(TenantScoped, Base):
     __tablename__ = "line_signatures"
+    __table_args__ = (
+        # One signature per signer per row per draft version. Without this the same
+        # person could sign a row twice and the export would name them twice.
+        UniqueConstraint(
+            "estimate_id",
+            "work_item_id",
+            "boe_version",
+            "name",
+            name="uq_line_signatures_item_signer_version",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     estimate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("estimates.id", ondelete="CASCADE"))
     work_item_id: Mapped[str] = mapped_column(String(120))
     boe_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    name: Mapped[str] = mapped_column(String(120))
+    role: Mapped[str] = mapped_column(String(80))
+    signed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class BoeVersionRow(TenantScoped, Base):
+    """A frozen snapshot of the BoE at one version.
+
+    The estimate row keeps only the CURRENT draft; rebuilding used to overwrite it,
+    so the document a customer had been shown could not be reconstructed and
+    "Diff v2 → v3" had nothing to diff. A BoE is the artifact the whole estimate
+    exists to produce — overwriting it is the one thing a record of that kind must
+    not do.
+    """
+
+    __tablename__ = "boe_versions"
+    __table_args__ = (
+        UniqueConstraint("estimate_id", "version", name="uq_boe_versions_estimate_version"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    estimate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("estimates.id", ondelete="CASCADE"))
+    version: Mapped[int] = mapped_column(Integer)
+    document: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    critic: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
+    # Why this version exists — "first draft", or which answers invalidated the last.
+    note: Mapped[str | None] = mapped_column(String(300), default=None)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DocumentSignature(TenantScoped, Base):
+    """A signature over the WHOLE document, not a row.
+
+    A reviewer signs the rows they reviewed (`LineSignature`); a signing authority
+    signs the scope once. Modelling the second as one signature per row would
+    misstate what was signed.
+    """
+
+    __tablename__ = "document_signatures"
+    __table_args__ = (
+        UniqueConstraint(
+            "estimate_id", "boe_version", "role", name="uq_document_signatures_version_role"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    estimate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("estimates.id", ondelete="CASCADE"))
+    boe_version: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(80))
     signed_at: Mapped[dt.datetime] = mapped_column(

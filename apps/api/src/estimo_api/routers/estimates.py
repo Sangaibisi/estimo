@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import itertools
 import json
 import re
 import statistics
@@ -49,6 +50,8 @@ from estimo_api import telemetry
 from estimo_api.auth import Principal, current_principal, require_signing
 from estimo_api.db import get_session
 from estimo_api.estimates_models import (
+    BoeVersionRow,
+    DocumentSignature,
     EstimateRecord,
     IndependentEstimate,
     LineSignature,
@@ -486,11 +489,35 @@ async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, An
     findings = review_boe(boe, state)
     # Computed fields (total) serialize but are rejected on re-validation
     # (extra="forbid") — persist the storable projection only.
-    record.boe = boe.model_dump(mode="json", exclude={"total"})
+    document = boe.model_dump(mode="json", exclude={"total"})
+    record.boe = document
     record.boe_version += 1
     record.critic = findings
     record.status = "boe_draft"
-    await session.commit()
+    # Freeze it. Without this the previous document was simply gone: a customer could
+    # be holding v2 while nothing in the system could say what v2 said.
+    session.add(
+        BoeVersionRow(
+            estimate_id=estimate_id,
+            version=record.boe_version,
+            document=document,
+            critic=findings,
+            # A stable key, not prose: this string is stored and rendered, and
+            # English in the database is English on a Turkish reader's screen.
+            note="first-draft" if record.boe_version == 1 else "rebuilt-after-answers",
+        )
+    )
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Two rebuilds raced for the same version number. The optimistic lock catches
+        # most of it; this is the narrower window where both read the same
+        # boe_version. A 409 matches the "a draft already exists" answer this endpoint
+        # gives to the sequential case.
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="a rebuild is already in flight; reload and retry"
+        ) from None
     # No draft body here (independent-first): bands are reachable only through the
     # per-estimator desk gate until full sign-off.
     return {"status": "boe_draft", "version": record.boe_version, "critic": findings}
@@ -825,6 +852,289 @@ async def sign_line(
     return {"status": "signed"}
 
 
+class SignRowsIn(BaseModel):
+    """The design's "Sign 12 rows": a signature names exactly what it covers."""
+
+    work_item_ids: list[str] = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=120)
+    role: str = Field(default="Reviewer", min_length=1, max_length=80)
+
+
+@router.post(
+    "/{estimate_id}/sign-rows",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_signing)],
+)
+async def sign_rows(
+    estimate_id: uuid.UUID,
+    payload: SignRowsIn,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict[str, Any]:
+    """Sign a SET of rows in one act, and refuse the whole set if any row is not
+    eligible — a partially-applied batch would leave the signer unsure what their
+    name now covers, which is the one thing a signature must never be."""
+    signer = _bound_identity(request, principal, payload.name)
+    record = await _get_record(session, estimate_id)
+    if record.boe is None:
+        raise HTTPException(status_code=409, detail="no BoE draft to sign")
+    boe = BoeDocument.model_validate(record.boe)
+    line_ids = {line.work_item_id for line in boe.lines}
+    unknown = sorted(set(payload.work_item_ids) - line_ids)
+    if unknown:
+        raise HTTPException(status_code=404, detail=f"not lines of this draft: {unknown}")
+
+    reviewed = set(
+        (
+            await session.execute(
+                select(IndependentEstimate.work_item_id).where(
+                    IndependentEstimate.estimate_id == estimate_id,
+                    IndependentEstimate.estimator == signer,
+                    IndependentEstimate.boe_version == record.boe_version,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    missing = sorted(set(payload.work_item_ids) - reviewed)
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"record your independent band before signing: {missing}",
+        )
+
+    # Skip only rows THIS signer already signed. Deduping across every signer meant a
+    # second reviewer's signature was silently discarded — they saw success and their
+    # name never appeared, which is the failure mode a signature trail cannot have.
+    mine = set(
+        (
+            await session.execute(
+                select(LineSignature.work_item_id).where(
+                    LineSignature.estimate_id == estimate_id,
+                    LineSignature.boe_version == record.boe_version,
+                    LineSignature.name == signer,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    added = [item for item in payload.work_item_ids if item not in mine]
+    for work_item_id in added:
+        session.add(
+            LineSignature(
+                estimate_id=estimate_id,
+                work_item_id=work_item_id,
+                boe_version=record.boe_version,
+                name=signer,
+                role=payload.role,
+            )
+        )
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="those rows are being signed concurrently; retry"
+        ) from None
+    return {"signed": len(added), "already_signed": len(payload.work_item_ids) - len(added)}
+
+
+class SignDocumentIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+@router.post(
+    "/{estimate_id}/sign-document",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_signing)],
+)
+async def sign_document(
+    estimate_id: uuid.UUID,
+    payload: SignDocumentIn,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict[str, str]:
+    """The signing authority's signature over the whole scope.
+
+    Second in a two-step flow on purpose: it may only be given once EVERY row
+    carries a reviewer's signature, so the authority is endorsing a document that
+    has actually been reviewed line by line rather than one nobody read.
+    """
+    signer = _bound_identity(request, principal, payload.name)
+    record = await _get_record(session, estimate_id)
+    if record.boe is None:
+        raise HTTPException(status_code=409, detail="no BoE draft to sign")
+    if not await _fully_signed(session, record):
+        raise HTTPException(status_code=409, detail="every line needs a reviewer signature first")
+    session.add(
+        DocumentSignature(
+            estimate_id=estimate_id,
+            boe_version=record.boe_version,
+            name=signer,
+            role="signing_authority",
+        )
+    )
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="this version already carries an authority signature"
+        ) from exc
+    return {"status": "signed"}
+
+
+@router.get("/{estimate_id}/versions")
+async def boe_versions(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
+    """Version history, and the line-level diff between any two of them.
+
+    Band content is withheld from unsigned versions for the same reason the draft is
+    (PRINCIPLES #4) — a diff that printed the numbers would be a reveal with extra
+    steps. What travels is WHICH lines changed and in which direction.
+    """
+    record = await _get_record(session, estimate_id)
+    rows = (
+        (
+            await session.execute(
+                select(BoeVersionRow)
+                .where(BoeVersionRow.estimate_id == estimate_id)
+                .order_by(BoeVersionRow.version.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    signed_versions = set(
+        (
+            await session.execute(
+                select(DocumentSignature.boe_version).where(
+                    DocumentSignature.estimate_id == estimate_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    line_counts = {row.version: len(BoeDocument.model_validate(row.document).lines) for row in rows}
+    # Which versions were fully reviewer-signed. Those documents were exportable, so
+    # comparing two of them discloses nothing their reader could not already read;
+    # any pair touching an unsigned version is withheld.
+    signed_line_ids: defaultdict[int, set[str]] = defaultdict(set)
+    for version, work_item_id in (
+        await session.execute(
+            select(LineSignature.boe_version, LineSignature.work_item_id).where(
+                LineSignature.estimate_id == estimate_id
+            )
+        )
+    ).all():
+        signed_line_ids[version].add(work_item_id)
+    readable = {
+        row.version
+        for row in rows
+        if (ids := {line.work_item_id for line in BoeDocument.model_validate(row.document).lines})
+        and ids <= signed_line_ids[row.version]
+    }
+    # Who signed the CURRENT version, so the document's signature page can name them
+    # instead of printing "Signed" over an anonymous role.
+    current_line_signers = sorted(
+        {
+            f"{name}"
+            for (name,) in (
+                await session.execute(
+                    select(LineSignature.name).where(
+                        LineSignature.estimate_id == estimate_id,
+                        LineSignature.boe_version == record.boe_version,
+                    )
+                )
+            ).all()
+        }
+    )
+    current_authority = (
+        await session.execute(
+            select(DocumentSignature).where(
+                DocumentSignature.estimate_id == estimate_id,
+                DocumentSignature.boe_version == record.boe_version,
+            )
+        )
+    ).scalar_one_or_none()
+
+    return {
+        "current": record.boe_version,
+        "reviewers": current_line_signers,
+        "authority": (
+            {
+                "name": current_authority.name,
+                "signed_at": current_authority.signed_at.isoformat(),
+            }
+            if current_authority
+            else None
+        ),
+        "versions": [
+            {
+                "version": row.version,
+                "created_at": row.created_at.isoformat(),
+                "note": row.note,
+                "lines": line_counts[row.version],
+                "critic_findings": len(row.critic or []),
+                "authority_signed": row.version in signed_versions,
+            }
+            for row in rows
+        ],
+        "diffs": [
+            _diff_versions(older, newer)
+            for newer, older in itertools.pairwise(rows)
+            if newer.version in readable and older.version in readable
+        ],
+        # Say a diff is being withheld rather than letting an empty list read as
+        # "nothing changed".
+        "diffs_withheld": sum(
+            1
+            for newer, older in itertools.pairwise(rows)
+            if newer.version not in readable or older.version not in readable
+        ),
+    }
+
+
+def _diff_versions(older: BoeVersionRow, newer: BoeVersionRow) -> dict[str, Any]:
+    """Which lines appeared, vanished or moved — never by how much.
+
+    Only ever called for versions the caller could already read in full; direction
+    alone is invertible enough to anchor on (see `boe_versions`).
+    """
+    before = {
+        line.work_item_id: line.range for line in BoeDocument.model_validate(older.document).lines
+    }
+    after = {
+        line.work_item_id: line.range for line in BoeDocument.model_validate(newer.document).lines
+    }
+    widened, narrowed, shifted = [], [], []
+    for work_item_id, new_range in after.items():
+        old_range = before.get(work_item_id)
+        if old_range is None:
+            continue
+        old_width = old_range.pessimistic - old_range.optimistic
+        new_width = new_range.pessimistic - new_range.optimistic
+        if new_width > old_width:
+            widened.append(work_item_id)
+        elif new_width < old_width:
+            narrowed.append(work_item_id)
+        elif new_range.likely != old_range.likely:
+            shifted.append(work_item_id)
+    return {
+        "from": older.version,
+        "to": newer.version,
+        "added": sorted(set(after) - set(before)),
+        "removed": sorted(set(before) - set(after)),
+        "widened": sorted(widened),
+        "narrowed": sorted(narrowed),
+        "shifted": sorted(shifted),
+    }
+
+
 @router.get("/{estimate_id}/boe.docx")
 async def download_boe(estimate_id: uuid.UUID, session: SessionDep) -> StreamingResponse:
     record = await _get_record(session, estimate_id)
@@ -849,16 +1159,40 @@ async def download_boe(estimate_id: uuid.UUID, session: SessionDep) -> Streaming
             .order_by(LineSignature.signed_at)
         )
     ).scalars()
+    # The authority's signature lives in its own table because it covers the SCOPE,
+    # not a row — and it was missing from the export entirely, so the artefact the
+    # customer receives named every reviewer and not the person who authorised it.
+    authority_rows = (
+        await session.execute(
+            select(DocumentSignature)
+            .where(
+                DocumentSignature.estimate_id == estimate_id,
+                DocumentSignature.boe_version == record.boe_version,
+            )
+            .order_by(DocumentSignature.signed_at)
+        )
+    ).scalars()
     boe = boe.model_copy(
         update={
-            "signatures": tuple(
-                Signature(
-                    name=row.name,
-                    role=row.role,
-                    scope=row.work_item_id,
-                    signed_at=row.signed_at,
-                )
-                for row in signature_rows
+            "signatures": (
+                *(
+                    Signature(
+                        name=row.name,
+                        role=row.role,
+                        scope=row.work_item_id,
+                        signed_at=row.signed_at,
+                    )
+                    for row in signature_rows
+                ),
+                *(
+                    Signature(
+                        name=row.name,
+                        role=row.role,
+                        scope="full",
+                        signed_at=row.signed_at,
+                    )
+                    for row in authority_rows
+                ),
             )
         }
     )

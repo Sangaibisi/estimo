@@ -1010,3 +1010,170 @@ async def test_unattributed_work_items_still_appear_on_the_map(
 
     body = (await client.get(f"/v1/estimates/{estimate_id}/impact")).json()
     assert "(unmapped)" in {m["module"] for m in body["modules"]}
+
+
+async def test_every_build_is_frozen_as_a_version(client: httpx.AsyncClient) -> None:
+    """S12-5: `record.boe` was overwritten on rebuild, so the document a customer had
+    been shown could not be reconstructed and "Diff v2 → v3" had nothing to diff."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    requirement = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"][
+        "requirements"
+    ][0]["id"]
+    created = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": requirement, "question": "Kurumsal segment kapsamda mı?"},
+    )
+    await client.post(
+        f"/v1/estimates/{estimate_id}/answers",
+        json={"answers": {created.json()["id"]: "Hayır, yalnız bireysel."}},
+    )
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    body = (await client.get(f"/v1/estimates/{estimate_id}/versions")).json()
+    assert body["current"] == 2
+    assert [entry["version"] for entry in body["versions"]] == [2, 1]
+    assert body["versions"][-1]["note"] == "first-draft"
+
+    # …and the DIFF is withheld, because neither version was ever signed. Direction is
+    # not neutral: a line's three points all scale with the same analog median, so
+    # "widened" on a named work item tells an estimator which way the draft moved
+    # before they record their own band — the inference the desk refuses to allow.
+    # The first version of this test asserted `body["diffs"]` was non-empty while
+    # signing nothing, which encoded the leak as the expected behaviour.
+    assert body["diffs"] == [], "an unsigned draft's line movement was disclosed"
+    assert body["diffs_withheld"] == 1, "the withholding must be visible, not silent"
+    text = (await client.get(f"/v1/estimates/{estimate_id}/versions")).text
+    assert "widened" not in text and "optimistic" not in text
+
+
+async def test_the_authority_signature_comes_second(client: httpx.AsyncClient) -> None:
+    """Two roles, in order: a reviewer signs the rows they reviewed; the authority
+    signs the scope once, and only over a document that was actually read line by
+    line. Signing it twice is refused rather than recorded twice."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+    desk = await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "D. Aksoy"})
+    item_ids = [row["work_item"]["id"] for row in desk.json()["items"]]
+
+    early = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-document", json={"name": "M. Yılmaz"}
+    )
+    assert early.status_code == 409, "the authority signed a document nobody reviewed"
+
+    # A batch that includes an unreviewed row is refused WHOLE — a partially applied
+    # signature would leave the signer unsure what their name covers.
+    partial = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-rows",
+        json={"work_item_ids": item_ids, "name": "D. Aksoy"},
+    )
+    assert partial.status_code == 409
+    assert all(item in partial.json()["detail"] for item in item_ids[:1])
+
+    for item_id in item_ids:
+        assert (await _record_band(client, estimate_id, item_id, "D. Aksoy")).status_code == 201
+    signed = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-rows",
+        json={"work_item_ids": item_ids, "name": "D. Aksoy"},
+    )
+    assert signed.json() == {"signed": len(item_ids), "already_signed": 0}
+
+    assert (
+        await client.post(f"/v1/estimates/{estimate_id}/sign-document", json={"name": "M. Yılmaz"})
+    ).status_code == 201
+    duplicate = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-document", json={"name": "M. Yılmaz"}
+    )
+    assert duplicate.status_code == 409
+
+    versions = (await client.get(f"/v1/estimates/{estimate_id}/versions")).json()
+    assert versions["versions"][0]["authority_signed"] is True
+
+
+async def test_a_diff_appears_once_both_versions_were_readable(
+    client: httpx.AsyncClient,
+) -> None:
+    """The mirror of the withholding test: a gate that silenced everything would pass
+    the negative assertion and be useless. Two fully-signed versions were both
+    exportable, so comparing them discloses nothing their reader could not read.
+    """
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+
+    async def build_and_sign() -> None:
+        assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+        desk = await client.get(
+            f"/v1/estimates/{estimate_id}/desk", params={"estimator": "D. Aksoy"}
+        )
+        item_ids = [row["work_item"]["id"] for row in desk.json()["items"]]
+        for item_id in item_ids:
+            await _record_band(client, estimate_id, item_id, "D. Aksoy")
+        signed = await client.post(
+            f"/v1/estimates/{estimate_id}/sign-rows",
+            json={"work_item_ids": item_ids, "name": "D. Aksoy"},
+        )
+        assert signed.status_code == 201, signed.text
+
+    await build_and_sign()
+    requirement = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"][
+        "requirements"
+    ][0]["id"]
+    created = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": requirement, "question": "Kurumsal segment kapsamda mı?"},
+    )
+    await client.post(
+        f"/v1/estimates/{estimate_id}/answers",
+        json={"answers": {created.json()["id"]: "Hayır."}},
+    )
+    await build_and_sign()
+
+    body = (await client.get(f"/v1/estimates/{estimate_id}/versions")).json()
+    assert body["diffs_withheld"] == 0
+    assert len(body["diffs"]) == 1
+    diff = body["diffs"][0]
+    assert diff["from"] == 1 and diff["to"] == 2
+    assert set(diff) == {"from", "to", "added", "removed", "widened", "narrowed", "shifted"}
+
+
+async def test_a_second_reviewer_signature_is_not_swallowed(
+    client: httpx.AsyncClient,
+) -> None:
+    """sign-rows skipped any row someone else had signed, so a second reviewer got a
+    success response and their name never appeared — the one failure a signature
+    trail cannot have."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+    desk = await client.get(f"/v1/estimates/{estimate_id}/desk", params={"estimator": "D. Aksoy"})
+    item_ids = [row["work_item"]["id"] for row in desk.json()["items"]]
+
+    for estimator in ("D. Aksoy", "E. Kaya"):
+        for item_id in item_ids:
+            await _record_band(client, estimate_id, item_id, estimator)
+
+    first = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-rows",
+        json={"work_item_ids": item_ids, "name": "D. Aksoy"},
+    )
+    assert first.json()["signed"] == len(item_ids)
+
+    second = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-rows",
+        json={"work_item_ids": item_ids, "name": "E. Kaya"},
+    )
+    assert second.json()["signed"] == len(item_ids), "the second reviewer was swallowed"
+
+    # Signing the same rows again as the SAME person is the no-op.
+    again = await client.post(
+        f"/v1/estimates/{estimate_id}/sign-rows",
+        json={"work_item_ids": item_ids, "name": "E. Kaya"},
+    )
+    assert again.json() == {"signed": 0, "already_signed": len(item_ids)}
+
+    # Both names reach the exported artefact.
+    export = await client.get(f"/v1/estimates/{estimate_id}/boe.docx")
+    assert export.status_code == 200
