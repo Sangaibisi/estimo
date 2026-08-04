@@ -16,7 +16,16 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from estimo_api.db import build_engine, build_sessionmaker
 from estimo_api.mcp_server import build_mcp
-from estimo_api.routers import connections, estimates, health, ledger, metrics, runs, system
+from estimo_api.routers import (
+    connections,
+    estimates,
+    health,
+    impact,
+    ledger,
+    metrics,
+    runs,
+    system,
+)
 from estimo_api.settings import Settings
 
 
@@ -142,6 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(runs.router, dependencies=[Depends(require_admin)])
     app.include_router(estimates.router, dependencies=[Depends(require_estimator)])
+    app.include_router(impact.router, dependencies=[Depends(require_estimator)])
     app.include_router(metrics.router, dependencies=[Depends(require_reviewer)])
     app.include_router(ledger.router, dependencies=[Depends(require_estimator)])
     # Connections/canonical READS need a reviewer at minimum; the mutating routes

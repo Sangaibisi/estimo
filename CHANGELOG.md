@@ -9,6 +9,44 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-4 — the Impact Map is a map again.** The design's graph view ships: a
+  dotted canvas with module cards laid out deterministically (a ring ordered by
+  weight, so the same estimate always draws the same picture — a force simulation
+  would look livelier and make the map change every visit, which is the opposite of
+  what a map is for), SVG edges between modules, and a Graph/Heat toggle. **Edges
+  are derived, not invented**: two modules are linked when a work item touches both,
+  and an edge only ONE work item supports is drawn dashed, because a single
+  co-occurrence is as likely incidental as structural.
+
+  Selecting a module opens the docked evidence panel — what actually grounds the
+  mapping: wiki pages (through the same ACL pre-filter every other retrieval path
+  uses; a title is content) and analog jobs with their range and delivered actual.
+  Per-module confidence is computed from **evidence coverage alone**, which is what
+  makes it safe here: the estimator's own confidence grade is invertible against the
+  draft (S12-1a), and the Impact Map runs before the desk, so nothing draft-derived
+  may appear on it. Evidence is retrieved with the module name **plus the titles of
+  the work items that touch it**, redacted — searching by tag alone matched almost
+  nothing, because a ledger row reads "Taksitli fatura ekranı", not "billing-core",
+  and an empty panel would have looked authoritative rather than uninformed. The
+  titles go through `redact_anchors` first, like every other retrieval boundary: a
+  work-item title inherits its requirement's first sentence verbatim, so unredacted
+  the customer's stated budget would have decided which analogs a reader sees.
+
+  **Coverage is withheld once a draft exists.** The first cut reasoned "this is
+  coverage, not a band, so it is always safe" — and that was wrong: the estimator
+  BRANCHES on the same analog lookup, taking a constant prior band with LOW
+  confidence and a fixed contingency exactly when it comes back empty. So after the
+  draft is built, "this module has zero analogs" *is* the closed band, on a screen
+  that runs one step before the desk and has no independent-first gate — the very
+  inversion S12-1a closed on the desk, reintroduced one stage earlier. Before a
+  draft exists there is nothing to infer and the signal is served in full. Closing
+  it for good needs a prior band that is not a constant (S12-1a), not a different
+  threshold here. Work items the decomposer could not attribute now appear as an
+  explicit `(unmapped)` bucket instead of vanishing, an analog whose scope changed
+  says so rather than reading as a clean outcome, and code-wiki chunks are listed
+  under Code references rather than under Wiki beside a line claiming no repository
+  is connected.
+
 - **S12-3 — the Question Board is the customer loop again.** `status` walked
   open → sent → answered → applied from the very first model, and nothing ever
   advanced it: dispatch was never recorded, so the board could only ever draw two

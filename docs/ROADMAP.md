@@ -482,8 +482,14 @@ Open, grouped (feasibility from the audit):
   navigate back to the Reading Room and applied cards that link to their desk row;
   the selected-card accent ring and the filled accent check square; and reason chips
   that carry the design's crit/warn severity split rather than one tone.
-- [ ] **S12-4 Impact Map (large):** graph view + Graph/Heat toggle, docked evidence
-  panel, per-module confidence chips + low-confidence escalation, analog-jobs section.
+- [ ] **S12-4 Impact Map (medium, remainder):** **code references** — the panel says
+  plainly that none can be shown because the API builds drafts with `graph=None` and
+  no repository is wired into the estimate path; closing this means running the code
+  graph over a synced git connection, which is a pipeline change, not a panel one.
+  Also: a similarity **percentage** on analog cards (retrieval computes RRF scores
+  and discards them — `AnalogyCard` exposes only an ordinal rank), and a wiki
+  freshness chip that states the age ("updated 8 months ago") rather than only
+  flagging staleness.
 - [ ] **S12-5 BoE (large):** version history + diff, two-role signature flow
   (Reviewer → Signing authority) with row-scoped batch signing, in-document signature
   block, contents rail, O/L/P columns + paper framing, provenance appendix on screen,

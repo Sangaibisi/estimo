@@ -18,8 +18,9 @@ import {
   type DeskItem,
   type DocBlock,
   type EstimateSummary,
-  type QuestionLetter,
   type HeldRequirement,
+  type ImpactMapData,
+  type QuestionLetter,
 } from "@/lib/api";
 import { detectLocale, issueSentence, t, type Locale } from "@/lib/i18n";
 import {
@@ -355,7 +356,7 @@ export default function EstimateWorkspace({
 
         {/* ---------- 4 · Impact Map ---------- */}
         {stage === "impact" && (
-          <ImpactMap locale={locale} workItems={state.work_items} />
+          <ImpactMap locale={locale} id={id} workItems={state.work_items} />
         )}
 
         {/* ---------- 5 · Estimate Desk ---------- */}
@@ -667,85 +668,500 @@ export default function EstimateWorkspace({
 
 /* ---------------- Impact Map ---------------- */
 
+/* ---------------- 4 · Impact Map ---------------- */
+
+/** Deterministic layout: modules on a ring, heaviest first, so the same estimate
+ * always draws the same map. A force simulation would look livelier and make the
+ * picture change every visit, which is the opposite of what a map is for. */
+function ringPosition(index: number, total: number): { x: number; y: number } {
+  if (total === 1) return { x: 50, y: 50 };
+  // Two rings past eight modules: on one ring the cards touch from about eight on,
+  // and the widest of them are the low-confidence ones carrying two chips — exactly
+  // the nodes a reader most needs to read.
+  const outer = total <= 8 || index % 2 === 0;
+  const ringSize = total <= 8 ? total : Math.ceil(total / 2);
+  const ringIndex = total <= 8 ? index : Math.floor(index / 2);
+  const angle = (ringIndex / ringSize) * Math.PI * 2 - Math.PI / 2;
+  const rx = outer ? 38 : 19;
+  const ry = outer ? 36 : 18;
+  return { x: 50 + Math.cos(angle) * rx, y: 50 + Math.sin(angle) * ry };
+}
+
 function ImpactMap({
   locale,
+  id,
   workItems,
 }: {
   locale: Locale;
+  id: string;
   workItems: WorkItemShape[];
 }) {
-  const modules = new Map<string, WorkItemShape[]>();
-  for (const item of workItems) {
-    for (const module of item.module_tags.length
-      ? item.module_tags
-      : ["(unmapped)"]) {
-      modules.set(module, [...(modules.get(module) ?? []), item]);
-    }
-  }
-  const ordered = [...modules.entries()].sort(
-    (a, b) => b[1].length - a[1].length,
+  const [view, setView] = useState<"graph" | "heat">("graph");
+  const [data, setData] = useState<ImpactMapData | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    api
+      .impact(id, selected ?? undefined)
+      .then((next) => {
+        if (!current) return;
+        setData(next);
+        // Clearing on success matters: without it one transient failure pinned the
+        // screen on an error with no way back.
+        setError(null);
+      })
+      .catch((err) => current && setError(String(err)));
+    return () => {
+      current = false;
+    };
+  }, [id, selected]);
+
+  const modules = data?.modules ?? [];
+  // A code-wiki chunk is repository evidence: it belongs under Code references, not
+  // under Wiki beside a line claiming no repository is connected.
+  const codeEvidence = (data?.selected?.wiki ?? []).filter(
+    (page) => page.source_type === "code-wiki",
   );
-  const max = Math.max(1, ...ordered.map(([, items]) => items.length));
+  const wikiEvidence = (data?.selected?.wiki ?? []).filter(
+    (page) => page.source_type !== "code-wiki",
+  );
+  const positions = new Map(
+    modules.map((entry, index) => [entry.module, ringPosition(index, modules.length)]),
+  );
+  const tone = (confidence: string | null) =>
+    confidence === "high" ? "ok" : confidence === "medium" ? "warn" : "crit";
+  const confidenceLabel = (confidence: string | null) =>
+    t(
+      locale,
+      confidence === "high" ? "confHigh" : confidence === "medium" ? "confMedium" : "confLow",
+    );
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        style={{ padding: "14px 18px", color: "var(--crit)", fontSize: 12.5 }}
+      >
+        {error}
+      </div>
+    );
+  }
+  if (workItems.length === 0) {
+    return (
+      <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
+        {t(locale, "impactSubtitle")}
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "14px 18px" }}>
-      <Lbl>{t(locale, "impactSubtitle")}</Lbl>
+    <div>
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          marginTop: 12,
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          padding: "9px 14px",
+          borderBottom: "1px solid var(--line)",
         }}
       >
-        {ordered.map(([module, items]) => (
-          <div
-            key={module}
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
+        <Lbl>
+          {t(locale, "impactSubtitle")}
+          {modules.length > 0 && modules[0].confidence === null
+            ? ` · ${t(locale, "coverageHidden")}`
+            : ""}
+        </Lbl>
+        <div style={{ display: "flex" }}>
+          <button
+            type="button"
+            className={`stg ${view === "graph" ? "on" : ""}`.trim()}
+            onClick={() => setView("graph")}
           >
-            <div
-              style={{
-                width: 170,
-                flex: "none",
-                fontSize: 13,
-                color: "var(--ink)",
-              }}
-            >
-              {module}
-            </div>
-            <div
-              style={{
-                flex: 1,
-                height: 16,
-                background: "var(--surf3)",
-                borderRadius: 8,
-                border: "1px solid var(--line2)",
-                overflow: "hidden",
-              }}
-            >
+            {t(locale, "viewGraph")}
+          </button>
+          <button
+            type="button"
+            className={`stg ${view === "heat" ? "on" : ""}`.trim()}
+            onClick={() => setView("heat")}
+          >
+            {t(locale, "viewHeat")}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", height: 500 }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            position: "relative",
+            borderRight: "1px solid var(--line)",
+            background: "var(--surf2)",
+            backgroundImage:
+              view === "graph"
+                ? "radial-gradient(var(--line2) 1px, transparent 1px)"
+                : undefined,
+            backgroundSize: "22px 22px",
+            overflow: "auto",
+          }}
+        >
+          {view === "graph" ? (
+            <>
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+                aria-hidden
+              >
+                {(data?.edges ?? []).map((edge) => {
+                  const from = positions.get(edge.source);
+                  const to = positions.get(edge.target);
+                  if (!from || !to) return null;
+                  return (
+                    <line
+                      key={`${edge.source}-${edge.target}`}
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke="var(--line2)"
+                      strokeWidth={0.25}
+                      // One work item linking two modules is as likely incidental as
+                      // structural; the design draws that uncertainty dashed rather
+                      // than asserting a dependency the data does not support.
+                      strokeDasharray={edge.uncertain ? "1 0.8" : undefined}
+                    />
+                  );
+                })}
+              </svg>
+              {modules.map((entry) => {
+                const at = positions.get(entry.module)!;
+                const isSelected = selected === entry.module;
+                return (
+                  <button
+                    key={entry.module}
+                    type="button"
+                    className="card"
+                    onClick={() => setSelected(isSelected ? null : entry.module)}
+                    style={{
+                      position: "absolute",
+                      left: `${at.x}%`,
+                      top: `${at.y}%`,
+                      transform: "translate(-50%, -50%)",
+                      padding: "9px 12px",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      font: "inherit",
+                      borderStyle: entry.confidence === "low" ? "dashed" : "solid",
+                      borderColor: entry.confidence === "low" ? "var(--crit)" : undefined,
+                      boxShadow: isSelected
+                        ? "0 0 0 2px var(--acc), var(--sh2)"
+                        : undefined,
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {entry.module === "(unmapped)"
+                        ? t(locale, "unmappedModule")
+                        : entry.module}
+                    </div>
+                    {entry.module === "(unmapped)" && (
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: "var(--mut)",
+                          marginTop: 3,
+                          maxWidth: 170,
+                          textWrap: "pretty",
+                        }}
+                      >
+                        {t(locale, "unmappedHint")}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 5,
+                        marginTop: 6,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {entry.confidence ? (
+                        <>
+                          <StatusChip status={tone(entry.confidence)}>
+                            {confidenceLabel(entry.confidence)}
+                          </StatusChip>
+                          {entry.confidence === "low" && (
+                            <StatusChip status="crit">
+                              {t(locale, "discoverySuggested")}
+                            </StatusChip>
+                          )}
+                        </>
+                      ) : (
+                        <Mn style={{ color: "var(--mut)" }}>{entry.work_items} ×</Mn>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
               <div
                 style={{
-                  width: `${(items.length / max) * 100}%`,
-                  height: "100%",
-                  background: "var(--acc-bg)",
-                  borderRight: "2px solid var(--acc)",
+                  position: "absolute",
+                  right: 16,
+                  bottom: 14,
+                  maxWidth: 240,
+                  fontSize: 12,
+                  color: "var(--mut)",
+                  textAlign: "right",
+                  textWrap: "pretty",
                 }}
-              />
+              >
+                {t(locale, "impactFootnote")}
+              </div>
+            </>
+          ) : (
+            <table className="dt">
+              <thead>
+                <tr>
+                  <th>{t(locale, "modules")}</th>
+                  <th style={{ width: 90 }}>{t(locale, "workItems")}</th>
+                  <th style={{ width: 150 }}>{t(locale, "confidenceHeader")}</th>
+                  <th style={{ width: 160 }}>{t(locale, "evidence")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modules.map((entry) => (
+                  <tr
+                    key={entry.module}
+                    onClick={() =>
+                      setSelected(selected === entry.module ? null : entry.module)
+                    }
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        selected === entry.module ? "var(--acc-bg)" : undefined,
+                    }}
+                  >
+                    <td style={{ fontSize: 13 }}>{entry.module}</td>
+                    <td className="num">{entry.work_items}</td>
+                    <td>
+                      {entry.confidence ? (
+                        <StatusChip status={tone(entry.confidence)}>
+                          {confidenceLabel(entry.confidence)}
+                        </StatusChip>
+                      ) : (
+                        <Mn style={{ color: "var(--mut)" }}>—</Mn>
+                      )}
+                    </td>
+                    <td>
+                      {entry.wiki_hits === null ? (
+                        <Mn style={{ color: "var(--mut)" }}>—</Mn>
+                      ) : (
+                        <Mn style={{ color: "var(--mut)" }}>
+                          wiki {entry.wiki_hits} · analog {entry.analog_hits}
+                        </Mn>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Docked evidence panel */}
+        <div
+          style={{
+            width: 400,
+            flex: "none",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "auto",
+          }}
+        >
+          {!data?.selected ? (
+            <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
+              {t(locale, "selectModule")}
             </div>
-            <Num style={{ width: 46, flex: "none" }}>{items.length}</Num>
-            <div style={{ flex: "none", display: "flex", gap: 5 }}>
-              {items.slice(0, 3).map((item) => (
-                <Mn key={item.id} style={{ color: "var(--mut)" }}>
-                  {item.id}
-                </Mn>
-              ))}
-            </div>
-          </div>
-        ))}
+          ) : (
+            <>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{data.selected.module}</div>
+                <Lbl>
+                  {t(locale, "evidenceFor")} · {data.selected.requirement_ids.join(", ") || "—"}
+                </Lbl>
+              </div>
+
+              {/* Repository evidence. A code-wiki chunk belongs HERE — listing it
+                  under Wiki while this section said "no repository is connected"
+                  made the panel contradict itself on the same screen. */}
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+                <Lbl style={{ color: "var(--ev-code)" }}>
+                  {t(locale, "codeSection")} · {codeEvidence.length}
+                </Lbl>
+                {codeEvidence.length === 0 ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--mut)",
+                      marginTop: 7,
+                      textWrap: "pretty",
+                    }}
+                  >
+                    {t(locale, "noCodeGraph")}
+                  </div>
+                ) : (
+                  codeEvidence.map((page, index) => (
+                    <div key={index} style={{ marginTop: 8 }}>
+                      <Mn style={{ color: "var(--ev-code)" }}>{page.title}</Mn>
+                      {page.snippet && (
+                        <div
+                          className="card"
+                          style={{
+                            marginTop: 5,
+                            padding: "7px 9px",
+                            background: "var(--surf2)",
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 11.5,
+                            color: "var(--ink2)",
+                            textWrap: "pretty",
+                          }}
+                        >
+                          {page.snippet}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+                <Lbl style={{ color: "var(--ev-wiki)" }}>
+                  {t(locale, "wikiSection")} · {wikiEvidence.length}
+                </Lbl>
+                {wikiEvidence.length === 0 && (
+                  <div style={{ fontSize: 12, color: "var(--mut)", marginTop: 7 }}>
+                    {t(locale, "noEvidenceForModule")}
+                  </div>
+                )}
+                {wikiEvidence.map((page, index) => (
+                  <div key={index} style={{ marginTop: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 10,
+                        fontSize: 13,
+                      }}
+                    >
+                      <span style={{ textWrap: "pretty" }}>{page.title}</span>
+                      {page.stale ? (
+                        <StatusChip status="crit">{t(locale, "staleSource")}</StatusChip>
+                      ) : null}
+                    </div>
+                    {page.snippet && (
+                      <div
+                        className="card"
+                        style={{
+                          marginTop: 5,
+                          padding: "7px 9px",
+                          background: "var(--surf2)",
+                          fontSize: 12,
+                          color: "var(--ink2)",
+                          textWrap: "pretty",
+                        }}
+                      >
+                        {page.snippet}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ padding: "12px 16px" }}>
+                <Lbl style={{ color: "var(--ev-analog)" }}>
+                  {t(locale, "analogSection")} · {data.selected.analogs.length}
+                </Lbl>
+                {data.selected.analogs.map((analog) => (
+                  <div
+                    key={analog.brd_ref + analog.item_title}
+                    className="card"
+                    style={{ marginTop: 8, padding: "10px 12px" }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 500, textWrap: "pretty" }}>
+                        {analog.item_title}
+                      </span>
+                      <Mn style={{ color: "var(--mut)", flex: "none" }}>{analog.brd_ref}</Mn>
+                    </div>
+                    {analog.estimate && (
+                      <div style={{ marginTop: 8 }}>
+                        <RangeBar
+                          band={analog.estimate}
+                          max={Math.max(
+                            analog.estimate.pessimistic,
+                            analog.actual_effort ?? 0,
+                            1,
+                          )}
+                          legend={false}
+                          actual={analog.actual_effort}
+                        />
+                        <div
+                          className="mn"
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginTop: 5,
+                            color: "var(--mut)",
+                          }}
+                        >
+                          <span>
+                            {t(locale, "estimatedShort")} {analog.estimate.optimistic}–
+                            {analog.estimate.pessimistic} pd
+                          </span>
+                          {analog.actual_effort !== null && (
+                            <span
+                              style={{
+                                color: analog.scope_changed ? "var(--crit)" : undefined,
+                              }}
+                            >
+                              {t(locale, "actualWord")} {analog.actual_effort} pd
+                              {analog.scope_changed
+                                ? ` · ${t(locale, "scopeChanged")}`
+                                : ` · ${t(
+                                    locale,
+                                    analog.actual_effort > analog.estimate.pessimistic
+                                      ? "devAbove"
+                                      : analog.actual_effort < analog.estimate.optimistic
+                                        ? "devBelow"
+                                        : "devWithin",
+                                  )}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
 
 /* ---------------- 3 · Question Board ---------------- */
 

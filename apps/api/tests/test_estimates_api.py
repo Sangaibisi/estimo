@@ -887,3 +887,126 @@ async def test_an_unapplied_manual_question_blocks_the_draft(
     )
     assert applied.status_code == 200
     assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+
+async def test_impact_map_grounds_the_mapping_without_touching_the_draft(
+    client: httpx.AsyncClient,
+) -> None:
+    """S12-4: the Impact Map runs BEFORE the desk, so it may show what grounds a
+    mapping — wiki pages, analog jobs — and nothing derived from a band."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+
+    overview = await client.get(f"/v1/estimates/{estimate_id}/impact")
+    assert overview.status_code == 200
+    body = overview.json()
+    assert body["modules"], "the fixture mapped no modules"
+    assert body["selected"] is None, "no module was asked for"
+
+    first = body["modules"][0]
+    assert first["work_items"] >= 1
+    assert first["confidence"] in {"low", "medium", "high"}
+    # Evidence coverage, never an estimate: no band-shaped value may appear at all.
+    assert "range" not in overview.text and "optimistic" not in overview.text
+
+    # Edges are DERIVED from work items touching two modules; a single supporting
+    # work item is marked uncertain rather than asserted as a dependency.
+    for edge in body["edges"]:
+        assert edge["uncertain"] == (edge["weight"] < 2)
+        assert {edge["source"], edge["target"]} <= {m["module"] for m in body["modules"]}
+
+    detail = await client.get(
+        f"/v1/estimates/{estimate_id}/impact", params={"module": first["module"]}
+    )
+    assert detail.status_code == 200
+    selected = detail.json()["selected"]
+    assert selected["module"] == first["module"]
+    assert isinstance(selected["wiki"], list) and isinstance(selected["analogs"], list)
+
+    unknown = await client.get(
+        f"/v1/estimates/{estimate_id}/impact", params={"module": "not-a-module"}
+    )
+    assert unknown.status_code == 404
+
+
+async def test_impact_coverage_is_withheld_once_a_draft_exists(
+    client: httpx.AsyncClient,
+) -> None:
+    """S12-4 review: "coverage is not a band, so it is always safe" was wrong.
+
+    The estimator BRANCHES on the same analog lookup: no analogs means a constant
+    prior band with LOW confidence and a fixed contingency. So once a draft exists,
+    "this module has zero analogs" IS the closed band — on a screen that runs one
+    step BEFORE the desk and has no independent-first gate. Before a draft exists
+    there is nothing to invert, so the signal is served in full.
+    """
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+
+    before = (await client.get(f"/v1/estimates/{estimate_id}/impact")).json()
+    assert before["modules"], "the fixture mapped no modules"
+    assert all(m["confidence"] is not None for m in before["modules"])
+    assert all(m["analog_hits"] is not None for m in before["modules"])
+
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200
+
+    after = await client.get(f"/v1/estimates/{estimate_id}/impact")
+    modules = after.json()["modules"]
+    assert modules, "the module list itself must survive — only the coverage is hidden"
+    for entry in modules:
+        assert entry["confidence"] is None, "coverage disclosed the draft's branch"
+        assert entry["analog_hits"] is None and entry["wiki_hits"] is None
+    # The words that would name the branch must not appear at all.
+    assert '"confidence": "low"' not in after.text.replace(" ", "").replace('":"', '": "')
+
+
+async def test_impact_query_redacts_anchors(client: httpx.AsyncClient) -> None:
+    """Every retrieval boundary quarantines anchors (PRINCIPLES #5). A work-item
+    title inherits its requirement's first sentence verbatim, so an unredacted query
+    would let the customer's stated budget choose which analogs a reader sees."""
+    from estimo_api.routers.impact import _query_for
+
+    anchored = _query_for(
+        "billing-core",
+        {"billing-core": ["Taksitli fatura ekranı için ayrılan bütçe 15 adam-gündür"]},
+    )
+    assert "15 adam-gün" not in anchored and "bütçe" not in anchored
+    assert "karantina" in anchored, "the anchor was dropped instead of quarantined"
+    # `redact_anchors` replaces the whole anchor-bearing SENTENCE, not just the
+    # number — the estimator pays the same price, and losing a sentence to
+    # quarantine is the intended trade against letting a budget steer retrieval.
+
+    # A title with no anchor keeps every word.
+    clean = _query_for("billing-core", {"billing-core": ["Konsolide fatura üretimi"]})
+    assert "konsolide fatura üretimi" in clean.lower()
+    assert "billing core" in clean, "the module tag still seeds the query"
+
+
+async def test_unattributed_work_items_still_appear_on_the_map(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """A work item the decomposer could not attribute is the most interesting one on
+    this screen, not the least — dropping it made the map claim the BRD lands only
+    where mapping succeeded."""
+    import uuid as uuid_mod
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from estimo_api.estimates_models import EstimateRecord
+
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+
+    engine = create_async_engine(database_url)
+    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        record = await session.get(EstimateRecord, uuid_mod.UUID(str(estimate_id)))
+        assert record is not None
+        state = dict(record.state)
+        items = list(state["work_items"])
+        items[0] = {**items[0], "module_tags": []}
+        record.state = {**state, "work_items": items}
+        await session.commit()
+    await engine.dispose()
+
+    body = (await client.get(f"/v1/estimates/{estimate_id}/impact")).json()
+    assert "(unmapped)" in {m["module"] for m in body["modules"]}

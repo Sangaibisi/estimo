@@ -160,6 +160,10 @@ export const api = {
     request<QuestionLetter>(
       `/v1/estimates/${id}/questions/letter?ids=${encodeURIComponent(ids.join(","))}&locale=${locale}`,
     ),
+  impact: (id: string, module?: string) =>
+    request<ImpactMapData>(
+      `/v1/estimates/${id}/impact${module ? `?module=${encodeURIComponent(module)}` : ""}`,
+    ),
   source: (id: string) =>
     request<{
       blocks: DocBlock[];
@@ -450,4 +454,42 @@ export interface QuestionLetter {
   paragraphs: string[];
   text: string;
   count: number;
+}
+
+export interface ImpactModule {
+  module: string;
+  work_items: number;
+  requirement_ids: string[];
+  titles: string[];
+  /** Null once a draft exists: the estimator branches on the same analog lookup,
+   * so after the draft is built these become a readout of the closed band and the
+   * map — which runs before the desk — must not carry them (ROADMAP S12-1a). */
+  wiki_hits: number | null;
+  analog_hits: number | null;
+  confidence: "low" | "medium" | "high" | null;
+}
+
+export interface ImpactMapData {
+  modules: ImpactModule[];
+  edges: { source: string; target: string; weight: number; uncertain: boolean }[];
+  selected: {
+    module: string;
+    requirement_ids: string[];
+    wiki: {
+      title: string;
+      source_type: string;
+      stale: boolean;
+      freshness_at: string | null;
+      snippet: string | null;
+    }[];
+    analogs: {
+      brd_ref: string;
+      item_title: string;
+      estimate: ThreePoint | null;
+      actual_effort: number | null;
+      /** Kept for honesty, excluded from calibration — the card must say so. */
+      scope_changed: boolean;
+      rank: number;
+    }[];
+  } | null;
 }
