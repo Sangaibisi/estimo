@@ -23,9 +23,13 @@ Containers are the only supported runtime ([ADR-0006](docs/adr/0006-fully-contai
 
 ```bash
 git clone https://github.com/Sangaibisi/estimo.git && cd estimo
-cp .env.example .env
+cp .env.dev.example .env                       # demo lane: the stub LLM in this repo
 docker compose --profile mock up --build
 ```
+
+For a real deployment the file and the command are different — `cp .env.example .env`,
+point the gateway at your own endpoint, and `docker compose up --build -d`, which starts
+db + migrate + api + web and nothing else. See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 The web app comes up on <http://localhost:3000> and the API on <http://localhost:8000>
 (OpenAPI at `/docs`), both bound to loopback. A `migrate` service runs Alembic to head
@@ -33,12 +37,12 @@ before the API starts.
 
 Two things to know before you read anything into the output:
 
-- **`--profile mock` is what makes that command work out of the box.** `.env.example`
-  points `ESTIMO_GATEWAY__BASE_URL` at a stub gateway that returns canned responses, and
-  that stub only runs under the `mock` profile. Parsing, decomposition and the question
-  gate are deterministic and need no model at all, but effort bands do — so for anything
-  you intend to believe, point `ESTIMO_GATEWAY__*` at a real LiteLLM endpoint and drop
-  the profile flag.
+- **`--profile mock` is what makes that command work out of the box.**
+  `.env.dev.example` points `ESTIMO_GATEWAY__BASE_URL` at a stub gateway that returns
+  canned responses, and that stub only runs under the `mock` profile. Parsing,
+  decomposition and the question gate are deterministic and need no model at all, but
+  effort bands do — so nothing this lane produces is an estimate anyone should read.
+  For that, use `.env.example` with a real LiteLLM endpoint and drop the profile flag.
 - **A default install is unauthenticated and single-tenant.** Leave `ESTIMO_AUTH__ISSUER`
   empty and every endpoint is open and every request runs as the default tenant. Set an
   OIDC issuer — and connect as the `estimo_app` role, not the owner — before exposing it

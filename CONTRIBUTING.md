@@ -40,9 +40,13 @@ Containers are the only supported runtime ([ADR-0006](docs/adr/0006-fully-contai
 so the fastest way to see the product is the quick start in the [README](README.md#quick-start):
 
 ```bash
-cp .env.example .env
+cp .env.dev.example .env
 docker compose --profile mock up --build
 ```
+
+`.env.dev.example` is the development lane: it points the gateway at the stub LLM in
+this repo, which the `mock` profile starts. `.env.example` is the template for a real
+deployment and configures no development-only service — do not mix them up.
 
 To work on the Python side you need [uv](https://docs.astral.sh/uv/) (the version CI pins is
 in `.github/workflows/ci.yml`):

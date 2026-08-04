@@ -10,24 +10,37 @@ automation is involved. Cloning the repo inside your company network is a comple
 deployment story:
 
 ```bash
-cp .env.example .env          # then edit gateway + (optional) auth values
+cp .env.example .env          # then set ESTIMO_GATEWAY__* to your own endpoint
 docker compose up --build -d  # db + migrate + api + web, built from this checkout
 ```
 
-> **The gateway values in `.env.example` point at the stub LLM, which only runs under
-> `--profile mock`.** Copied unchanged, the command above brings up a deployment whose
-> gateway host does not exist — nothing fails at boot, and every model-backed feature
-> fails later with a connection error. For a first look use
-> `docker compose --profile mock up --build -d`; for real use, put your own endpoint in
-> `.env` (or in **Admin → Model gateway** after first start, which overrides it).
+**That command brings up exactly four containers** — `db`, the one-shot `migrate`,
+`api`, `web`. Nothing development-only starts: the stub LLM and the Langfuse stack sit
+behind compose profiles and stay down unless you name them.
+
+### Which env file
+
+| File | For | Gateway |
+|---|---|---|
+| `.env.example` | a real deployment | placeholders you replace with your endpoint; the API logs a warning at every startup while they are still in place |
+| `.env.dev.example` | a local demo, no external endpoint | the stub LLM in this repo, started by `--profile mock` |
+
+The stub returns fixed, obviously-synthetic completions. It exercises the wiring; it
+does not produce estimates anyone should read. A demo run is:
+
+```bash
+cp .env.dev.example .env
+docker compose --profile mock up --build -d
+```
 
 - API on `http://localhost:8000`, web on `http://localhost:3000`.
 - Runs **open in single-tenant mode** — no OIDC required. Every row belongs to the
   implicit DEFAULT_TENANT.
-- Point the gateway at your real endpoint before first start: in `.env` set
-  `ESTIMO_GATEWAY__BASE_URL` (your LiteLLM or any OpenAI-compatible endpoint),
-  `ESTIMO_GATEWAY__API_KEY`, and `ESTIMO_GATEWAY__PROFILES` (the `.env.example`
-  values target the `--profile mock` stub LLM, which is for development only).
+- The gateway is the one thing you must supply: `ESTIMO_GATEWAY__BASE_URL` (your
+  LiteLLM or any OpenAI-compatible endpoint), `ESTIMO_GATEWAY__API_KEY` and
+  `ESTIMO_GATEWAY__PROFILES`. Set them in `.env` before the first start, or start
+  anyway and save them under **Admin → Model gateway**, which overrides the
+  environment per field with no restart.
 - Upgrades are `git pull && docker compose up --build -d` — the one-shot `migrate`
   service brings the schema to head before the API starts.
 - Optional profiles: `--profile mock` (a stub LLM for smoke tests),

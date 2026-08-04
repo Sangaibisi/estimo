@@ -219,6 +219,46 @@ const dict = {
     backWord: "Back",
     nextWord: "Next",
     calibrationSubtitle: "Are our ranges honest? The product grades itself.",
+    exportFigures: "Export figures",
+    windowAll: "All time",
+    windowMonths: "Last {n} months",
+    perSliceTitle: "Coverage by team and domain",
+    perSliceHint:
+      "One bar per slice, drawn only where enough closed jobs exist to mean anything.",
+    sliceWithheld: "{n} of {need} closed jobs — too few to state a rate",
+    worstSlice:
+      "{key} sits at {value} across {n} closed jobs — under target. We are not adjusting the target to match.",
+    noSlicesYet:
+      "No slice has enough closed jobs yet. Attribution is supplied when an actual is recorded — a BRD never says which team will do the work.",
+    unbandedNote:
+      "{n} completed items carried a single number rather than a range, so they cannot be graded.",
+    mapeTitle: "Percentage error",
+    mapeExcluded:
+      "{n} items under 2 pd excluded — a half-day miss there is 50%.",
+    pBelowFloor: "< 0.0001",
+    verdictNotDistinguishable:
+      "On this dataset the difference is not meaningful ({wins} wins / {losses} losses, p={p}). We say so rather than round it into a win.",
+    verdictPipelineBetter:
+      "The pipeline beat the baseline on {wins} of {decided} items (p={p}).",
+    verdictBaselineBetter:
+      "The baseline beat the pipeline on {losses} of {decided} items (p={p}). Stated as plainly as a win would be.",
+    verdictNoSignal:
+      "Not enough completed items to compare against the baseline yet.",
+    entryBlind: "Recorded while the draft was hidden",
+    entryAfterReadable: "Recorded once the draft was readable",
+    entryUnknown: "Recorded before this was tracked",
+    entryHint:
+      "The desk withholds the draft until a band exists — but a fully signed draft is readable through the API and the .docx, and a band entered after that cannot testify about anchoring.",
+    questionImpactTitle: "Question impact",
+    questionImpactHint:
+      "Measured by comparing frozen draft versions: only lines that gained an answer as evidence are counted.",
+    changedShare: "of answered questions changed a line's range",
+    widthChange: "median range width once an answer lands",
+    linesCreated:
+      "{n} answers produced a new line rather than moving one — counted apart.",
+    questionImpactEmpty:
+      "No answer yet landed on an estimate that already had a draft. The gate refuses to build over an open question, so most answers arrive before the first draft — there is nothing to compare.",
+    reasonsTitle: "What raised the questions people answered",
     howHonest: "Interval honesty",
     completedItems: "completed items",
     coverageVsTarget:
@@ -667,6 +707,47 @@ const dict = {
     backWord: "Geri",
     nextWord: "İleri",
     calibrationSubtitle: "Aralıklarımız dürüst mü? Ürün kendine not veriyor.",
+    exportFigures: "Rakamları dışa aktar",
+    windowAll: "Tüm zamanlar",
+    windowMonths: "Son {n} ay",
+    perSliceTitle: "Ekip ve alan bazında kapsama",
+    perSliceHint:
+      "Dilim başına bir çubuk — yalnız anlam taşıyacak kadar kapanmış iş varsa çiziliyor.",
+    sliceWithheld:
+      "{need} kapanmış işten {n} tanesi — oran söylemek için çok az",
+    worstSlice:
+      "{key} {value} seviyesinde ({n} kapanmış iş) — hedefin altında. Hedefi buna uydurmuyoruz.",
+    noSlicesYet:
+      "Henüz hiçbir dilimde yeterli kapanmış iş yok. Atıf, gerçekleşme kaydedilirken giriliyor — BRD işi hangi ekibin yapacağını söylemez.",
+    unbandedNote:
+      "{n} tamamlanan kalem aralık değil tek sayı taşıyor, bu yüzden notlandırılamıyor.",
+    mapeTitle: "Yüzdesel hata",
+    mapeExcluded:
+      "2 gün altındaki {n} kalem hariç — orada yarım günlük sapma %50 eder.",
+    pBelowFloor: "< 0,0001",
+    verdictNotDistinguishable:
+      "Bu veri setinde fark anlamlı değil ({wins} lehte / {losses} aleyhte, p={p}). Zafere yuvarlamak yerine böyle söylüyoruz.",
+    verdictPipelineBetter:
+      "Hat, {decided} kalemin {wins} tanesinde referansı geçti (p={p}).",
+    verdictBaselineBetter:
+      "Referans, {decided} kalemin {losses} tanesinde hattı geçti (p={p}). Kazanç kadar açık yazıyoruz.",
+    verdictNoSignal:
+      "Referansla karşılaştırmak için henüz yeterli tamamlanan kalem yok.",
+    entryBlind: "Taslak gizliyken kaydedildi",
+    entryAfterReadable: "Taslak okunabilir hale geldikten sonra kaydedildi",
+    entryUnknown: "Bu izlenmeye başlamadan önce kaydedildi",
+    entryHint:
+      "Masa, kendi bandınız girilene kadar taslağı saklıyor — ama tümüyle imzalanmış taslak API'den ve .docx'ten okunabilir; ondan sonra girilen bir bant çapalama hakkında tanıklık edemez.",
+    questionImpactTitle: "Soruların etkisi",
+    questionImpactHint:
+      "Dondurulmuş taslak sürümleri karşılaştırılarak ölçülüyor: yalnız kanıtına cevap eklenen satırlar sayılıyor.",
+    changedShare: "cevaplanan sorunun bir satırın aralığını değiştirdiği oran",
+    widthChange: "cevap geldiğinde aralık genişliğindeki medyan değişim",
+    linesCreated:
+      "{n} cevap bir satırı oynatmak yerine yeni satır doğurdu — ayrı sayıldı.",
+    questionImpactEmpty:
+      "Henüz hiçbir cevap, taslağı zaten olan bir tahmine gelmedi. Kapı, açık soru varken taslak kurmayı reddediyor; bu yüzden cevapların çoğu ilk taslaktan önce geliyor — karşılaştıracak bir şey yok.",
+    reasonsTitle: "Cevaplanan soruları hangi kural açtı",
     howHonest: "Aralık dürüstlüğü",
     completedItems: "tamamlanan kalem",
     coverageVsTarget:

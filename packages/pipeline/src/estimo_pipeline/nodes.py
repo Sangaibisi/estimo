@@ -186,6 +186,10 @@ async def generate_questions(
                 requirement_id=req_id,
                 question=question_text,
                 reason=reason,
+                # Taken from the requirement as it stands NOW, before any answer
+                # re-scores it, and left alone by the LLM branch above — which is
+                # free to rewrite the human sentence but never the classification.
+                issue_codes=tuple(req.ambiguity_issues),
             )
         )
 

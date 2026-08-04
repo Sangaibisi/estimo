@@ -38,6 +38,11 @@ class _BodyTooLarge(Exception):
 # endpoint) is the largest legitimate payload; the headroom covers multipart framing.
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 
+# The host `.env.example` ships. Deliberately a .invalid domain (RFC 2606): it can
+# never resolve, so a deployment that forgot to configure the gateway fails loudly
+# instead of reaching something real by accident.
+PLACEHOLDER_GATEWAY_HOST = "replace-me.invalid"
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings if settings is not None else Settings()
@@ -75,6 +80,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.oidc_verifier = OidcVerifier(app_settings.auth)
             logging.getLogger("estimo.api").info(
                 "OIDC auth enabled (issuer=%s)", app_settings.auth.issuer
+            )
+
+        # A deployment still holding the .env.example placeholder gets told at BOOT.
+        # Otherwise the first symptom is a connection error inside a feature, minutes
+        # later, to a host nobody recognises — and on someone else's machine.
+        if PLACEHOLDER_GATEWAY_HOST in str(app_settings.gateway.base_url):
+            logging.getLogger("estimo.api").warning(
+                "the model gateway is still the .env.example placeholder (%s) — set "
+                "ESTIMO_GATEWAY__* or configure it under Admin -> Model gateway; every "
+                "model-backed feature will fail until you do",
+                app_settings.gateway.base_url,
             )
 
         # A crashed process leaves sync runs 'running' forever, which would block every

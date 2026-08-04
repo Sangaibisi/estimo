@@ -8,7 +8,90 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Fixed
+- **The first-run path pointed at a container that was not running.** `.env.example` is
+  the file `docs/DEPLOY.md` tells an operator to copy, and it configured the gateway for
+  the stub LLM — which only starts under `docker compose --profile mock`. The documented
+  command therefore produced a deployment aimed at an unresolvable host; nothing failed
+  at boot, and the first symptom was a connection error inside a feature, minutes later,
+  on someone else's machine. The two lanes are now separate files: `.env.example` is the
+  deployment template (placeholder endpoint, and the API logs a warning at every startup
+  while it is still in place) and `.env.dev.example` is the demo lane that uses the stub.
+  A repo guard fails CI if a compose service outside `db/migrate/api/web` ever loses its
+  `profiles:` key, or if the deployment template starts naming the stub again.
+
 ### Added
+- **S12-7 — the calibration screen grades itself, and says what it cannot measure.**
+  The dashboard gained the design's slicing (team, domain, a 12/24-month window), a
+  per-slice coverage bar per team and domain, percentage error beside absolute error,
+  a question-impact panel, and an export. Three of those needed a decision about
+  honesty before any of them could be drawn.
+
+  **A rate needs a sample count, and below a floor it needs silence.** A per-slice bar
+  computed from three closed jobs can only read 0% or 100%; neither says anything about
+  the team. Slices below `MIN_SAMPLES` now come back with `coverage: null` and their
+  count, and the screen states the reason. The same rule now applies to the rolling
+  coverage line, which used to return a bare float that a caller could render alone.
+
+  **"The difference is not meaningful" is a claim about a test.** The design's copy
+  says it; the product now runs it — a two-sided sign test over the paired per-item
+  errors, reported with its wins, losses and p-value, and worded plainly in whichever
+  direction it falls. Percentage error ships alongside, with items under 2 pd excluded
+  and counted, because a half-day miss on a one-day item is 50% and one such row
+  dominates a mean.
+
+  **Three live measurement defects fell out of the read.** Coverage counted every row
+  with an `origin_ref`, which includes the Jira connector's `jira://` rows — those
+  carry a single number, so each was an automatic miss charged to a pipeline that never
+  estimated them. The denominator also counted rows with no band at all, turning "not a
+  range" into "a range that failed". And the rolling window ordered by `created_at`,
+  which a seed import writes identically for every row in the file, so "the last 20
+  closed jobs" was an arbitrary 20 of 212; it now orders by when the work finished.
+
+  **Two of the design's panels could not be built as drawn, and were not faked.** The
+  anchoring strip "entered after the draft was revealed" describes something the
+  product does not allow — bands are immutable and the reveal *is* the recording. What
+  is real is a band recorded after a fully-signed draft became readable through the API
+  or the `.docx`, and that is now stored (`independent_estimates.blind`, migration
+  0015, NULLABLE because back-filling a claim about history nobody verified is how a
+  measurement becomes a decoration). Likewise the per-reason bars: the gate has no
+  detector for "undefined ownership" or "two readings possible", so the panel shows the
+  codes the rules actually emit — now carried as `issue_codes` frozen on the question at
+  ask time, because the LLM rewrites the human-facing reason and the gate re-scores the
+  requirement once its answer lands, erasing the very issue the question was raised for.
+
+  **What the review pass found (27 confirmed findings, 14 distinct defects).** The sign
+  test computed its denominator as `2.0**decided`, which raises OverflowError at 1024
+  decided pairs — not an exotic input but the success case, and it took the whole
+  dashboard down with it, since every panel is built in one dict. It is summed in log
+  space now. The p-value was also rounded to four decimals, so any strong result
+  rendered as the impossible literal `p = 0`; anything under the floor now reads
+  "< 0.0001". The window fix introduced its own regression: ordering by
+  `completed_at DESC NULLS LAST` parked the window on whatever imported history carried
+  dates, and since the product's own write path leaves that column NULL (the web client
+  never sends it), recent work could never enter the drift signal — an undated row is
+  now dated by when it was recorded. `blind` asked whether the CURRENT draft was signed,
+  so a rebuild made a band typed by someone who had already read v1 look blind; it now
+  asks whether ANY version was ever fully signed. The headline coverage had no sample
+  floor, so picking a thin slice from the screen's own dropdown produced a one-row
+  verdict on the product. `_question_reasons` deduplicated questions by bare id across
+  estimates, and gate ids are derived from each BRD's own requirement codes — two BRDs
+  that number requirements alike collapsed into one survivor. Slice rows carried no
+  team/domain qualifier, so a team named after a domain rendered twice, identically.
+  And the chart's tooltip paired the rolling coverage rate with the transfer
+  distribution's sample count, printing "33% · n=33" for a three-row window (migration
+  0016 stores the right count; older snapshots show none rather than a made-up one).
+
+  **The one that matters most: the question-impact panel leaked what the desk gate
+  withholds.** `GET /{id}/versions` refuses to disclose even the DIRECTION a line moved
+  for a version that is not fully signed, because a line's three points scale with the
+  same analog median. The new panel aggregated every frozen version with no such gate —
+  and it is reachable by a reviewer, the exact role that gate exists for. It now diffs
+  only fully-signed versions, and withholds its rates below a minimum contributing-
+  estimate count, because an aggregate over one estimate is that estimate's own diff
+  wearing a corpus-wide label. That is the fourth time this sprint series that a
+  draft-derived signal reached a reader early through a surface nobody thought of as
+  the desk.
 - **S12-6 — the ledger gets its slices, an honest similarity, and a way in.** A seed
   set could only be imported from a shell (`estimo-ledger-import`), which meant the
   product's own memory could not be populated by the person who owns the data. There

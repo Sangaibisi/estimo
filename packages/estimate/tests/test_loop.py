@@ -1,5 +1,6 @@
 """S8 calibration loop: ledger upsert, analog feedback, snapshots, rolling coverage."""
 
+import datetime as dt
 import uuid
 from pathlib import Path
 
@@ -209,6 +210,147 @@ class TestLoop:
         seeded.expire_all()
         feedback = list((await seeded.execute(select(AnalogFeedback))).scalars())
         assert {f.entry_id for f in feedback} == set(analog_ids[2:])
+
+    async def test_rolling_coverage_ignores_rows_the_product_did_not_estimate(
+        self, seeded: AsyncSession
+    ) -> None:
+        """`origin_ref IS NOT NULL` also matches the Jira connector's `jira://` rows.
+
+        Those are somebody else's numbers. Counting them here grades the pipeline on
+        estimates it never made — and the drift signal is exactly the number nobody
+        should be able to move without having made an estimate.
+        """
+        from estimo_knowledge import LedgerEntryRow
+
+        seeded.add(
+            LedgerEntryRow(
+                brd_ref="ACME-42",
+                item_title="Connector row",
+                origin_ref="jira://ACME-42",
+                est_optimistic=1,
+                est_likely=2,
+                est_pessimistic=3,
+                actual_effort=40.0,
+                actual_source="project-report",
+            )
+        )
+        seeded.add(
+            LedgerEntryRow(
+                brd_ref="BRD-1",
+                item_title="Product row",
+                origin_ref=f"estimate://{uuid.uuid4()}/WI-1",
+                est_optimistic=8,
+                est_likely=10,
+                est_pessimistic=17,
+                actual_effort=12.0,
+                actual_source="timesheet",
+            )
+        )
+        await seeded.commit()
+
+        rolling = await rolling_coverage(seeded)
+        assert rolling is not None
+        assert rolling.samples == 1, "a connector row entered the rolling window"
+        assert rolling.coverage == 1.0
+
+    async def test_the_rolling_window_is_the_last_JOBS_not_the_last_rows_written(
+        self, seeded: AsyncSession
+    ) -> None:
+        """A seed import commits every row in one transaction.
+
+        `created_at` then ties across the whole file, so "the last 20" degenerates into
+        an arbitrary 20 — on a 212-row imported ledger the drift signal would be
+        computed from a subset nobody chose. The window orders by when the work
+        finished. The ids below are pinned so the wrong ordering has a KNOWN wrong
+        answer rather than a random one.
+        """
+        from estimo_knowledge import LedgerEntryRow
+
+        stale_miss = uuid.UUID("00000000-0000-0000-0000-000000000001")
+        for index in range(6):
+            seeded.add(
+                LedgerEntryRow(
+                    id=uuid.UUID(f"ffffffff-0000-0000-0000-{index:012d}"),
+                    brd_ref=f"BRD-{index}",
+                    item_title="Recent job",
+                    origin_ref=f"estimate://{uuid.uuid4()}/WI-{index}",
+                    est_optimistic=8,
+                    est_likely=10,
+                    est_pessimistic=17,
+                    actual_effort=12.0,
+                    actual_source="timesheet",
+                    completed_at=dt.date(2026, 6, 1) + dt.timedelta(days=index),
+                )
+            )
+        seeded.add(
+            LedgerEntryRow(
+                # Smallest id, so an ordering that falls back to it puts this row FIRST.
+                id=stale_miss,
+                brd_ref="BRD-OLD",
+                item_title="Job finished years ago",
+                origin_ref=f"estimate://{uuid.uuid4()}/WI-OLD",
+                est_optimistic=8,
+                est_likely=10,
+                est_pessimistic=17,
+                actual_effort=99.0,
+                actual_source="timesheet",
+                completed_at=dt.date(2019, 1, 1),
+            )
+        )
+        await seeded.commit()
+
+        rolling = await rolling_coverage(seeded, window=6)
+        assert rolling is not None
+        assert rolling.samples == 6
+        assert rolling.coverage == 1.0, "the window included a job that finished years ago"
+
+    async def test_a_job_that_never_said_when_it_finished_still_enters_the_window(
+        self, seeded: AsyncSession
+    ) -> None:
+        """`completed_at` is optional on the product's own write path.
+
+        The web client does not send it at all, so ordering dated rows ahead of undated
+        ones parks the window on whatever imported history happens to carry dates — and
+        the product's own recent work can never enter the drift signal. An undated row
+        is dated by when it was recorded, which is the best fact there is.
+        """
+        from estimo_knowledge import LedgerEntryRow
+
+        for index in range(6):
+            seeded.add(
+                LedgerEntryRow(
+                    brd_ref=f"OLD-{index}",
+                    item_title="Old job that missed its band",
+                    origin_ref=f"estimate://{uuid.uuid4()}/WI-OLD-{index}",
+                    est_optimistic=8,
+                    est_likely=10,
+                    est_pessimistic=17,
+                    actual_effort=99.0,
+                    actual_source="timesheet",
+                    completed_at=dt.date(2019, 1, 1),
+                )
+            )
+        await seeded.commit()
+        for index in range(6):
+            seeded.add(
+                LedgerEntryRow(
+                    brd_ref=f"NEW-{index}",
+                    item_title="Recent job recorded through the product",
+                    origin_ref=f"estimate://{uuid.uuid4()}/WI-NEW-{index}",
+                    est_optimistic=8,
+                    est_likely=10,
+                    est_pessimistic=17,
+                    actual_effort=12.0,
+                    actual_source="timesheet",
+                    completed_at=None,
+                )
+            )
+        await seeded.commit()
+
+        rolling = await rolling_coverage(seeded, window=6)
+        assert rolling is not None
+        assert rolling.samples == 6
+        assert rolling.coverage == 1.0, "undated recent jobs were evicted by dated old ones"
 
 
 def test_feedback_weight_shape() -> None:

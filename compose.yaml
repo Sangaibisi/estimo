@@ -1,4 +1,8 @@
-# `docker compose up` runs the product (ADR-0006). Copy .env.example to .env first.
+# `docker compose up` runs the product (ADR-0006): db + migrate + api + web, and
+# nothing else — everything development-only is behind a profile and stays down.
+#
+#   real deployment:  cp .env.example .env      && docker compose up --build -d
+#   local demo:       cp .env.dev.example .env  && docker compose --profile mock up --build -d
 # Optional services live behind profiles: `docker compose --profile mock up` (mock LLM),
 # `docker compose --profile observability up` (Langfuse self-host — see the S8-4 note
 # above the langfuse-web service for the real resource cost).

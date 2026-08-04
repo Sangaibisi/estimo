@@ -244,7 +244,20 @@ export const api = {
     ),
   listActuals: (id: string) =>
     request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
-  metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
+  metrics: (view?: {
+    team?: string;
+    domain?: string;
+    months?: number | null;
+  }) => {
+    const params = new URLSearchParams();
+    if (view?.team) params.set("team", view.team);
+    if (view?.domain) params.set("domain", view.domain);
+    if (view?.months) params.set("months", String(view.months));
+    const query = params.toString();
+    return request<MetricsOverview>(
+      `/v1/metrics/overview${query ? `?${query}` : ""}`,
+    );
+  },
   ledger: (q: string, slice?: { team?: string; domain?: string }) => {
     const params = new URLSearchParams({ q });
     if (slice?.team) params.set("team", slice.team);
@@ -417,6 +430,19 @@ export function parseEffort(raw: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+/** One team or domain, with the sample count that decides whether its bar may be
+ * drawn at all. `coverage` is null below `min_samples`: a rate computed from three
+ * jobs is a point estimate wearing a rate's clothes. */
+export interface CalibrationSlice {
+  key: string;
+  /** Which dimension — "billing" can be both a team and a domain. */
+  kind: "team" | "domain";
+  coverage: number | null;
+  samples: number;
+  unbanded: number;
+  enough: boolean;
+}
+
 export interface MetricsOverview {
   calibration: {
     current: {
@@ -426,6 +452,10 @@ export interface MetricsOverview {
       q50: number;
       q90: number;
       rolling_coverage: number | null;
+      /** The rate above is unreadable without this: coverage at ±5% needs ~100
+       * points and the rolling window is 20 by construction. */
+      rolling_samples: number;
+      min_samples: number;
     };
     series: {
       at: string;
@@ -436,20 +466,72 @@ export interface MetricsOverview {
       q90: number;
       nominal: number;
       rolling_coverage: number | null;
+      /** Rows THAT rate was computed from; null before migration 0016. */
+      rolling_samples: number | null;
     }[];
   };
   product_accuracy: {
+    /** Rows that carried a BAND and could therefore be graded. */
     samples: number;
     coverage: number | null;
+    /** Product rows with an actual but no band — not misses, just not ranges. */
+    unbanded: number;
+    /** False when the slice is below the sample floor; `coverage` is null then. */
+    enough: boolean;
+    min_samples: number;
     nominal: number;
     mae_product: number | null;
     mae_naive_median: number | null;
+    mape_product: number | null;
+    mape_naive_median: number | null;
+    /** Items too small for a percentage error to mean anything. */
+    mape_excluded: number;
+    /** A two-sided sign test over the paired per-item errors — the design's "on this
+     * dataset the difference is not meaningful" as a test rather than a feeling. */
+    comparison: {
+      verdict:
+        | "pipeline-better"
+        | "baseline-better"
+        | "not-distinguishable"
+        | "no-signal";
+      wins: number;
+      losses: number;
+      p_value: number | null;
+      /** True when the exact p is below the printable floor — the screen shows
+       * "< 0.0001" instead of rounding a real number to the impossible literal 0. */
+      p_value_is_upper_bound: boolean;
+    };
+  };
+  slices: {
+    min_samples: number;
+    teams: CalibrationSlice[];
+    domains: CalibrationSlice[];
   };
   anchoring: {
     samples: number;
     mean_abs_delta: number | null;
     zero_delta_share: number | null;
+    entry: {
+      /** Recorded while the draft was still hidden. */
+      blind: number;
+      /** Recorded once the draft was readable another way (fully signed). */
+      after_readable: number;
+      /** Recorded before the product tracked this (migration 0015). */
+      unknown: number;
+    };
   };
+  question_impact: {
+    samples: number;
+    /** Estimates contributing; below `min_estimates` the rates are withheld. */
+    estimates: number;
+    min_estimates: number;
+    changed_share: number | null;
+    median_width_change: number | null;
+    /** Answers that produced a line rather than moving one. */
+    lines_created: number;
+    reasons: { code: string; count: number; share: number | null }[];
+  };
+  window: { months: number | null; team: string | null; domain: string | null };
   workflow: {
     estimates: number;
     wip: number;

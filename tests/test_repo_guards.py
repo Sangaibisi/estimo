@@ -86,3 +86,41 @@ class TestOpenCorePathGuard:
             if any(part in {"ee", "enterprise"} for part in Path(path).parts[:-1])
         ]
         assert not flagged, f"forbidden open-core-style paths: {flagged}"
+
+
+# The services a plain `docker compose up` starts. Everything else in the file must be
+# behind a profile: the deployment lane and the demo lane are different products, and
+# the difference has to live in the file rather than in a sentence somebody reads.
+DEPLOYMENT_SERVICES = {"db", "migrate", "api", "web"}
+
+
+def test_a_plain_compose_up_starts_nothing_development_only() -> None:
+    """A missing `profiles:` key silently hands the next deployer a stub LLM.
+
+    The stub answers every model call with canned text, so an estimate built against it
+    looks finished and means nothing — which is exactly the failure this repo's rules
+    exist to prevent, arriving through infrastructure instead of code.
+    """
+    import yaml
+
+    compose = yaml.safe_load((REPO_ROOT / "compose.yaml").read_text(encoding="utf-8"))
+    default_up = {
+        name for name, service in compose["services"].items() if not (service or {}).get("profiles")
+    }
+    assert default_up == DEPLOYMENT_SERVICES, (
+        "services outside the deployment set must declare `profiles:` — "
+        f"unexpectedly starting by default: {sorted(default_up - DEPLOYMENT_SERVICES)}"
+    )
+
+
+def test_the_deployment_env_template_does_not_point_at_the_stub_llm() -> None:
+    """`.env.example` is what DEPLOY.md tells an operator to copy.
+
+    It once configured the gateway for the `mock` container, so the documented
+    first-run command produced a deployment aimed at a host that was not running —
+    and nothing said so until a feature failed minutes later.
+    """
+    deployment = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+    demo = (REPO_ROOT / ".env.dev.example").read_text(encoding="utf-8")
+    assert "mock-llm" not in deployment, ".env.example points at the development stub LLM"
+    assert "mock-llm" in demo, ".env.dev.example is the lane that may use the stub"

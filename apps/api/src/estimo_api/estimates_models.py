@@ -86,6 +86,13 @@ class IndependentEstimate(TenantScoped, Base):
     # Why this band, in the estimator's words. Optional, captured at entry — the delta
     # to the draft records how far apart the two were, never what the human knew.
     rationale: Mapped[str | None] = mapped_column(Text, default=None)
+    # Was the draft still hidden from this estimator when the band was recorded?
+    # The desk gate guarantees it for its own path, but a fully-signed draft is
+    # readable through GET /{id} and /boe.docx, and a band recorded after that is not
+    # evidence of independence. NULL = recorded before the product tracked this
+    # (migration 0015); the dashboard reports that bucket separately rather than
+    # counting it as blind.
+    blind: Mapped[bool | None] = mapped_column(Boolean, default=None)
     revealed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

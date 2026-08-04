@@ -141,6 +141,45 @@ async def _fully_signed(session: AsyncSession, record: EstimateRecord) -> bool:
     return bool(line_ids) and line_ids <= await _signed_item_ids(session, record)
 
 
+async def _ever_fully_signed(session: AsyncSession, record: EstimateRecord) -> bool:
+    """Was ANY version of this estimate's draft ever fully signed — and so readable?
+
+    `_fully_signed` answers for the current version, which is the right question for
+    gating a read. It is the wrong question for "has this person had a chance to see
+    the numbers", because a rebuild drops the signatures and would make the answer
+    False again for a document people have already read and exported.
+    """
+    if await _fully_signed(session, record):
+        return True
+    signed = (
+        await session.execute(
+            select(
+                LineSignature.boe_version,
+                LineSignature.work_item_id,
+            )
+            .where(LineSignature.estimate_id == record.id)
+            .distinct()
+        )
+    ).all()
+    if not signed:
+        return False
+    by_version: dict[int, set[str]] = {}
+    for version, item_id in signed:
+        by_version.setdefault(version, set()).add(item_id)
+    versions = (
+        await session.execute(
+            select(BoeVersionRow.version, BoeVersionRow.document).where(
+                BoeVersionRow.estimate_id == record.id
+            )
+        )
+    ).all()
+    for version, document in versions:
+        line_ids = {line["work_item_id"] for line in document.get("lines", [])}
+        if line_ids and line_ids <= by_version.get(version, set()):
+            return True
+    return False
+
+
 def _bound_identity(request: Request, principal: Principal, claimed: str) -> str:
     """The estimator/signer identity of record.
 
@@ -409,6 +448,10 @@ async def add_question(
         requirement_id=payload.requirement_id,
         question=payload.question.strip(),
         reason=payload.reason.strip(),
+        # A reader raised this one, not a rule. Coded as such so the calibration
+        # breakdown separates "our gate caught it" from "a human noticed it" instead
+        # of filing human judgement under whichever rule happens to be nearby.
+        issue_codes=("manual",),
     )
     record.state = state.model_copy(update={"questions": (*state.questions, question)}).model_dump(
         mode="json"
@@ -573,12 +616,24 @@ async def record_independent(
     boe = BoeDocument.model_validate(record.boe)
     line = next((ln for ln in boe.lines if ln.work_item_id == payload.work_item_id), None)
     delta_likely = round(float(payload.likely) - line.range.likely, 1) if line is not None else None
+    # Was the draft still hidden when this band was entered? The desk withholds it, but
+    # a fully-signed draft is readable through GET /{id} and /boe.docx — a band recorded
+    # after that is not evidence of independence, and counting it as such would flatter
+    # the one measurement PRINCIPLES #4 exists to keep honest. Recorded, not refused:
+    # the band is still worth having, it just cannot testify about anchoring.
+    #
+    # ANY version, not just the current one: `_fully_signed` asks about the draft in
+    # front of us, and a rebuild resets it to unsigned. Someone who read v1 after it was
+    # signed and then typed a band against v2 has seen the numbers — the estimate's
+    # history is what decides this, not its present state.
+    blind = not await _ever_fully_signed(session, record)
     session.add(
         IndependentEstimate(
             estimate_id=estimate_id,
             work_item_id=payload.work_item_id,
             estimator=estimator,
             boe_version=record.boe_version,
+            blind=blind,
             optimistic=payload.optimistic,
             likely=payload.likely,
             pessimistic=payload.pessimistic,

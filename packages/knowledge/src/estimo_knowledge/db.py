@@ -153,6 +153,12 @@ class CalibrationSnapshot(TenantScoped, Base):
     q90: Mapped[float] = mapped_column(Numeric(8, 3))
     nominal: Mapped[float] = mapped_column(Numeric(4, 2), default=0.8)
     rolling_coverage: Mapped[float | None] = mapped_column(Numeric(4, 3), default=None)
+    # How many rows THAT rate was computed from. `samples` above is the transfer
+    # distribution's count over a different population; pairing it with this rate
+    # rendered a 3-row 33% coverage as "33% · n=33". NULL on snapshots written before
+    # migration 0016 — unrecoverable, and inventing one is the failure this screen
+    # exists to avoid.
+    rolling_samples: Mapped[int | None] = mapped_column(Integer, default=None)
     trigger: Mapped[str] = mapped_column(String(60), default="actual-recorded")
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

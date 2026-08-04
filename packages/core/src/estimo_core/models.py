@@ -153,6 +153,17 @@ class ClarificationQuestion(EstimoModel):
     requirement_id: str = Field(min_length=1)
     question: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    # The ambiguity rules that raised this question, frozen at ASK time.
+    #
+    # `reason` is prose for a human, and when a gateway is configured the LLM rewrites
+    # it — so counting reasons by parsing that sentence silently becomes a count of the
+    # offline subset. These codes are the machine-readable half and are never rewritten.
+    #
+    # Frozen matters as much as machine-readable: the gate re-scores a requirement once
+    # its answer is folded in, so the requirement's LIVE issues describe the state after
+    # the question did its job. `missing-acceptance-criteria` disappears from exactly the
+    # requirement whose question was raised for missing acceptance criteria.
+    issue_codes: tuple[str, ...] = ()
     status: Literal["open", "sent", "answered", "applied"] = "open"
     answer: str | None = None
     sent_at: dt.datetime | None = None

@@ -506,9 +506,20 @@ Open, grouped (feasibility from the audit):
   similarity percentage is shown only where a cosine distance was actually measured,
   so entries that have never been through the embedding backfill show none (a
   rank-derived percentage was refused — an ordinal position is not a measurement).
-- [ ] **S12-7 Calibration (medium):** per-domain coverage bars, anchoring comparison
-  strips, question-impact quadrant, team/domain slicing, time-window scoping,
-  MAPE-vs-MAE decision, export figures.
+- [ ] **S12-7 Calibration (small, remainder):** the design's second anchoring strip
+  ("entered after the draft was revealed") is **not buildable as drawn** and was
+  replaced rather than faked — a band is immutable and the reveal happens BY recording
+  it, so nobody enters one having already seen the draft for that item. What ships
+  instead is what can be true: recorded while the draft was hidden vs recorded once a
+  fully-signed draft was readable another way. The design's comparison arrives only
+  with **S12-1's explicit reveal controls**, which is a decision about the anchoring
+  measurement, not a rendering task. Also open: the design's per-reason bars name
+  "undefined ownership" and "two readings possible", and the gate has **no detector for
+  either** — the panel shows the codes the rules actually emit
+  (`missing-acceptance-criteria`, `unstructured-source`, `vague-terms`,
+  `implicit-acceptance-only`, `manual`), and inventing the other two would mean
+  inventing both a taxonomy and its distribution. New rules belong in
+  `packages/parse/ambiguity.py` with golden coverage and planted fixtures.
 - [ ] **S12-8 Knowledge (medium):** source TEXT pane (not refs), revise/reject actions,
   freshness warnings block, version-label agreement.
 - [ ] **S12-9 Chrome & Admin (medium):** rail identity item (needs /me), workspace
