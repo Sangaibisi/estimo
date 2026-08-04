@@ -8,6 +8,25 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Decided
+- **ADR-0009 — LLM-led scope reasoning, calibration-led numbers.** The deployment target
+  sharpened to a single company's center: BRD in → person-days out **with an FE/BE
+  split, across multiple repos**. A four-lens architecture review against the working
+  tree found the maintainer's "the LLM is used too little" concern to be *literally*
+  true — the production estimate path makes **zero model calls** (`run_brd`,
+  `resume_with_answers` and `estimate_state` all run without a gateway client, so even
+  the estimator's dense retrieval leg is off), and the deterministic stand-ins are
+  demo-shaped (a 9-row module keyword table, a 14-entry synonym dictionary). The
+  decision: grow the LLM enormously in **reasoning** (agentic, citation-carrying impact
+  analysis over persisted multi-repo code graphs + the knowledge index; discipline
+  composition proposals), keep the **number** anchored on the ledger's calibration
+  (with two new LLM roles: analog vetting, and an evidence-grounded proposal replacing
+  the arbitrary 1/3/8 prior on the no-analog branch — labeled uncalibrated), and keep
+  REST connectors as the **only writer** to the evidence index. Rovo cannot "feed"
+  Estimo — it is a client-side surface that can only call out; the discovery-then-pin
+  hybrid (MCP finds refs, REST pins them) is the flag-gated future path. Plan: ROADMAP
+  **S13** (S12-8/9 chrome deprioritized behind it).
+
 ### Fixed
 - **The first-run path pointed at a container that was not running.** `.env.example` is
   the file `docs/DEPLOY.md` tells an operator to copy, and it configured the gateway for

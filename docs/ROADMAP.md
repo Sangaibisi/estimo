@@ -531,6 +531,65 @@ The full per-gap audit (design evidence + code evidence per claim) lives in the 
 that produced it; each sub-item above must re-verify against the design file when
 picked up — the design HTML is the source of truth (docs/design/README.md).
 
+> **Priority note (2026-08-05):** S12-8 and S12-9 are deprioritized behind S13 — the
+> maintainer's sharpened goal (BRD → person-days **with an FE/BE split, across multiple
+> repos**, at the center of one company) is estimation-core work, and the S13 review
+> found the deployed estimate path making **zero** model calls. Chrome polish waits.
+
+---
+
+## S13 — LLM-led reasoning, calibrated numbers · `Status: 🔴 Not started` ([ADR-0009](adr/0009-llm-led-reasoning-calibrated-numbers.md))
+
+The architecture decision this sprint implements is recorded in ADR-0009: grow the LLM
+enormously in scope/impact **reasoning**, keep the **number** anchored on the ledger's
+calibration, keep REST connectors as the only writer to the evidence index. Same
+tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
+
+- [ ] **S13-1 Wire the gateway into the production estimate path (small, FIRST).**
+  `run_brd` (:214), `resume_with_answers` (:298) and `estimate_state` (:529) in
+  `routers/estimates.py` all run with `client=None` — no LLM gate blend, no LLM
+  question wording, no decomposition refinement, no within-band nudge, and the
+  estimator's own analog retrieval is lexical-only while the ledger browse screen gets
+  hybrid. Thread `gateway_client(await effective_gateway(...))` through, with the
+  existing degradation paths (every GatewayError already falls back deterministic).
+  Regression test: a respx-mocked gateway must be CALLED by a BRD upload.
+- [ ] **S13-2 Persist per-repo CodeGraphs + agentic impact worker (large).** Sync
+  builds a CodeGraph per repo and discards it after wiki generation; persist it (or
+  rebuild from the kept clones at ESTIMO_REPOS_DIR) and replace the 14-entry synonym
+  dictionary with a tool-using LLM loop per work item over (a) all repos' graphs,
+  (b) the knowledge index, (c) analog search — emitting a structured impact analysis
+  (repos touched, modules, integration points, discovery risks, discipline
+  composition) where **every claim carries a resolvable EvidenceRef**, verified
+  before rendering. Fills S12-4's missing code references at the same time.
+- [ ] **S13-3 Discipline (FE/BE) dimension end to end (medium).** Schema: composition
+  on `WorkItem`, per-discipline sub-ranges on `EstimateLine`, per-discipline totals on
+  the BoE ("X pd FE, Y pd BE"), discipline column on `ledger_entries` (+ actuals form
+  field) so per-slice calibration data starts accruing NOW. The impact worker proposes
+  the split with citations; until a discipline slice clears MIN_SAMPLES the split
+  renders with a "model-proposed, uncalibrated" badge (the S12-7 honest-silence
+  pattern). Naive baseline: the tenant's historical FE/BE ratio per module.
+- [ ] **S13-4 Number policy refinement (medium).** Where analogs exist: keep the
+  analog-median anchor; add LLM **analog vetting** (flag non-comparable analogs out of
+  the median — auditable, citable) and give the within-band nudge the top-k analog
+  cards as context. Where no analogs exist: replace the constant 1/3/8 pd prior with
+  an evidence-grounded structured LLM proposal — cone-stage-wide band, LOW confidence,
+  `basis_note="model-proposed, uncalibrated"`, errors tracked as a separate reference
+  class. NEVER wrap tenant quantiles around an LLM-proposed likely (they are measured
+  against the analog median; see the 7%-coverage note in calibration.py).
+- [ ] **S13-5 Freshness + pin primitive (medium).** Per-connection sync scheduler with
+  cadence config (Confluence has no external webhooks; git uses the existing HMAC
+  webhook), and a "pin this source now" path: page ID / issue key → existing
+  single-page REST fetch (ACL-walked, version-pinned) → upsert + embed, independent of
+  a full crawl. Pinned refs must join a re-sync set or they never refresh.
+- [ ] **S13-6 Frontier-LLM eval arm (medium).** Add a free-form LLM arm (BRD + repo +
+  wiki context, no band constraint) beside the calibrated arm and the naive baseline in
+  the eval harness; measured MAE/coverage — not 2023-24 citations — decides future
+  number-policy changes (PRINCIPLES #7).
+- [ ] **S13-7 Atlassian MCP discovery leg (deferred, flag-gated).** Teamwork Graph MCP
+  may *discover* candidate page IDs / issue keys — refs only, never text — feeding the
+  S13-5 pin queue. Gated on Teamwork Graph GA or a measured retrieval-recall gap
+  (ADR-0002 revisit triggers). Rovo remains distribution-only (S10-4, still deferred).
+
 ---
 
 ## Continuous tracks (apply to every sprint)
