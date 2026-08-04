@@ -9,6 +9,72 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-6 — the ledger gets its slices, an honest similarity, and a way in.** A seed
+  set could only be imported from a shell (`estimo-ledger-import`), which meant the
+  product's own memory could not be populated by the person who owns the data. There
+  is now a four-step wizard on the Ledger screen: choose a CSV/XLSX, confirm the
+  column mapping, confirm the privacy checklist, read the report. Three of those
+  steps are load-bearing rather than decorative. The **mapping is the whole
+  contract** — the importer applies no alias fallback underneath a confirmed
+  mapping, so a column an operator deliberately unmapped cannot come back by name
+  coincidence. The **checklist is enforced server-side**, because a checkbox that
+  only exists in the browser is not an assertion that a file about to become
+  permanent vendor memory carries no personal data (SECURITY.md). And the report
+  separates rows that were *rejected* from rows that imported *without actuals* —
+  the latter are kept (an estimate whose actual has not landed is still a true
+  record) but counted apart, since calibration cannot use them.
+
+  **The similarity percentage is measured, not ranked.** The design asks for an
+  "81% match" chip. The fused RRF score that ordered the analogs is ordinal —
+  1/(60+1) means "first", not "97% alike" — so rendering it as a percentage would
+  have invented a figure on the one screen whose entire argument is that its numbers
+  come from somewhere. Retrieval now carries the **cosine similarity** measured by
+  the dense leg, and the chip appears only where one exists; where nothing was
+  measured (no gateway, or entries with no embedding yet) the screen says so
+  instead.
+
+  **Team and domain slices go into the SQL of both retrieval legs**, not onto their
+  output. Filtering the top-N after the fact would have shown three matches where
+  the ledger holds forty — the reader would conclude their team had never done the
+  work. The counts in the header describe the same slice. The table gains the
+  design's `Delivered`, `Range that day`, `Team` and `BoE row` columns, the last
+  linking a product-written entry back to the draft row it came from. An unreachable
+  embedding endpoint now degrades ledger search to its lexical leg instead of
+  failing the screen, and says which leg answered.
+
+  **What the review pass found.** The clamp that was supposed to keep the similarity
+  honest failed OPEN on the one non-finite input pgvector actually produces: a
+  zero-vector embedding gives a NaN distance, `nan < 1.0` is False, so `min(1.0, nan)`
+  returns 1.0 and the *least* comparable row in the ledger wore a "100% match" chip.
+  Unmeasurable distances are now dropped rather than clamped. Re-importing a file
+  appended a second copy of every row — one observation counted twice, in a table
+  whose readers (calibration, analog retrieval) treat each row as an independent
+  sample, so a duplicate both inflated the sample and became its own nearest analog;
+  identical rows are now skipped and reported. A mapping posting two columns at one
+  field was silently resolved by column order (and could differ row to row) and is
+  now refused. Column samples were looked up by the stripped header while
+  `csv.DictReader` keys rows by the header as written, so every whitespace-padded
+  column previewed blank — and those are precisely the free-text columns the privacy
+  checklist exists to check. The wizard also discarded the importer's parse warnings,
+  presenting a row that *lost* its actual as a row that never had one; and its
+  unknown-modules block could never fire, because the API passed no taxonomy — the
+  deployment's own module history now stands in for one. Smaller: "N of M closed
+  jobs" counted estimate-only rows as closed; a filter matching nothing said the
+  ledger was empty; a failed or out-of-order load left the previous slice's rows
+  under the new filters; facet lists were unbounded; and the lexical fallback caught
+  only `GatewayError`, so a gateway answering 200 with an unparseable body turned
+  search into a 500 from inside the provider SDK's own parser.
+
+  **A near-miss worth recording.** One review agent proved the admin gate was
+  untested by deleting `dependencies=[Depends(require_admin)]` from both import
+  routes — and did not put it back, while `ruff --fix` silently removed the
+  now-unused import. The whole suite stayed green, exactly as the finding predicted.
+  The gate is restored and now pinned in `test_auth.py`, where auth is actually on;
+  the ledger tests run in open mode, where every caller holds every role, so they
+  could never have caught it. A request body is also bounded before routing now:
+  Starlette parses multipart *before* dependencies resolve, spooling to disk with no
+  ceiling, so an unauthenticated caller could make the server write to disk on the
+  way to a 401.
 - **S12-5 — the BoE keeps its versions, and two roles sign it.** `record.boe` was
   overwritten on every rebuild and `boe_version` was a bare counter, so the document
   a customer had been shown could not be reconstructed and the design's

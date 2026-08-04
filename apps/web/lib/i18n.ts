@@ -95,7 +95,8 @@ const dict = {
     impactShort: "Impact",
     viewGraph: "Graph",
     viewHeat: "Heat list",
-    impactFootnote: "Uncertainty is not hidden here — it is priced on the desk.",
+    impactFootnote:
+      "Uncertainty is not hidden here — it is priced on the desk.",
     evidenceFor: "Evidence",
     wikiSection: "Wiki",
     analogSection: "Analog jobs",
@@ -111,7 +112,8 @@ const dict = {
       "Evidence coverage is hidden once a draft exists — it would disclose the closed band.",
     unmappedModule: "(unmapped)",
     unmappedHint: "The decomposer could not attribute these to a module.",
-    noEvidenceForModule: "Nothing retrieved for this module — the mapping rests on naming alone.",
+    noEvidenceForModule:
+      "Nothing retrieved for this module — the mapping rests on naming alone.",
     estimatedShort: "estimated",
     impactSubtitle: "Which modules this BRD lands on, by work items touched.",
     openDesk: "Open desk",
@@ -135,12 +137,12 @@ const dict = {
     signScopeHint:
       "Your signature names exactly the rows it covers. Anything you did not sign stays unsigned.",
     afterSigning: "After signing",
-    afterSigningBody:
-      "Any change afterwards opens a new version with a diff.",
+    afterSigningBody: "Any change afterwards opens a new version with a diff.",
     versionHistory: "Version history",
     "note-first-draft": "first draft",
     "note-rebuilt-after-answers": "rebuilt after answers",
-    "note-snapshot taken at migration 0014": "snapshot taken when history began",
+    "note-snapshot taken at migration 0014":
+      "snapshot taken when history began",
     sectionAbsent: "This estimate does not carry that section.",
     diffsWithheld:
       "{n} diff withheld — a version nobody signed cannot be compared without disclosing it.",
@@ -173,6 +175,49 @@ const dict = {
     source: "Source",
     ledgerFootnote:
       "Scope-changed rows are kept for honesty but excluded from calibration.",
+    allTeams: "All teams",
+    allDomains: "All domains",
+    teamWord: "Team",
+    domainWord: "Domain",
+    deliveredWord: "Delivered",
+    rangeThatDay: "Range that day",
+    boeRowColumn: "BoE row",
+    openWord: "open",
+    lexicalOnlyHint:
+      "No similarity measured — either the dense retrieval leg did not run, or these entries carry no embeddings yet.",
+    similarityWord: "match",
+    importSeedSet: "Import seed set",
+    seedImportTitle: "Seed set import",
+    stepOf: "step {n} of 4",
+    chooseFile: "Choose a CSV or XLSX file",
+    mapTheColumns: "Map the columns",
+    unmappedWord: "unmapped",
+    doNotImport: "do not import",
+    missingRequired: "Required columns are unmapped: {fields}",
+    beforeAnythingEnters: "Before anything enters",
+    checkNoPersonalData: "No personal data in free-text fields",
+    checkCustomersAnonymised: "Customer names anonymised",
+    checklistBlocks:
+      "Both boxes have to be true. The server refuses the import until they are confirmed.",
+    startImport: "Import",
+    importingWord: "Importing…",
+    importDone: "{imported} of {total} rows imported",
+    reviewFailedRows: "Review failed rows",
+    failedRowsQueue:
+      "{n} rows were rejected and did not enter the ledger. Fix them in the file and import it again — this list is not kept after you close the wizard.",
+    noActualsNote:
+      "{n} rows imported without actuals. They are kept, but calibration cannot use them until an actual lands.",
+    reviewQueueModules: "Modules the ledger has not seen before",
+    parseWarnings: "Values that could not be read",
+    duplicatesNote:
+      "{n} rows were already in the ledger and were skipped — importing them again would count the same job twice.",
+    noMatchHere:
+      "Nothing matches this search or filter. The ledger itself is not empty.",
+    rowWord: "row",
+    startOver: "Import another file",
+    cancelWord: "Cancel",
+    backWord: "Back",
+    nextWord: "Next",
     calibrationSubtitle: "Are our ranges honest? The product grades itself.",
     howHonest: "Interval honesty",
     completedItems: "completed items",
@@ -512,7 +557,8 @@ const dict = {
       "Taslak kurulduktan sonra kanıt kapsamı gizlenir — kapalı bandı açığa çıkarırdı.",
     unmappedModule: "(eşlenmemiş)",
     unmappedHint: "Ayrıştırıcı bunları bir modüle bağlayamadı.",
-    noEvidenceForModule: "Bu modül için hiçbir şey bulunamadı — eşleme yalnız isim benzerliğine dayanıyor.",
+    noEvidenceForModule:
+      "Bu modül için hiçbir şey bulunamadı — eşleme yalnız isim benzerliğine dayanıyor.",
     estimatedShort: "tahmin",
     impactSubtitle:
       "Bu BRD'nin hangi modüllere dokunduğu, iş kalemi sayısıyla.",
@@ -542,7 +588,8 @@ const dict = {
     versionHistory: "Sürüm geçmişi",
     "note-first-draft": "ilk taslak",
     "note-rebuilt-after-answers": "yanıtlardan sonra yeniden kuruldu",
-    "note-snapshot taken at migration 0014": "geçmiş başlarken alınan anlık görüntü",
+    "note-snapshot taken at migration 0014":
+      "geçmiş başlarken alınan anlık görüntü",
     sectionAbsent: "Bu tahmin o bölümü taşımıyor.",
     diffsWithheld:
       "{n} fark gizlendi — kimsenin imzalamadığı bir sürüm, açığa çıkarılmadan karşılaştırılamaz.",
@@ -576,6 +623,49 @@ const dict = {
     source: "Kaynak",
     ledgerFootnote:
       "Kapsamı değişen satırlar dürüstlük için tutulur, kalibrasyondan çıkarılır.",
+    allTeams: "Tüm ekipler",
+    allDomains: "Tüm alanlar",
+    teamWord: "Ekip",
+    domainWord: "Alan",
+    deliveredWord: "Teslim",
+    rangeThatDay: "O günkü aralık",
+    boeRowColumn: "BoE satırı",
+    openWord: "aç",
+    lexicalOnlyHint:
+      "Benzerlik ölçülmedi — ya yoğun arama bacağı çalışmadı ya da bu kayıtların gömme vektörü yok.",
+    similarityWord: "benzerlik",
+    importSeedSet: "Seed set içe aktar",
+    seedImportTitle: "Seed set içe aktarma",
+    stepOf: "adım {n} / 4",
+    chooseFile: "CSV veya XLSX dosyası seçin",
+    mapTheColumns: "Sütunları eşleyin",
+    unmappedWord: "eşlenmedi",
+    doNotImport: "içe aktarma",
+    missingRequired: "Zorunlu sütunlar eşlenmedi: {fields}",
+    beforeAnythingEnters: "Hiçbir şey girmeden önce",
+    checkNoPersonalData: "Serbest metin alanlarında kişisel veri yok",
+    checkCustomersAnonymised: "Müşteri adları anonimleştirildi",
+    checklistBlocks:
+      "İkisi de doğru olmalı. Onaylanmadan sunucu içe aktarmayı reddeder.",
+    startImport: "İçe aktar",
+    importingWord: "İçe aktarılıyor…",
+    importDone: "{total} satırın {imported} tanesi içe aktarıldı",
+    reviewFailedRows: "Hatalı satırları incele",
+    failedRowsQueue:
+      "{n} satır reddedildi ve kayıt defterine girmedi. Dosyada düzeltip yeniden aktarın — bu liste sihirbazı kapatınca saklanmıyor.",
+    noActualsNote:
+      "{n} satır gerçekleşme olmadan içe aktarıldı. Saklanıyorlar, ama gerçekleşme gelene kadar kalibrasyon onları kullanamaz.",
+    reviewQueueModules: "Kayıt defterinin daha önce görmediği modüller",
+    parseWarnings: "Okunamayan değerler",
+    duplicatesNote:
+      "{n} satır zaten kayıt defterindeydi, atlandı — tekrar aktarmak aynı işi iki kez saymak olurdu.",
+    noMatchHere:
+      "Bu arama veya filtreyle eşleşen yok. Kayıt defteri boş değil.",
+    rowWord: "satır",
+    startOver: "Başka dosya aktar",
+    cancelWord: "İptal",
+    backWord: "Geri",
+    nextWord: "İleri",
     calibrationSubtitle: "Aralıklarımız dürüst mü? Ürün kendine not veriyor.",
     howHonest: "Aralık dürüstlüğü",
     completedItems: "tamamlanan kalem",
@@ -777,7 +867,8 @@ const dict = {
     statusBlocked: "bloke — açık soru",
     rationaleLabel: "Gerekçeniz",
     rationalePlaceholder: "bu bandın nedeni (isteğe bağlı)",
-    rationaleHint: "Yazın veya çubuğu sürükleyin. Gerekçe satırı isteğe bağlıdır.",
+    rationaleHint:
+      "Yazın veya çubuğu sürükleyin. Gerekçe satırı isteğe bağlıdır.",
     heldHeadline: "Bekletiliyor — kanıt eksik ve açık bir soru var.",
     discoveryChip: "+ keşif",
     weakEvidence: "zayıf kanıt",

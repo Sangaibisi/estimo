@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from estimo_core.secrets import MASTER_KEY_ENV, SealedSecretError, unseal
-from estimo_gateway import GatewayConfig
+from estimo_gateway import GatewayClient, GatewayConfig
 
 logger = logging.getLogger("estimo.api.runtime_config")
 
@@ -127,6 +127,22 @@ def gateway_key_readable(override: dict[str, Any] | None) -> bool:
 
 def invalidate_gateway_cache(request: Request) -> None:
     request.app.state.gateway_cache = None
+
+
+def gateway_client(config: GatewayConfig | None) -> GatewayClient | None:
+    """Best-effort gateway client from an EFFECTIVE config (panel override > env).
+
+    `None` when there is no usable gateway, so callers whose LLM leg is optional —
+    connector distillation, the ledger's dense retrieval leg — degrade instead of
+    failing: a misconfigured gateway must not take down a screen that has a
+    lexical answer to give.
+    """
+    if config is None:
+        return None
+    try:
+        return GatewayClient(config)
+    except Exception:  # noqa: BLE001 - an unusable gateway is a degradation, not a 500
+        return None
 
 
 async def effective_gateway(request: Request, session: AsyncSession) -> GatewayConfig:

@@ -214,3 +214,37 @@ def test_tenant_string_folds_to_stable_uuid() -> None:
     assert tenant_to_uuid("11111111-1111-1111-1111-111111111111") == (
         "11111111-1111-1111-1111-111111111111"
     )
+
+
+async def test_seed_set_import_is_admin_only(client: httpx.AsyncClient) -> None:
+    """The import endpoints write PERMANENT vendor memory and are the only route into
+    the ledger from the product, so the route-level require_admin is their only gate.
+
+    It belongs here rather than in test_ledger_api.py: those tests run in open mode,
+    where the synthetic principal holds every role, so deleting the `dependencies=`
+    kwarg leaves the whole ledger suite green. That mutation is exactly what this
+    pins — the same shape as the /v1/system gate above."""
+    payload = b"brd_ref;kalem;olasi\nBRD-1;Fatura uretimi;10\n"
+    files = {"file": ("seed.csv", payload, "text/csv")}
+    estimator = {"Authorization": f"Bearer {_token(roles=['estimator'])}"}
+    reviewer = {"Authorization": f"Bearer {_token(roles=['reviewer'])}"}
+
+    for headers in (estimator, reviewer):
+        assert (
+            await client.post("/v1/ledger/import/preview", headers=headers, files=files)
+        ).status_code == 403
+        assert (
+            await client.post(
+                "/v1/ledger/import",
+                headers=headers,
+                files=files,
+                data={"acknowledged": "true"},
+            )
+        ).status_code == 403
+    # Reading the ledger is an estimator's job; only writing to it is not.
+    assert (await client.get("/v1/ledger", headers=estimator)).status_code == 200
+
+    admin = {"Authorization": f"Bearer {_token(roles=['admin'])}"}
+    assert (
+        await client.post("/v1/ledger/import/preview", headers=admin, files=files)
+    ).status_code == 200

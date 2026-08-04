@@ -47,7 +47,13 @@ function Svg({
 export function LogoMark({ size = 22, style }: IconProps) {
   const id = useId();
   return (
-    <svg aria-hidden width={size} height={size} viewBox="0 0 32 32" style={{ flex: "none", ...style }}>
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      style={{ flex: "none", ...style }}
+    >
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#2b5fa8" />
@@ -55,9 +61,25 @@ export function LogoMark({ size = 22, style }: IconProps) {
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="8" fill={`url(#${id})`} />
-      <rect x="8" y="8.6" width="10" height="3.4" rx="1.7" fill="#fff" opacity="0.75" />
+      <rect
+        x="8"
+        y="8.6"
+        width="10"
+        height="3.4"
+        rx="1.7"
+        fill="#fff"
+        opacity="0.75"
+      />
       <rect x="8" y="14.3" width="16" height="3.4" rx="1.7" fill="#fff" />
-      <rect x="8" y="20" width="13" height="3.4" rx="1.7" fill="#fff" opacity="0.75" />
+      <rect
+        x="8"
+        y="20"
+        width="13"
+        height="3.4"
+        rx="1.7"
+        fill="#fff"
+        opacity="0.75"
+      />
     </svg>
   );
 }
@@ -81,6 +103,17 @@ export function IconLedger(props: IconProps) {
       <circle cx="3.5" cy="8" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="3.5" cy="12" r="0.9" fill="currentColor" stroke="none" />
       <path d="M6.5 4h6.5M6.5 8h6.5M6.5 12h6.5" />
+    </Svg>
+  );
+}
+
+/** Import — a file taken in through a gate: the seed-set wizard's affordance. */
+export function IconImport(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 2.25v7.5" />
+      <path d="M5.25 7l2.75 2.75L10.75 7" />
+      <path d="M2.75 11.25v1.5a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1v-1.5" />
     </Svg>
   );
 }

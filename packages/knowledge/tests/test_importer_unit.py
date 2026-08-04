@@ -3,7 +3,8 @@
 import uuid
 
 import pytest
-from estimo_knowledge import rrf_merge, to_ledger_entry
+from estimo_knowledge import propose_mapping, rrf_merge, to_ledger_entry
+from estimo_knowledge.importer import _canonicalize
 
 
 def row(**overrides: str) -> dict[str, str]:
@@ -55,3 +56,40 @@ class TestRrfMerge:
         first = rrf_merge([[a], [b]])
         second = rrf_merge([[b], [a]])
         assert [i for i, _ in first] == [i for i, _ in second] == [a, b]
+
+
+class TestProposeMapping:
+    """The wizard's step-2 proposal (S12-6)."""
+
+    def test_turkish_headers_land_on_canonical_fields(self) -> None:
+        proposal = propose_mapping(["BRD No", "İş Kalemi", "Gerçekleşen"])
+        assert proposal == {
+            "BRD No": "brd_ref",
+            "İş Kalemi": "item_title",
+            "Gerçekleşen": "actual_effort",
+        }
+
+    def test_every_header_is_answered_even_when_nothing_matches(self) -> None:
+        """An unrecognized column must come back as an explicit `None`, or the wizard
+        would drop it silently instead of showing "unmapped"."""
+        assert propose_mapping(["serbest not"]) == {"serbest not": None}
+
+    def test_a_field_is_not_claimed_twice(self) -> None:
+        """Two columns feeding one field would make which one wins depend on order."""
+        proposal = propose_mapping(["efor", "tahmin"])
+        assert proposal["efor"] == "est_likely"
+        assert proposal["tahmin"] is None
+
+
+class TestConfirmedMapping:
+    """A confirmed mapping is the whole contract — no alias fallback underneath it."""
+
+    def test_only_mapped_columns_are_read(self) -> None:
+        raw = {"BRD": "BRD-1", "kalem": "Fatura", "takım": "billing"}
+        canonical = _canonicalize(raw, {"BRD": "brd_ref", "kalem": "item_title"})
+        assert canonical == {"brd_ref": "BRD-1", "item_title": "Fatura"}
+        assert "team" not in canonical, "an unmapped column came back by alias"
+
+    def test_no_mapping_still_uses_aliases(self) -> None:
+        canonical = _canonicalize({"takım": "billing"})
+        assert canonical == {"team": "billing"}

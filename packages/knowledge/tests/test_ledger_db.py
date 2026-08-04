@@ -2,6 +2,8 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from estimo_knowledge import (
@@ -155,3 +157,133 @@ async def test_code_wiki_chunks_upsert_replaces(session: AsyncSession, clean_tab
     assert await upsert_generated_chunks(session, pages) == 1  # re-ingest replaces
     hits = await lexical_chunk_ids(session, "taksit planı", acl_keys=["public"])
     assert len(hits) == 1
+
+
+async def test_dense_similarity_is_measured_not_ranked(seeded: AsyncSession) -> None:
+    """S12-6: the number behind a "81% match" chip.
+
+    It has to be the cosine similarity between two vectors. An identical vector scores
+    ~1.0 and an orthogonal one ~0.0 — a rank-derived score would have no way to tell
+    those two apart, since both are simply "first" and "second".
+    """
+    from estimo_knowledge.search import dense_ledger_matches
+
+    rows = list((await seeded.execute(select(LedgerEntryRow).limit(2))).scalars())
+    same, orthogonal = rows[0], rows[1]
+    for row, vector in ((same, [1.0, 0.0, 0.0, 0.0]), (orthogonal, [0.0, 1.0, 0.0, 0.0])):
+        await seeded.execute(
+            update(LedgerEntryRow)
+            .where(LedgerEntryRow.id == row.id)
+            .values(embedding=vector, embedding_model="mock", embedding_dim=4)
+        )
+    await seeded.commit()
+
+    matches = dict(await dense_ledger_matches(seeded, [1.0, 0.0, 0.0, 0.0], limit=5))
+    assert matches[same.id] == pytest.approx(1.0, abs=1e-6)
+    assert matches[orthogonal.id] == pytest.approx(0.0, abs=1e-6)
+
+
+async def test_a_slice_is_applied_inside_the_dense_leg(seeded: AsyncSession) -> None:
+    """The slice must reach the SQL of BOTH legs, not just the lexical one."""
+    from estimo_knowledge.search import dense_ledger_matches, ledger_slice_conditions
+
+    rows = list((await seeded.execute(select(LedgerEntryRow).limit(2))).scalars())
+    for row in rows:
+        await seeded.execute(
+            update(LedgerEntryRow)
+            .where(LedgerEntryRow.id == row.id)
+            .values(embedding=[1.0, 0.0, 0.0, 0.0], embedding_model="mock", embedding_dim=4)
+        )
+    await seeded.execute(
+        update(LedgerEntryRow).where(LedgerEntryRow.id == rows[0].id).values(team="billing")
+    )
+    await seeded.execute(
+        update(LedgerEntryRow).where(LedgerEntryRow.id == rows[1].id).values(team="charging")
+    )
+    await seeded.commit()
+
+    matched = await dense_ledger_matches(
+        seeded, [1.0, 0.0, 0.0, 0.0], limit=5, conditions=ledger_slice_conditions("billing", None)
+    )
+    assert [entry_id for entry_id, _ in matched] == [rows[0].id]
+
+
+async def test_an_unmeasurable_distance_never_becomes_a_perfect_match(
+    seeded: AsyncSession,
+) -> None:
+    """The clamp used to fail OPEN on the one non-finite input pgvector produces.
+
+    A zero-vector embedding makes cosine distance undefined; pgvector returns NaN, and
+    `min(1.0, nan)` is 1.0 because `nan < 1.0` is False — so the least comparable row
+    in the ledger wore a "100% match" chip on the one screen whose whole claim is that
+    its numbers are measured."""
+    from estimo_knowledge.search import dense_ledger_matches
+
+    rows = list((await seeded.execute(select(LedgerEntryRow).limit(2))).scalars())
+    real, degenerate = rows[0], rows[1]
+    for row, vector in ((real, [0.6, 0.8, 0.0, 0.0]), (degenerate, [0.0, 0.0, 0.0, 0.0])):
+        await seeded.execute(
+            update(LedgerEntryRow)
+            .where(LedgerEntryRow.id == row.id)
+            .values(embedding=vector, embedding_model="mock", embedding_dim=4)
+        )
+    await seeded.commit()
+
+    matched = dict(await dense_ledger_matches(seeded, [1.0, 0.0, 0.0, 0.0], limit=5))
+    assert matched[real.id] == pytest.approx(0.6, abs=1e-6)
+    assert degenerate.id not in matched, "an undefined distance was served as a similarity"
+
+
+async def test_a_measured_similarity_stays_on_its_own_row(seeded: AsyncSession) -> None:
+    """Feedback reordering reshuffles the analog list AFTER retrieval scored it.
+
+    Attaching scores positionally instead of by id would print one entry's measured
+    percentage on another entry's card — the precise failure the percentage exists to
+    rule out."""
+    from estimo_knowledge.db import AnalogFeedback
+    from estimo_knowledge.search import hybrid_ledger_matches
+
+    # A query that matches EXACTLY these two rows, so the ±2-position feedback nudge
+    # is guaranteed to reorder them rather than move one row inside a longer list.
+    rows = list((await seeded.execute(select(LedgerEntryRow).limit(2))).scalars())
+    for row, title, vector in (
+        (rows[0], "zümrütlü fatura alfa", [1.0, 0.0, 0.0, 0.0]),
+        (rows[1], "zümrütlü fatura beta", [0.6, 0.8, 0.0, 0.0]),
+    ):
+        await seeded.execute(
+            update(LedgerEntryRow)
+            .where(LedgerEntryRow.id == row.id)
+            .values(item_title=title, embedding=vector, embedding_model="mock", embedding_dim=4)
+        )
+    await seeded.commit()
+
+    class _StubClient:
+        async def embed(self, texts: list[str]) -> Any:
+            return SimpleNamespace(vectors=[[1.0, 0.0, 0.0, 0.0]])
+
+    stub = _StubClient()
+    retrieved = await hybrid_ledger_matches(seeded, "zümrütlü", client=stub, limit=5)  # type: ignore[arg-type]
+    assert len(retrieved) == 2, "the query must isolate the two seeded rows"
+    similarity = dict(retrieved)
+
+    # Promote whichever row retrieval ranked LAST (PRINCIPLES #8 outcome feedback).
+    seeded.add(
+        AnalogFeedback(
+            entry_id=retrieved[-1][0],
+            origin_ref="estimate://test/WI-1",
+            weight=2.0,
+            reason="within-range",
+        )
+    )
+    await seeded.commit()
+
+    cards = await find_analogs(seeded, "zümrütlü", client=stub, limit=5)  # type: ignore[arg-type]
+    # The card order is NOT the order retrieval scored. Without this the assertions
+    # below would hold under positional attachment too, and prove nothing.
+    assert [entry_id for entry_id, _ in retrieved] != [card.entry_id for card in cards]
+    for card in cards:
+        assert card.similarity == pytest.approx(similarity[card.entry_id], abs=1e-6)
+    assert sorted(card.similarity or 0.0 for card in cards) == [
+        pytest.approx(0.6, abs=1e-6),
+        pytest.approx(1.0, abs=1e-6),
+    ], "both measured values must survive, not one duplicated onto both rows"

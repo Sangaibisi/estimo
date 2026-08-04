@@ -84,7 +84,11 @@ export interface DeskItem {
     confidence: string;
     basis_note?: string | null;
     evidence: { uri: string; kind: string; label?: string | null }[];
-    assumptions: { kind: string; text: string; contingency_pd: number | null }[];
+    assumptions: {
+      kind: string;
+      text: string;
+      contingency_pd: number | null;
+    }[];
     risks: { kind: string; text: string; contingency_pd: number | null }[];
   } | null;
   delta_likely: number | null;
@@ -160,7 +164,12 @@ export const api = {
     request<QuestionLetter>(
       `/v1/estimates/${id}/questions/letter?ids=${encodeURIComponent(ids.join(","))}&locale=${locale}`,
     ),
-  signRows: (id: string, work_item_ids: string[], name: string, role = "Reviewer") =>
+  signRows: (
+    id: string,
+    work_item_ids: string[],
+    name: string,
+    role = "Reviewer",
+  ) =>
     request<{ signed: number; already_signed: number }>(
       `/v1/estimates/${id}/sign-rows`,
       { method: "POST", body: JSON.stringify({ work_item_ids, name, role }) },
@@ -236,13 +245,39 @@ export const api = {
   listActuals: (id: string) =>
     request<ActualEntry[]>(`/v1/estimates/${id}/actuals`),
   metrics: () => request<MetricsOverview>("/v1/metrics/overview"),
-  ledger: (q: string) =>
-    request<{
-      entries: LedgerEntry[];
-      total: number;
-      with_actuals: number;
-      searched: boolean;
-    }>(`/v1/ledger?q=${encodeURIComponent(q)}`),
+  ledger: (q: string, slice?: { team?: string; domain?: string }) => {
+    const params = new URLSearchParams({ q });
+    if (slice?.team) params.set("team", slice.team);
+    if (slice?.domain) params.set("domain", slice.domain);
+    return request<LedgerPage>(`/v1/ledger?${params.toString()}`);
+  },
+  previewImport: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<ImportPreview>("/v1/ledger/import/preview", {
+      method: "POST",
+      body: form,
+    });
+  },
+  runImport: (file: File, mapping: Record<string, string | null>) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append(
+      "mapping",
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(mapping).filter(([, field]) => field !== null),
+        ),
+      ),
+    );
+    // The checklist is confirmed in the browser AND enforced by the server; this
+    // flag is the browser's half of that, never the whole gate.
+    form.append("acknowledged", "true");
+    return request<ImportReport>("/v1/ledger/import", {
+      method: "POST",
+      body: form,
+    });
+  },
   listConnections: () => request<ConnectionEntry[]>("/v1/connections"),
   createConnection: (payload: {
     kind: string;
@@ -440,7 +475,52 @@ export interface LedgerEntry {
   scope_changed: boolean;
   deviation: number | null;
   origin: "product" | "imported";
+  /** The BoE row this entry was written from — product-written entries only.
+   * Imported seed rows predate the product and link nowhere. */
+  boe_link: { estimate_id: string; work_item_id: string } | null;
+  estimated_at: string | null;
   completed_at: string | null;
+  /** MEASURED cosine similarity to the query, or null when the dense retrieval leg
+   * did not run. Never derived from the rank — see estimo_knowledge.search. */
+  similarity: number | null;
+  domain_tags: string[];
+}
+
+export interface LedgerPage {
+  entries: LedgerEntry[];
+  total: number;
+  with_actuals: number;
+  searched: boolean;
+  sliced: boolean;
+  /** "hybrid" only when the dense leg ran; "lexical" explains absent percentages. */
+  retrieval: "hybrid" | "lexical";
+  facets: { teams: string[]; domains: string[] };
+}
+
+/** Step 2 of the seed-set import wizard: what is in the file, and where each
+ * column would go. Nothing is written until the mapping and the privacy checklist
+ * are confirmed. */
+export interface ImportPreview {
+  source: string;
+  rows: number;
+  columns: { header: string; field: string | null; sample: string }[];
+  fields: string[];
+  missing_required: string[];
+}
+
+export interface ImportReport {
+  source: string;
+  total_rows: number;
+  imported: number;
+  /** Imported, NOT rejected — but outside calibration until an actual lands. */
+  without_actuals: number;
+  rejected: { row: number; error: string }[];
+  /** Rows already in the ledger, skipped rather than appended — a duplicate is one
+   * observation counted twice, and both calibration and retrieval read every row as
+   * an independent sample. */
+  duplicates: { row: number; brd_ref: string }[];
+  warnings: { row: number; warning: string }[];
+  unknown_modules: Record<string, number>;
 }
 
 /** One rendered unit of the source BRD (Reading Room's left pane). `source_ref`
@@ -483,7 +563,12 @@ export interface ImpactModule {
 
 export interface ImpactMapData {
   modules: ImpactModule[];
-  edges: { source: string; target: string; weight: number; uncertain: boolean }[];
+  edges: {
+    source: string;
+    target: string;
+    weight: number;
+    uncertain: boolean;
+  }[];
   selected: {
     module: string;
     requirement_ids: string[];

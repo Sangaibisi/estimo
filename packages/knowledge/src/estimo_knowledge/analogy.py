@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from estimo_core import ThreePoint
 from estimo_gateway import GatewayClient
 from estimo_knowledge.db import LedgerEntryRow
-from estimo_knowledge.search import hybrid_ledger_ids
+from estimo_knowledge.search import hybrid_ledger_matches
 
 
 class AnalogyCard(BaseModel):
@@ -25,6 +25,11 @@ class AnalogyCard(BaseModel):
 
     entry_id: uuid.UUID
     rank: int
+    # Measured cosine similarity to the query, or None when the dense leg did not
+    # run. Never derived from the rank: an ordinal position is not a measurement,
+    # and a percentage printed from one would be a fabricated figure on a screen
+    # whose whole claim is that its numbers come from somewhere.
+    similarity: float | None = None
     brd_ref: str
     item_title: str
     module_tags: tuple[str, ...] = ()
@@ -39,7 +44,7 @@ class AnalogyCard(BaseModel):
     deviation: float | None = None
 
 
-def _card(rank: int, row: LedgerEntryRow) -> AnalogyCard:
+def _card(rank: int, row: LedgerEntryRow, similarity: float | None = None) -> AnalogyCard:
     estimate: ThreePoint | None = None
     if row.est_likely is not None and row.est_optimistic is not None:
         estimate = ThreePoint(
@@ -54,6 +59,7 @@ def _card(rank: int, row: LedgerEntryRow) -> AnalogyCard:
     return AnalogyCard(
         entry_id=row.id,
         rank=rank,
+        similarity=similarity,
         brd_ref=row.brd_ref,
         item_title=row.item_title,
         module_tags=tuple(row.module_tags or ()),
@@ -75,14 +81,20 @@ async def find_analogs(
     *,
     client: GatewayClient | None = None,
     limit: int = 5,
+    team: str | None = None,
+    domain: str | None = None,
 ) -> list[AnalogyCard]:
-    ids = await hybrid_ledger_ids(session, text, client=client, limit=limit)
-    if not ids:
+    matches = await hybrid_ledger_matches(
+        session, text, client=client, limit=limit, team=team, domain=domain
+    )
+    if not matches:
         return []
+    similarity = dict(matches)
+    ids = [entry_id for entry_id, _ in matches]
     result = await session.execute(select(LedgerEntryRow).where(LedgerEntryRow.id.in_(ids)))
     by_id = {row.id: row for row in result.scalars()}
     ordered = await _feedback_reorder(session, [i for i in ids if i in by_id])
-    return [_card(rank, by_id[i]) for rank, i in enumerate(ordered, start=1)]
+    return [_card(rank, by_id[i], similarity.get(i)) for rank, i in enumerate(ordered, start=1)]
 
 
 # Outcome feedback folds into ranking as a bounded nudge (PRINCIPLES #8): retrieval

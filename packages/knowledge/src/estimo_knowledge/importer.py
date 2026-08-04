@@ -18,6 +18,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,6 +62,17 @@ class ImportReport:
     rejected: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[dict[str, Any]] = field(default_factory=list)
     unknown_modules: dict[str, int] = field(default_factory=dict)
+    # Rows that imported cleanly but carry no actual effort. They are NOT rejected —
+    # an estimate whose actual has not landed yet is still a true record, and
+    # LEDGER-SCHEMA.md's import contract is deliberately tolerant. They are counted
+    # separately because they cannot answer the question this ledger exists for, so
+    # calibration never sees them and the importing operator should know how many
+    # of their rows are in that state.
+    without_actuals: int = 0
+    # Rows already present in the ledger, skipped rather than appended. A duplicate is
+    # the same observation counted twice, and both readers of this table (calibration
+    # and analog retrieval) treat every row as an independent sample.
+    duplicates: list[dict[str, Any]] = field(default_factory=list)
 
     def summary(self) -> str:
         lines = [
@@ -70,6 +82,10 @@ class ImportReport:
                 f"rejected: {len(self.rejected)}  warnings: {len(self.warnings)}"
             ),
         ]
+        if self.without_actuals:
+            lines.append(f"  imported without actuals (not in calibration): {self.without_actuals}")
+        if self.duplicates:
+            lines.append(f"  skipped as already in the ledger: {len(self.duplicates)}")
         if self.unknown_modules:
             listed = ", ".join(f"{m}×{c}" for m, c in sorted(self.unknown_modules.items()))
             lines.append(f"  review queue (unknown modules): {listed}")
@@ -119,10 +135,43 @@ def read_rows(path: Path) -> list[dict[str, str]]:
     return _read_csv(path)
 
 
-def _canonicalize(row: dict[Any, Any]) -> dict[str, str]:
+def propose_mapping(headers: list[str]) -> dict[str, str | None]:
+    """Header → canonical field, by alias, for the import wizard's mapping step.
+
+    Returns an entry for EVERY header, `None` where nothing matched, so the wizard
+    can show "Column G → unmapped" instead of quietly dropping it. A field already
+    claimed by an earlier header is not claimed twice — two columns feeding one
+    field would make which one wins depend on dictionary order.
+    """
+    proposal: dict[str, str | None] = {}
+    claimed: set[str] = set()
+    by_alias = {alias: name for name, aliases in COLUMN_ALIASES.items() for alias in aliases}
+    for header in headers:
+        stripped = (header or "").strip()
+        field_name = by_alias.get(tr_lower(stripped)) or by_alias.get(stripped.lower())
+        if field_name is not None and field_name not in claimed:
+            claimed.add(field_name)
+            proposal[stripped] = field_name
+        else:
+            proposal[stripped] = None
+    return proposal
+
+
+def _canonicalize(row: dict[Any, Any], mapping: dict[str, str] | None = None) -> dict[str, str]:
     if None in row:
         msg = "row has more fields than the header (stray delimiter?)"
         raise ValueError(msg)
+    if mapping is not None:
+        # A confirmed mapping is the WHOLE contract: no alias fallback underneath it.
+        # An operator who unmapped a column in the wizard must not find it re-mapped
+        # by a name coincidence — that would import a column they chose to exclude.
+        confirmed: dict[str, str] = {}
+        for key, value in row.items():
+            field_name = mapping.get((key or "").strip())
+            val = value.strip() if isinstance(value, str) else ""
+            if field_name and val != "":
+                confirmed.setdefault(field_name, val)
+        return confirmed
     canonical: dict[str, str] = {}
     lowered: dict[str, str] = {}
     for key, value in row.items():
@@ -242,18 +291,85 @@ def _to_row(entry: LedgerEntry, extras: dict[str, str]) -> LedgerEntryRow:
     )
 
 
-async def import_seed(
+# What makes two ledger rows "the same job". Deliberately the whole observation, not
+# just an id: two genuinely different jobs may share a BRD reference and a title (the
+# same item re-estimated for another team), and those differ in team or in the numbers.
+# A row matching on ALL of these is the same measurement, arriving twice.
+def _dedupe_key(entry: LedgerEntry) -> tuple[Any, ...]:
+    return (
+        entry.brd_ref,
+        entry.item_title,
+        entry.team,
+        entry.estimate.optimistic if entry.estimate else None,
+        entry.estimate.likely if entry.estimate else None,
+        entry.estimate.pessimistic if entry.estimate else None,
+        entry.estimate_single,
+        entry.actual_effort,
+        entry.completed_at,
+    )
+
+
+async def _existing_keys(session: AsyncSession) -> set[tuple[Any, ...]]:
+    """Dedupe keys already in the ledger, read once per import.
+
+    Read up front rather than queried per row: an import is one pass over a file, and
+    a per-row SELECT would turn a 10k-row seed set into 10k round-trips. Only rows the
+    caller's tenant can see are returned — RLS applies to this SELECT like any other.
+    """
+    result = await session.execute(
+        select(
+            LedgerEntryRow.brd_ref,
+            LedgerEntryRow.item_title,
+            LedgerEntryRow.team,
+            LedgerEntryRow.est_optimistic,
+            LedgerEntryRow.est_likely,
+            LedgerEntryRow.est_pessimistic,
+            LedgerEntryRow.estimate_single,
+            LedgerEntryRow.actual_effort,
+            LedgerEntryRow.completed_at,
+        )
+    )
+    return {
+        (
+            brd_ref,
+            item_title,
+            team,
+            _as_float(opt),
+            _as_float(likely),
+            _as_float(pess),
+            _as_float(single),
+            _as_float(actual),
+            completed,
+        )
+        for brd_ref, item_title, team, opt, likely, pess, single, actual, completed in result
+    }
+
+
+def _as_float(value: Any) -> float | None:
+    """Numeric columns come back as Decimal; the entry side holds floats."""
+    return None if value is None else float(value)
+
+
+async def import_rows(
     session: AsyncSession,
-    path: Path,
+    rows: list[dict[str, str]],
     *,
+    source: str,
     taxonomy: set[str] | None = None,
+    mapping: dict[str, str] | None = None,
 ) -> ImportReport:
-    """Import a seed file; commits once at the end. Bad rows never abort good rows."""
-    report = ImportReport(source=path.name)
-    for row_no, raw in enumerate(read_rows(path), start=2):  # header is line 1
+    """Import already-parsed rows; commits once at the end.
+
+    The file-reading half lives in `import_seed`; this half is what the API's
+    upload wizard drives, so the CLI and the panel import through exactly the same
+    validation, the same per-row savepoints and the same report.
+    """
+    report = ImportReport(source=source)
+    seen = await _existing_keys(session)
+    for row_no, raw in enumerate(rows, start=2):  # header is line 1
         report.total_rows += 1
         try:
-            canonical = _canonicalize(raw)
+            canonical = _canonicalize(raw, mapping)
             entry = to_ledger_entry(canonical)
         except (ValidationError, ValueError) as exc:
             message = str(exc)
@@ -262,6 +378,18 @@ async def import_seed(
                 message = f"{'.'.join(str(loc) for loc in first['loc'])}: {first['msg']}"
             report.rejected.append({"row": row_no, "error": message})
             continue
+        key = _dedupe_key(entry)
+        if key in seen:
+            # An identical row is already in the ledger. Importing it again is never a
+            # second observation of the world — it is the same observation counted
+            # twice, and the ledger's readers are calibration and analog retrieval, so
+            # a duplicated row both inflates the sample it is graded against and
+            # becomes its own nearest analog. Re-running an import (a retry, a file
+            # sent twice, a wizard the operator was unsure had worked) must therefore
+            # be a no-op for rows already present, and must SAY so.
+            report.duplicates.append({"row": row_no, "brd_ref": entry.brd_ref})
+            continue
+        seen.add(key)
         for warning in _collect_parse_warnings(canonical):
             report.warnings.append({"row": row_no, "warning": warning})
         if taxonomy is not None:
@@ -278,5 +406,20 @@ async def import_seed(
             report.rejected.append({"row": row_no, "error": f"db rejected row: {exc.orig}"})
             continue
         report.imported += 1
+        if entry.actual_effort is None:
+            report.without_actuals += 1
     await session.commit()
     return report
+
+
+async def import_seed(
+    session: AsyncSession,
+    path: Path,
+    *,
+    taxonomy: set[str] | None = None,
+    mapping: dict[str, str] | None = None,
+) -> ImportReport:
+    """Import a seed file; commits once at the end. Bad rows never abort good rows."""
+    return await import_rows(
+        session, read_rows(path), source=path.name, taxonomy=taxonomy, mapping=mapping
+    )

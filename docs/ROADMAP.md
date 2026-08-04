@@ -486,10 +486,10 @@ Open, grouped (feasibility from the audit):
   plainly that none can be shown because the API builds drafts with `graph=None` and
   no repository is wired into the estimate path; closing this means running the code
   graph over a synced git connection, which is a pipeline change, not a panel one.
-  Also: a similarity **percentage** on analog cards (retrieval computes RRF scores
-  and discards them — `AnalogyCard` exposes only an ordinal rank), and a wiki
-  freshness chip that states the age ("updated 8 months ago") rather than only
-  flagging staleness.
+  Also: a wiki freshness chip that states the age ("updated 8 months ago") rather
+  than only flagging staleness. (The similarity **percentage** is no longer blocked —
+  S12-6 made retrieval carry the measured cosine similarity and `AnalogyCard` expose
+  it; the impact panel's analog cards still have to render it.)
 - [ ] **S12-5 BoE (small, remainder):** an **archival PDF** export (the `.docx`
   renderer exists; PDF needs a new rendering dependency, which is an ADR-0005
   decision, not a wiring job); a **scope & exclusions** section (`BoeDocument` has no
@@ -499,9 +499,13 @@ Open, grouped (feasibility from the audit):
   so on the BoE screen there is nothing left to batch — moving the panel there means
   moving the document gate); and the **paper framing** of the document card
   (shadowed page, ruled header with customer · version · date).
-- [ ] **S12-6 Ledger (medium):** seed-set import wizard + error queue, similarity
-  percentages (needs retrieval to surface scores), team/domain filters, Delivered/Team
-  columns, BoE cross-links, 'Range that day' header.
+- [ ] **S12-6 Ledger (small, remainder):** the failed rows are reported per import
+  and then forgotten — the design's "error queue" implies rows that **persist** until
+  someone fixes them, which means storing rejected rows (with their source file) and
+  a re-map-and-retry path that does not need the file uploaded again. Also: the
+  similarity percentage is shown only where a cosine distance was actually measured,
+  so entries that have never been through the embedding backfill show none (a
+  rank-derived percentage was refused — an ordinal position is not a measurement).
 - [ ] **S12-7 Calibration (medium):** per-domain coverage bars, anchoring comparison
   strips, question-impact quadrant, team/domain slicing, time-window scoping,
   MAPE-vs-MAE decision, export figures.

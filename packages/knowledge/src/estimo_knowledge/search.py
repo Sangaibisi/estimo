@@ -12,6 +12,7 @@ the ledger is vendor-internal and carries no ACL.
 
 from __future__ import annotations
 
+import math
 import re
 import uuid
 from dataclasses import dataclass
@@ -192,10 +193,40 @@ def _lexical_stmt(
     )
 
 
+def ledger_slice_conditions(team: str | None, domain: str | None) -> list[Any]:
+    """Slice predicates shared by BOTH retrieval legs.
+
+    Filtering after retrieval would silently shrink the result set — a reader who
+    filters by team would see three matches where the ledger holds forty, because
+    the top-N was chosen before the filter was known. So the slice goes into the
+    SQL of each leg and the top-N is the top-N *of the slice*.
+
+    Team and domain are stored normalized (`tr_lower` at the import boundary), so
+    the comparison normalizes too.
+    """
+    conditions: list[Any] = []
+    if team:
+        conditions.append(LedgerEntryRow.team == tr_lower(team.strip()))
+    if domain:
+        conditions.append(
+            LedgerEntryRow.domain_tags.op("&&")(
+                bindparam("domain_slice", [tr_lower(domain.strip())], type_=ARRAY(String(60)))
+            )
+        )
+    return conditions
+
+
 async def lexical_ledger_ids(
-    session: AsyncSession, query: str, *, limit: int = 20
+    session: AsyncSession,
+    query: str,
+    *,
+    limit: int = 20,
+    conditions: list[Any] | None = None,
 ) -> list[uuid.UUID]:
-    result = await session.execute(_lexical_stmt(LedgerEntryRow, query, limit))
+    stmt = _lexical_stmt(LedgerEntryRow, query, limit)
+    if conditions:
+        stmt = stmt.where(*conditions)
+    result = await session.execute(stmt)
     return list(result.scalars())
 
 
@@ -225,20 +256,60 @@ async def lexical_chunk_ids(
     return list(result.scalars())
 
 
-async def dense_ledger_ids(
-    session: AsyncSession, embedding: list[float], *, limit: int = 20
-) -> list[uuid.UUID]:
+async def dense_ledger_matches(
+    session: AsyncSession,
+    embedding: list[float],
+    *,
+    limit: int = 20,
+    conditions: list[Any] | None = None,
+) -> list[tuple[uuid.UUID, float]]:
+    """Nearest ledger entries WITH their cosine similarity.
+
+    The similarity is the only defensible "how alike is this?" number the system
+    has: it is measured between two vectors. The fused RRF score is not — it is
+    built from ordinal positions, so 1/(60+1) means "first", not "97% alike", and
+    rendering it as a percentage would invent a measurement. Anything that wants
+    to show a percentage must read it from here, and show nothing when the dense
+    leg did not run.
+    """
+    distance = LedgerEntryRow.embedding.cosine_distance(embedding)
     stmt = (
-        select(LedgerEntryRow.id)
+        select(LedgerEntryRow.id, distance)
         .where(
             LedgerEntryRow.embedding.is_not(None),
             LedgerEntryRow.embedding_dim == len(embedding),
+            *(conditions or ()),
         )
-        .order_by(LedgerEntryRow.embedding.cosine_distance(embedding), LedgerEntryRow.id)
+        .order_by(distance, LedgerEntryRow.id)
         .limit(limit)
     )
     result = await session.execute(stmt)
-    return list(result.scalars())
+    # pgvector cosine distance is 1 - cosine similarity, in [0, 2]; negative
+    # similarity means "points the other way", which is no similarity at all.
+    #
+    # NaN is dropped, not clamped. A zero-vector embedding (a misbehaving embedder,
+    # a hand-backfilled row) makes cosine distance undefined, and pgvector returns
+    # NaN for it — and a clamp fails OPEN on NaN, because `nan < 1.0` is False, so
+    # `min(1.0, nan)` returns 1.0 and the least comparable row in the ledger would
+    # wear a "100% match" chip. An unmeasurable distance is not a similarity of any
+    # value. Such a row leaves the DENSE ranking (Postgres sorts NaN last, so it was
+    # never a near neighbour anyway) and can still be found by the lexical leg.
+    return [
+        (row_id, max(0.0, min(1.0, 1.0 - value)))
+        for row_id, dist in result
+        if not math.isnan(value := float(dist))
+    ]
+
+
+async def dense_ledger_ids(
+    session: AsyncSession,
+    embedding: list[float],
+    *,
+    limit: int = 20,
+    conditions: list[Any] | None = None,
+) -> list[uuid.UUID]:
+    matches = await dense_ledger_matches(session, embedding, limit=limit, conditions=conditions)
+    return [row_id for row_id, _ in matches]
 
 
 async def dense_chunk_ids(
@@ -297,16 +368,45 @@ async def hybrid_chunk_ids(
     return [chunk_id for chunk_id, _ in rrf_merge(rankings)][:limit]
 
 
+async def hybrid_ledger_matches(
+    session: AsyncSession,
+    query: str,
+    *,
+    client: GatewayClient | None = None,
+    limit: int = 10,
+    team: str | None = None,
+    domain: str | None = None,
+) -> list[tuple[uuid.UUID, float | None]]:
+    """Lexical always; dense joins in when a gateway client is provided.
+
+    Each hit carries its MEASURED cosine similarity, or `None` when the dense leg
+    did not run (or the entry has no embedding of the right dimension) — the rank
+    alone never becomes a number.
+    """
+    conditions = ledger_slice_conditions(team, domain)
+    rankings = [await lexical_ledger_ids(session, query, limit=limit * 2, conditions=conditions)]
+    similarity: dict[uuid.UUID, float] = {}
+    if client is not None:
+        embedded = await client.embed([query])
+        dense = await dense_ledger_matches(
+            session, embedded.vectors[0], limit=limit * 2, conditions=conditions
+        )
+        rankings.append([row_id for row_id, _ in dense])
+        similarity = dict(dense)
+    fused = [item_id for item_id, _ in rrf_merge(rankings)][:limit]
+    return [(item_id, similarity.get(item_id)) for item_id in fused]
+
+
 async def hybrid_ledger_ids(
     session: AsyncSession,
     query: str,
     *,
     client: GatewayClient | None = None,
     limit: int = 10,
+    team: str | None = None,
+    domain: str | None = None,
 ) -> list[uuid.UUID]:
-    """Lexical always; dense joins in when a gateway client is provided."""
-    rankings = [await lexical_ledger_ids(session, query, limit=limit * 2)]
-    if client is not None:
-        embedded = await client.embed([query])
-        rankings.append(await dense_ledger_ids(session, embedded.vectors[0], limit=limit * 2))
-    return [item_id for item_id, _ in rrf_merge(rankings)][:limit]
+    matches = await hybrid_ledger_matches(
+        session, query, client=client, limit=limit, team=team, domain=domain
+    )
+    return [item_id for item_id, _ in matches]

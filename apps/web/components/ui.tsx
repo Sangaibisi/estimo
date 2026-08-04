@@ -324,6 +324,9 @@ export function BandHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        // Wraps rather than crushing the title column when a header carries many
+        // controls (the ledger's search + two slice selects + import).
+        flexWrap: "wrap",
         gap: 14,
         padding: "11px 18px",
         borderBottom: "1px solid var(--line)",
@@ -339,7 +342,15 @@ export function BandHeader({
       </div>
       {center}
       {right && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginLeft: "auto",
+          }}
+        >
           {right}
         </div>
       )}

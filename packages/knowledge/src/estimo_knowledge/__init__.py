@@ -9,7 +9,14 @@ from estimo_knowledge.db import (
     LedgerEntryRow,
 )
 from estimo_knowledge.embedding import EmbedReport, embed_pending, embed_text
-from estimo_knowledge.importer import ImportReport, import_seed, to_ledger_entry
+from estimo_knowledge.importer import (
+    ImportReport,
+    import_rows,
+    import_seed,
+    propose_mapping,
+    read_rows,
+    to_ledger_entry,
+)
 from estimo_knowledge.ingest import is_stale, upsert_document, upsert_generated_chunks
 from estimo_knowledge.search import (
     dense_chunk_ids,
@@ -35,10 +42,13 @@ __all__ = [
     "find_analogs",
     "hybrid_chunk_ids",
     "hybrid_ledger_ids",
+    "import_rows",
     "import_seed",
     "is_stale",
     "lexical_chunk_ids",
     "lexical_ledger_ids",
+    "propose_mapping",
+    "read_rows",
     "rrf_merge",
     "to_ledger_entry",
     "upsert_document",

@@ -6,11 +6,12 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -27,6 +28,15 @@ from estimo_api.routers import (
     system,
 )
 from estimo_api.settings import Settings
+
+
+class _BodyTooLarge(Exception):
+    """Raised from inside the ASGI receive seam; turned into a 413 by the middleware."""
+
+
+# Hard ceiling for ANY request body. The ledger import (8 MB, checked again inside the
+# endpoint) is the largest legitimate payload; the headroom covers multipart framing.
+MAX_REQUEST_BYTES = 12 * 1024 * 1024
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -133,6 +143,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ]
             },
         )
+
+    @app.middleware("http")
+    async def _bound_request_body(request: Request, call_next: Any) -> Response:
+        """Refuse an oversized body BEFORE anything reads it.
+
+        Route dependencies — including `require_admin` — run after Starlette has
+        already parsed the multipart body, and its parser spools past 1 MB to a
+        temp file with no ceiling. So without this, an unauthenticated caller can
+        make the server write an arbitrary amount to disk on the way to a 401, and
+        the endpoint's own 8 MB cap only ever bounds the copy it makes afterwards.
+
+        Content-Length is a claim, not a fact, so it is checked first (cheap, and it
+        stops the honest case) and the streamed bytes are counted regardless.
+        """
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_REQUEST_BYTES:
+            return JSONResponse(status_code=413, content={"detail": "request body too large"})
+
+        received = 0
+        exceeded = False
+        original = request.receive
+
+        async def _counting_receive() -> Any:
+            nonlocal received, exceeded
+            message = await original()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > MAX_REQUEST_BYTES:
+                    exceeded = True
+                    msg = "request body too large"
+                    raise _BodyTooLarge(msg)
+            return message
+
+        request._receive = _counting_receive
+        try:
+            response: Response = await call_next(request)
+        except _BodyTooLarge:
+            return JSONResponse(status_code=413, content={"detail": "request body too large"})
+        # The multipart parser catches broadly, so tripping the ceiling mid-parse
+        # surfaces as its own "error parsing the body" 400. The read still stopped —
+        # which is the point — but the caller deserves the real reason, so the flag is
+        # checked after the fact rather than trusting the exception to propagate.
+        if exceeded:
+            return JSONResponse(status_code=413, content={"detail": "request body too large"})
+        return response
 
     app.add_middleware(
         CORSMiddleware,
