@@ -9,6 +9,35 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S12-3 — the Question Board is the customer loop again.** `status` walked
+  open → sent → answered → applied from the very first model, and nothing ever
+  advanced it: dispatch was never recorded, so the board could only ever draw two
+  lanes and "waiting 3 days" had nothing to count from. Sending a set now records
+  **who it went to and when** (re-sending an already-sent question is refused rather
+  than restarting its wait), an answer is recorded **per question and attributed**
+  without rebuilding anything — recording and applying are separate because folding
+  an answer in invalidates the draft and every band recorded against it — and
+  applying marks the question applied and records **which work item it landed on**.
+  A reader can add a question the gate missed. The customer letter is compiled
+  **once, on the server**, and the preview, the clipboard and any future export read
+  that one text: they used to disagree, so "Copy text" produced markdown bullets the
+  customer never saw.
+
+  Two invariants the board made reachable are now enforced. **The estimate row
+  carries an optimistic lock** (migration 0013): `state` is one JSONB document that
+  every workflow endpoint reads, mutates and writes back whole, so two overlapping
+  requests both read the pre-image and the second erased the first — both callers
+  getting 200, nothing logged. A review reproduced it in 11 of 12 *natural* races,
+  and one user double-clicking was enough because the board's buttons did not
+  disable during their own request. The loser now gets a 409 telling them to reload,
+  and the buttons disable. **One live question per requirement**: the gate folds
+  answers into requirement text through a map keyed by requirement, so a second
+  question on one requirement meant only the last answer ever reached it while both
+  cards claimed they were applied. And an unapplied manual question now blocks the
+  draft — otherwise the New-question button changed nothing about whether a BoE
+  could be built and signed over the very ambiguity a reader had just recorded
+  (PRINCIPLES #3).
+
 - **S12-2 — the Reading Room shows the document again.** The BRD body now survives
   the parse (`ParsedBrd.blocks`, capped at 120k characters with `body_truncated`
   saying so) and is served by a dedicated `GET /v1/estimates/{id}/source`, so the

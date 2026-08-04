@@ -140,12 +140,27 @@ class Requirement(EstimoModel):
 
 
 class ClarificationQuestion(EstimoModel):
+    """One question the gate raised, and where it is in the customer loop.
+
+    `status` walks open → sent → answered → applied. It existed from the start and
+    nothing ever advanced it, so the board could only ever show two lanes and the
+    dispatch itself — when it went out, to whom, how long it has been waiting — was
+    never recorded anywhere. The timestamps below are what make "waiting 3 days" a
+    fact rather than a guess.
+    """
+
     id: str = Field(min_length=1)
     requirement_id: str = Field(min_length=1)
     question: str = Field(min_length=1)
     reason: str = Field(min_length=1)
     status: Literal["open", "sent", "answered", "applied"] = "open"
     answer: str | None = None
+    sent_at: dt.datetime | None = None
+    recipient: str | None = None
+    answered_at: dt.datetime | None = None
+    answered_by: str | None = None
+    # The work item this answer was folded into, once the estimate was rebuilt.
+    applied_to: str | None = None
 
 
 class WorkItem(EstimoModel):

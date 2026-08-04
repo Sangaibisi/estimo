@@ -83,8 +83,10 @@ Terminology: [docs/GLOSSARY.md](docs/GLOSSARY.md).
     after being cleaned into a proper `feat/*` (or their findings land as an ADR/doc).
 - One roadmap item (or one coherent slice of it) per branch/PR. Reference the item ID
   (e.g. `S2-3`) in the PR title or body.
-- Releases: tags `v0.x.y` from `main`; release automation (release-please) arrives in S1.
-  Until then, version bumps and CHANGELOG promotion are manual.
+- Releases: tags `v0.x.y` from `main`, cut BY HAND — version bumps and CHANGELOG
+  promotion are manual. The release-PR bot was removed: the product is deployed from
+  source (docs/DEPLOY.md), so a release loop nobody walks is a step that only goes
+  stale. Pushing a `v*` tag still publishes semver images.
 
 ### Commit convention
 

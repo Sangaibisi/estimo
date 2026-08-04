@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       # Squash-only merges with "PR title" as the commit message make the PR title THE
-      # conventional commit that release-please reads — so the title is what we lint.
+      # conventional commit that lands on main — so the title is what we lint.
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

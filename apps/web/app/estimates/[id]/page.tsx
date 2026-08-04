@@ -18,6 +18,7 @@ import {
   type DeskItem,
   type DocBlock,
   type EstimateSummary,
+  type QuestionLetter,
   type HeldRequirement,
 } from "@/lib/api";
 import { detectLocale, issueSentence, t, type Locale } from "@/lib/i18n";
@@ -40,6 +41,13 @@ interface Question {
   requirement_id: string;
   question: string;
   reason: string;
+  status: "open" | "sent" | "answered" | "applied";
+  answer?: string | null;
+  sent_at?: string | null;
+  recipient?: string | null;
+  answered_at?: string | null;
+  answered_by?: string | null;
+  applied_to?: string | null;
 }
 
 interface Requirement {
@@ -96,8 +104,6 @@ export default function EstimateWorkspace({
   const [summary, setSummary] = useState<EstimateSummary | null>(null);
   const [state, setState] = useState<StateShape | null>(null);
   const [stage, setStage] = useState<StageKey>("reading");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [estimator, setEstimator] = useState("");
   const [deskItems, setDeskItems] = useState<DeskItem[]>([]);
   const [held, setHeld] = useState<HeldRequirement[]>([]);
@@ -181,14 +187,9 @@ export default function EstimateWorkspace({
   }
 
   const blocked = new Set(state.blocked_ids);
+  // Same definition the workspace and the board use: unapplied, not un-answered.
   const openQuestions = state.questions.filter(
-    (question) => !(question.id in state.answers),
-  );
-  const answeredQuestions = state.questions.filter(
-    (question) => question.id in state.answers,
-  );
-  const filledAnswers = Object.fromEntries(
-    Object.entries(answers).filter(([, value]) => value.trim()),
+    (question) => question.status !== "applied",
   );
 
   const stages: { key: StageKey; label: string }[] = [
@@ -330,257 +331,26 @@ export default function EstimateWorkspace({
 
         {/* ---------- 3 · Question Board ---------- */}
         {stage === "questions" && (
-          <div style={{ display: "flex" }}>
-            <div
-              style={{
-                flex: 1,
-                minWidth: 0,
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-              }}
-            >
-              <div
-                style={{
-                  padding: 12,
-                  borderRight: "1px solid var(--line)",
-                  background: "var(--surf2)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 10,
-                  }}
-                >
-                  <Lbl>{t(locale, "laneOpen")}</Lbl>
-                  <Mn style={{ color: "var(--mut)" }}>
-                    {openQuestions.length}
-                  </Mn>
-                </div>
-                {openQuestions.length === 0 && (
-                  <p
-                    style={{ fontSize: 12.5, color: "var(--ink2)", margin: 0 }}
-                  >
-                    {t(locale, "emptyQuestions")}
-                  </p>
-                )}
-                {openQuestions.map((question) => (
-                  <div
-                    key={question.id}
-                    className="card"
-                    style={{ padding: 11, marginBottom: 9 }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected.has(question.id)}
-                        onChange={(event) => {
-                          const next = new Set(selected);
-                          if (event.target.checked) next.add(question.id);
-                          else next.delete(question.id);
-                          setSelected(next);
-                        }}
-                        style={{ padding: 0 }}
-                      />
-                      <Mn style={{ color: "var(--acc)" }}>
-                        {question.requirement_id}
-                      </Mn>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        marginTop: 6,
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {question.question}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 6,
-                        flexWrap: "wrap",
-                        marginTop: 7,
-                      }}
-                    >
-                      {question.reason
-                        .split(",")
-                        .slice(0, 2)
-                        .map((reason) => (
-                          <StatusChip key={reason} status="warn">
-                            {reason.trim().split(":")[0]}
-                          </StatusChip>
-                        ))}
-                    </div>
-                    <input
-                      style={{ width: "100%", marginTop: 8 }}
-                      placeholder={t(locale, "answerPlaceholder")}
-                      value={answers[question.id] ?? ""}
-                      onChange={(event) =>
-                        setAnswers({
-                          ...answers,
-                          [question.id]: event.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ padding: 12 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 10,
-                  }}
-                >
-                  <Lbl>{t(locale, "laneApplied")}</Lbl>
-                  <Mn style={{ color: "var(--mut)" }}>
-                    {answeredQuestions.length}
-                  </Mn>
-                </div>
-                {answeredQuestions.map((question) => (
-                  <div
-                    key={question.id}
-                    className="card"
-                    style={{
-                      padding: 11,
-                      marginBottom: 9,
-                      background: "var(--surf2)",
-                    }}
-                  >
-                    <Mn style={{ color: "var(--mut)" }}>
-                      {question.requirement_id}
-                    </Mn>
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        marginTop: 5,
-                        color: "var(--ink2)",
-                      }}
-                    >
-                      {question.question}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        marginTop: 7,
-                        paddingLeft: 9,
-                        borderLeft: "2px solid var(--ok)",
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {state.answers[question.id]}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Composer */}
-            <div
-              style={{
-                width: 320,
-                flex: "none",
-                borderLeft: "1px solid var(--line)",
-                padding: "14px 16px",
-                background: "var(--surf2)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                }}
-              >
-                <Lbl>{t(locale, "customerSet")}</Lbl>
-                <Chip>
-                  {selected.size} {t(locale, "selectedShort")}
-                </Chip>
-              </div>
-              <p
-                style={{
-                  fontSize: 12.5,
-                  color: "var(--ink2)",
-                  margin: "8px 0 11px",
-                  textWrap: "pretty",
-                }}
-              >
-                {t(locale, "composerHint")}
-              </p>
-              <div
-                className="card doc"
-                style={{
-                  padding: "13px 15px",
-                  fontSize: 12.5,
-                  lineHeight: 1.6,
-                  color: "var(--ink2)",
-                }}
-              >
-                <div
-                  style={{
-                    color: "var(--ink)",
-                    fontWeight: 600,
-                    marginBottom: 7,
-                  }}
-                >
-                  {summary.brd_ref} — {t(locale, "openPoints")}
-                </div>
-                {state.questions
-                  .filter((question) => selected.has(question.id))
-                  .map((question) => (
-                    <p key={question.id} style={{ margin: "0 0 8px" }}>
-                      {question.question}
-                    </p>
-                  ))}
-                {selected.size === 0 && (
-                  <p style={{ margin: 0, color: "var(--mut)" }}>
-                    {t(locale, "selectToCompose")}
-                  </p>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-                <button
-                  type="button"
-                  className="btn p"
-                  disabled={busy || Object.keys(filledAnswers).length === 0}
-                  onClick={() =>
-                    run(async () => {
-                      await api.applyAnswers(id, filledAnswers);
-                      setAnswers({});
-                      setSelected(new Set());
-                      setDeskItems([]);
-                      await refresh();
-                    })
-                  }
-                >
-                  {t(locale, "applyAnswers")}
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={selected.size === 0}
-                  onClick={() =>
-                    navigator.clipboard.writeText(
-                      state.questions
-                        .filter((question) => selected.has(question.id))
-                        .map((question) => `- ${question.question}`)
-                        .join("\n"),
-                    )
-                  }
-                >
-                  {t(locale, "copyText")}
-                </button>
-              </div>
-            </div>
-          </div>
+          <QuestionBoard
+            locale={locale}
+            id={id}
+            questions={state.questions}
+            requirements={state.requirements}
+            busy={busy}
+            onChanged={refresh}
+            onApply={(answers) =>
+              run(async () => {
+                await api.applyAnswers(id, answers);
+                // The server sets boe=None: the draft, its critic findings and every
+                // band recorded against it are gone. Leaving deskItems in place left
+                // the Estimate Desk rendering a destroyed draft's revealed bands.
+                setDeskItems([]);
+                setHeld([]);
+                setConeStage(null);
+                await refresh();
+              })
+            }
+          />
         )}
 
         {/* ---------- 4 · Impact Map ---------- */}
@@ -972,6 +742,457 @@ function ImpactMap({
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 3 · Question Board ---------------- */
+
+const LANES = [
+  { key: "open", label: "laneOpen", empty: "laneEmpty_open" },
+  { key: "sent", label: "laneSent", empty: "laneEmpty_sent" },
+  { key: "answered", label: "laneAnswered", empty: "laneEmpty_answered" },
+  { key: "applied", label: "laneApplied", empty: "laneEmpty_applied" },
+] as const;
+
+/** The customer loop as four lanes. It used to be two, because nothing ever advanced
+ * a question's status: dispatch was not recorded, so "sent" and "answered" could not
+ * be distinguished from "open", and an answer could only be applied in bulk. */
+function QuestionBoard({
+  locale,
+  id,
+  questions,
+  requirements,
+  busy,
+  onChanged,
+  onApply,
+}: {
+  locale: Locale;
+  id: string;
+  questions: Question[];
+  requirements: Requirement[];
+  busy: boolean;
+  onChanged: () => Promise<void>;
+  onApply: (answers: Record<string, string>) => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [recipient, setRecipient] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answeredBy, setAnsweredBy] = useState("");
+  const [letter, setLetter] = useState<QuestionLetter | null>(null);
+  const [newFor, setNewFor] = useState(requirements[0]?.id ?? "");
+  const [newText, setNewText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedIds = [...selected];
+
+  useEffect(() => {
+    if (selectedIds.length === 0) {
+      setLetter(null);
+      return;
+    }
+    // Compiled on the SERVER: the preview, the clipboard and any export must be the
+    // same text. They used to differ — the panel showed a formal message while
+    // "Copy text" produced markdown bullets the customer never saw.
+    let current = true;
+    api
+      .questionLetter(id, selectedIds, locale)
+      .then((compiled) => {
+        // Two selections in quick succession resolve out of order; without this the
+        // preview and the clipboard can hold a letter for a selection that is gone.
+        if (current) setLetter(compiled);
+      })
+      .catch(() => {
+        if (current) setLetter(null);
+      });
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, locale, selected]);
+
+  const [working, setWorking] = useState(false);
+  const inFlight = busy || working;
+
+  async function act(action: () => Promise<unknown>) {
+    if (working) return;
+    setError(null);
+    setWorking(true);
+    try {
+      await action();
+      await onChanged();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const waitedDays = (iso?: string | null) =>
+    iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)) : null;
+
+  return (
+    <div>
+      {error && (
+        <div
+          role="alert"
+          style={{
+            padding: "10px 18px",
+            background: "var(--crit-bg)",
+            color: "var(--crit)",
+            fontSize: 12.5,
+          }}
+        >
+          {error}
+        </div>
+      )}
+      <div style={{ display: "flex" }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+          }}
+        >
+          {LANES.map((lane, laneIndex) => {
+            const rows = questions.filter((question) => question.status === lane.key);
+            return (
+              <div
+                key={lane.key}
+                style={{
+                  borderRight:
+                    laneIndex < LANES.length - 1 ? "1px solid var(--line)" : undefined,
+                  padding: 12,
+                  background: lane.key === "open" ? "var(--surf2)" : undefined,
+                  minHeight: 240,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  <Lbl>{t(locale, lane.label)}</Lbl>
+                  <Mn style={{ color: "var(--mut)" }}>{rows.length}</Mn>
+                </div>
+                {rows.length === 0 && (
+                  <div style={{ fontSize: 12, color: "var(--mut)", textWrap: "pretty" }}>
+                    {t(locale, lane.empty)}
+                  </div>
+                )}
+                {rows.map((question) => (
+                  <div
+                    key={question.id}
+                    className="card"
+                    style={{
+                      padding: 11,
+                      marginBottom: 9,
+                      background: lane.key === "applied" ? "var(--surf2)" : undefined,
+                      boxShadow: selected.has(question.id)
+                        ? "0 0 0 1px var(--acc) inset"
+                        : undefined,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Mn style={{ color: "var(--acc)" }}>{question.requirement_id}</Mn>
+                      {lane.key === "open" && (
+                        <input
+                          type="checkbox"
+                          aria-label={question.id}
+                          checked={selected.has(question.id)}
+                          onChange={() => {
+                            const next = new Set(selected);
+                            if (next.has(question.id)) next.delete(question.id);
+                            else next.add(question.id);
+                            setSelected(next);
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13, margin: "7px 0", textWrap: "pretty" }}>
+                      {question.question}
+                    </div>
+
+                    {lane.key === "open" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11.5,
+                          color: "var(--warn)",
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 7,
+                            height: 7,
+                            background: "var(--warn)",
+                            transform: "rotate(45deg)",
+                            flex: "none",
+                          }}
+                        />
+                        <span style={{ color: "var(--ink2)", textWrap: "pretty" }}>
+                          {question.reason}
+                        </span>
+                      </div>
+                    )}
+
+                    {lane.key === "sent" && (
+                      <>
+                        <Lbl style={{ textTransform: "none", letterSpacing: 0 }}>
+                          {t(locale, "waitingDays").replace(
+                            "{n}",
+                            String(waitedDays(question.sent_at) ?? 0),
+                          )}
+                          {question.recipient ? ` · ${question.recipient}` : ""}
+                        </Lbl>
+                        <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
+                          <input
+                            style={{ flex: 1, minWidth: 0 }}
+                            placeholder={t(locale, "answerFrom")}
+                            value={answers[question.id] ?? ""}
+                            onChange={(event) =>
+                              setAnswers({ ...answers, [question.id]: event.target.value })
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ marginTop: 6, width: "100%", justifyContent: "center" }}
+                          disabled={inFlight || !(answers[question.id] ?? "").trim() || !answeredBy}
+                          onClick={() =>
+                            act(() =>
+                              api.answerQuestion(
+                                id,
+                                question.id,
+                                answers[question.id],
+                                answeredBy,
+                              ),
+                            )
+                          }
+                        >
+                          {t(locale, "recordAnswer")}
+                        </button>
+                      </>
+                    )}
+
+                    {lane.key === "answered" && (
+                      <>
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            background: "var(--ok-bg)",
+                            boxShadow: "inset 3px 0 0 var(--ok)",
+                            borderRadius: "0 4px 4px 0",
+                            padding: "7px 9px",
+                            color: "var(--ink)",
+                            textWrap: "pretty",
+                          }}
+                        >
+                          “{question.answer}”
+                        </div>
+                        <Lbl style={{ textTransform: "none", letterSpacing: 0 }}>
+                          {question.answered_by}
+                          {question.answered_at
+                            ? ` · ${new Date(question.answered_at).toLocaleDateString(locale)}`
+                            : ""}
+                        </Lbl>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ marginTop: 9, width: "100%", justifyContent: "center" }}
+                          disabled={inFlight}
+                          onClick={() =>
+                            onApply({ [question.id]: question.answer ?? "" })
+                          }
+                        >
+                          {t(locale, "applyToLine")}
+                        </button>
+                      </>
+                    )}
+
+                    {lane.key === "applied" && (
+                      <>
+                        <div style={{ fontSize: 12, color: "var(--mut)" }}>
+                          {t(locale, "appliedTo")}{" "}
+                          <Mn style={{ color: "var(--ink2)" }}>
+                            {question.applied_to ?? "—"}
+                          </Mn>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 7,
+                            marginTop: 9,
+                            border: "1px solid var(--acc-line)",
+                            background: "var(--acc-bg)",
+                            color: "var(--acc)",
+                            borderRadius: 4,
+                            padding: "6px 8px",
+                            fontSize: 11.5,
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              background: "var(--acc)",
+                              flex: "none",
+                            }}
+                          />
+                          {t(locale, "reEstimateSuggested")}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Customer set */}
+        <div
+          style={{
+            width: 320,
+            flex: "none",
+            borderLeft: "1px solid var(--line)",
+            padding: "14px 16px",
+            background: "var(--surf2)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Lbl>{t(locale, "customerSet")}</Lbl>
+            <Chip>
+              {selected.size} {t(locale, "selectedShort")}
+            </Chip>
+          </div>
+          <div
+            style={{
+              fontSize: 12.5,
+              color: "var(--ink2)",
+              margin: "8px 0 11px",
+              textWrap: "pretty",
+            }}
+          >
+            {t(locale, "letterHint")}
+          </div>
+
+          {letter ? (
+            <div
+              className="card doc"
+              style={{ padding: "13px 15px", fontSize: 12.5, lineHeight: 1.6, color: "var(--ink2)" }}
+            >
+              <div style={{ color: "var(--ink)", fontWeight: 600, marginBottom: 7 }}>
+                {letter.heading}
+              </div>
+              {letter.paragraphs.map((paragraph, index) => (
+                <p key={index} style={{ margin: "0 0 8px" }}>
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <div className="ph" style={{ padding: "20px 14px" }}>
+              {t(locale, "selectToCompose")}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 11, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn p"
+              disabled={!letter}
+              onClick={() => letter && navigator.clipboard.writeText(letter.text)}
+            >
+              {t(locale, "copyText")}
+            </button>
+            <input
+              style={{ width: 130 }}
+              placeholder={t(locale, "recipientPlaceholder")}
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+            />
+            <button
+              type="button"
+              className="btn"
+              disabled={inFlight || selected.size === 0 || !recipient.trim()}
+              onClick={() =>
+                act(async () => {
+                  await api.sendQuestions(id, selectedIds, recipient.trim());
+                  setSelected(new Set());
+                })
+              }
+            >
+              {t(locale, "sendSelected")}
+            </button>
+          </div>
+
+          <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <Lbl>{t(locale, "answeredBy")}</Lbl>
+            <input
+              style={{ width: "100%", marginTop: 6 }}
+              value={answeredBy}
+              onChange={(event) => setAnsweredBy(event.target.value)}
+            />
+          </div>
+
+          <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <Lbl>{t(locale, "newQuestion")}</Lbl>
+            <select
+              style={{ width: "100%", marginTop: 6 }}
+              value={newFor}
+              onChange={(event) => setNewFor(event.target.value)}
+            >
+              {requirements.map((requirement) => (
+                <option key={requirement.id} value={requirement.id}>
+                  {requirement.id}
+                </option>
+              ))}
+            </select>
+            <input
+              style={{ width: "100%", marginTop: 6 }}
+              placeholder={t(locale, "questionPlaceholder")}
+              value={newText}
+              onChange={(event) => setNewText(event.target.value)}
+            />
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: 6, width: "100%", justifyContent: "center" }}
+              disabled={inFlight || !newText.trim() || !newFor}
+              onClick={() =>
+                act(async () => {
+                  await api.addQuestion(id, {
+                    requirement_id: newFor,
+                    question: newText.trim(),
+                  });
+                  setNewText("");
+                })
+              }
+            >
+              {t(locale, "newQuestion")}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

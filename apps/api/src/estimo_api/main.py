@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm.exc import StaleDataError
 
 from estimo_api.db import build_engine, build_sessionmaker
 from estimo_api.mcp_server import build_mcp
@@ -85,6 +86,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await system_engine.dispose()
 
     app = FastAPI(title="Estimo API", lifespan=lifespan)
+
+    @app.exception_handler(StaleDataError)
+    async def _stale_state(_request: Request, _exc: StaleDataError) -> JSONResponse:
+        """Someone else changed this estimate between our read and our write.
+
+        The workflow rewrites the whole `state` document, so the alternative to
+        failing here is erasing their change and reporting success — which is what
+        happened before the version column existed.
+        """
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": (
+                    "this estimate changed while your request was in flight — reload and try again"
+                )
+            },
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:

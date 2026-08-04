@@ -692,3 +692,198 @@ async def test_source_pane_serves_the_body_and_the_state_read_does_not(
     # Anchors are quarantined from the MODEL, not from the reader (PRINCIPLES #5), so
     # the source pane carries them; this fixture plants a budget anchor.
     assert any(block["anchors"] for block in blocks), "no anchor survived into the body"
+
+
+async def test_the_question_loop_walks_all_four_lanes(client: httpx.AsyncClient) -> None:
+    """S12-3: open -> sent -> answered -> applied.
+
+    `status` existed from the start and nothing ever advanced it, so the board could
+    only ever show two lanes: dispatch was never recorded (no Sent lane, and "waiting
+    3 days" had nothing to count from) and an answer could only be applied in bulk.
+    """
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    estimate_id = summary["id"]
+    state = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"]
+    question = state["questions"][0]
+    assert question["status"] == "open"
+
+    sent = await client.post(
+        f"/v1/estimates/{estimate_id}/questions/send",
+        json={"question_ids": [question["id"]], "recipient": "E. Kaya"},
+    )
+    assert sent.json() == {"sent": 1, "skipped": 0}
+    # Re-sending must not restart a wait that already started.
+    again = await client.post(
+        f"/v1/estimates/{estimate_id}/questions/send",
+        json={"question_ids": [question["id"]], "recipient": "E. Kaya"},
+    )
+    assert again.json() == {"sent": 0, "skipped": 1}
+
+    row = _question(await client.get(f"/v1/estimates/{estimate_id}"), question["id"])
+    assert row["status"] == "sent" and row["recipient"] == "E. Kaya" and row["sent_at"]
+
+    answered = await client.post(
+        f"/v1/estimates/{estimate_id}/questions/{question['id']}/answer",
+        json={"answer": "Renderer v4 kullanılacak.", "answered_by": "E. Kaya"},
+    )
+    assert answered.status_code == 200
+    row = _question(await client.get(f"/v1/estimates/{estimate_id}"), question["id"])
+    assert row["status"] == "answered" and row["answered_by"] == "E. Kaya"
+
+    applied = await client.post(
+        f"/v1/estimates/{estimate_id}/answers",
+        json={"answers": {question["id"]: "Renderer v4 kullanılacak."}},
+    )
+    assert applied.status_code == 200
+    row = _question(await client.get(f"/v1/estimates/{estimate_id}"), question["id"])
+    assert row["status"] == "applied", "the last lane was unreachable"
+
+
+def _question(response: httpx.Response, question_id: str) -> dict[str, object]:
+    questions = response.json()["state"]["questions"]
+    return next(row for row in questions if row["id"] == question_id)
+
+
+async def test_the_letter_is_compiled_once_on_the_server(client: httpx.AsyncClient) -> None:
+    """The preview, the clipboard and any export must be the same text — they used to
+    disagree, so the reader copied markdown bullets the customer never saw."""
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    estimate_id = summary["id"]
+    ids = [
+        q["id"]
+        for q in (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"]["questions"]
+    ]
+
+    letter = await client.get(
+        f"/v1/estimates/{estimate_id}/questions/letter",
+        params={"ids": ",".join(ids), "locale": "en"},
+    )
+    assert letter.status_code == 200
+    body = letter.json()
+    assert body["count"] == len(ids)
+    assert body["heading"].startswith("Clarifications")
+    # `text` is exactly what the preview renders, joined — not a second rendering.
+    assert body["text"].startswith(body["heading"])
+    for paragraph in body["paragraphs"]:
+        assert paragraph in body["text"]
+
+
+async def test_a_manual_question_can_be_added(client: httpx.AsyncClient) -> None:
+    """The gate is a filter, not an oracle: a reader who spots an ambiguity it missed
+    needs somewhere to put it."""
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    requirement = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"][
+        "requirements"
+    ][0]["id"]
+
+    created = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": requirement, "question": "Hangi kanal kapsam dahilinde?"},
+    )
+    assert created.status_code == 201
+    rows = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"]["questions"]
+    added = next(row for row in rows if row["id"] == created.json()["id"])
+    assert added["status"] == "open" and added["requirement_id"] == requirement
+
+    unknown = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": "REQ-NOPE", "question": "?"},
+    )
+    assert unknown.status_code == 404
+
+
+async def test_a_concurrent_state_write_is_refused_not_silently_swallowed(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """The whole `state` document is read, mutated in Python and written back, so two
+    overlapping requests both read the pre-image and the second erased the first —
+    both callers getting 200, nothing logged. A review reproduced it in 11 of 12
+    natural races; one user double-clicking was enough.
+
+    The race is exercised at the level the guard lives on: two sessions that both
+    LOADED the row before either wrote. Driving it through HTTP would need the
+    requests to interleave inside the handler, which a test cannot force without
+    instrumenting production code — and the endpoints are protected precisely because
+    the guard is on the row, not in any one handler.
+    """
+    import uuid as uuid_mod
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.orm.exc import StaleDataError
+
+    from estimo_api.estimates_models import EstimateRecord
+
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    record_id = uuid_mod.UUID(str(summary["id"]))
+
+    engine = create_async_engine(database_url)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as first, maker() as second:
+        a = await first.get(EstimateRecord, record_id)
+        b = await second.get(EstimateRecord, record_id)
+        assert a is not None and b is not None
+        assert a.state_version == b.state_version, "both read the same pre-image"
+
+        a.state = {**a.state, "answers": {"first": "won"}}
+        await first.commit()
+
+        b.state = {**b.state, "answers": {"second": "lost"}}
+        with pytest.raises(StaleDataError):
+            await second.commit()
+
+    async with maker() as check:
+        final = await check.get(EstimateRecord, record_id)
+        assert final is not None
+        assert final.state["answers"] == {"first": "won"}, "the loser overwrote the winner"
+        assert final.state_version > 1, "the version did not advance"
+    await engine.dispose()
+
+
+async def test_one_live_question_per_requirement(client: httpx.AsyncClient) -> None:
+    """The gate folds answers in through a map keyed by REQUIREMENT, so a second live
+    question on one requirement means only the last answer ever reaches it — while
+    both cards claim they were applied."""
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    estimate_id = summary["id"]
+    existing = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"]["questions"][0]
+
+    clash = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": existing["requirement_id"], "question": "İkinci soru?"},
+    )
+    assert clash.status_code == 409
+    assert existing["id"] in clash.json()["detail"]
+
+
+async def test_an_unapplied_manual_question_blocks_the_draft(
+    client: httpx.AsyncClient,
+) -> None:
+    """PRINCIPLES #3 is questions before numbers. The ambiguity gate knows nothing
+    about a question a READER raised, so without this the New-question button changed
+    nothing about whether a draft could be built and signed over that very ambiguity.
+    """
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    estimate_id = summary["id"]
+    assert summary["status"] == "ready_for_estimation"
+    requirement = (await client.get(f"/v1/estimates/{estimate_id}")).json()["state"][
+        "requirements"
+    ][0]["id"]
+
+    created = await client.post(
+        f"/v1/estimates/{estimate_id}/questions",
+        json={"requirement_id": requirement, "question": "Hangi kanal kapsamda?"},
+    )
+    assert created.status_code == 201
+
+    blocked = await client.post(f"/v1/estimates/{estimate_id}/estimate")
+    assert blocked.status_code == 409
+    assert created.json()["id"] in blocked.json()["detail"]
+
+    # Applying the answer clears the block.
+    applied = await client.post(
+        f"/v1/estimates/{estimate_id}/answers",
+        json={"answers": {created.json()["id"]: "Yalnız web kanalı kapsamdadır."}},
+    )
+    assert applied.status_code == 200
+    assert (await client.post(f"/v1/estimates/{estimate_id}/estimate")).status_code == 200

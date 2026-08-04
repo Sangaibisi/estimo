@@ -30,6 +30,14 @@ class EstimateRecord(TenantScoped, Base):
     __tablename__ = "estimates"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # Optimistic lock. `state` is one JSONB document that every workflow endpoint
+    # reads, mutates in Python and writes back WHOLE, so two overlapping requests
+    # both read the pre-image and the second erases the first — silently, with both
+    # callers getting 200. SQLAlchemy adds `WHERE state_version = <read value>` to
+    # every UPDATE of this row and raises StaleDataError when it matches nothing,
+    # which the app turns into a 409. Broader than locking each endpoint: it also
+    # covers writers that do not exist yet.
+    state_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     brd_ref: Mapped[str] = mapped_column(String(120))
     title: Mapped[str] = mapped_column(String(300))
     status: Mapped[str] = mapped_column(String(40))
@@ -46,6 +54,8 @@ class EstimateRecord(TenantScoped, Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    __mapper_args__ = {"version_id_col": state_version}  # noqa: RUF012
 
 
 class IndependentEstimate(TenantScoped, Base):

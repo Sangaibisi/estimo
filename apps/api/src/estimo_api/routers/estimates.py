@@ -54,7 +54,7 @@ from estimo_api.estimates_models import (
     LineSignature,
     UiEvent,
 )
-from estimo_core import BoeDocument, Signature
+from estimo_core import BoeDocument, ClarificationQuestion, Signature
 
 router = APIRouter(prefix="/v1/estimates", tags=["estimates"])
 
@@ -95,7 +95,6 @@ def _state_without_body(state: dict[str, Any]) -> dict[str, Any]:
 
 def _summary(record: EstimateRecord) -> EstimateSummary:
     state = PipelineState.model_validate(_state_without_body(record.state))
-    answered = set(state.answers)
     return EstimateSummary(
         id=record.id,
         brd_ref=record.brd_ref,
@@ -103,7 +102,11 @@ def _summary(record: EstimateRecord) -> EstimateSummary:
         status=record.status,
         requirements=len(state.requirements),
         blocked=len(state.blocked_ids),
-        open_questions=sum(1 for q in state.questions if q.id not in answered),
+        # "Open" means the loop has not closed: a question waiting to be sent, waiting
+        # on the customer, or answered but not yet folded in. Counting "has no answer"
+        # instead called an answered-but-unapplied question closed, so the workspace
+        # and the board disagreed about the same question.
+        open_questions=sum(1 for q in state.questions if q.status != "applied"),
         work_items=len(state.work_items),
         has_boe=record.boe is not None,
     )
@@ -253,6 +256,27 @@ async def apply_answers(
         state = await resume_with_answers(state, answers)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # The questions whose answers were just folded in are APPLIED — the board's last
+    # lane was unreachable while nothing ever advanced the status.
+    applied = {
+        question.id: question.model_copy(
+            update={
+                "status": "applied",
+                "answer": question.answer or answers.get(question.id),
+                "applied_to": next(
+                    (
+                        item.id
+                        for item in state.work_items
+                        if question.requirement_id in item.requirement_ids
+                    ),
+                    None,
+                ),
+            }
+        )
+        for question in state.questions
+        if question.id in answers
+    }
+    state = _replace_questions(state, applied)
     record.state = state.model_dump(mode="json")
     record.status = state.status
     record.boe = None  # answers invalidate any previous draft
@@ -260,6 +284,176 @@ async def apply_answers(
     await session.commit()
     await session.refresh(record)
     return _summary(record)
+
+
+class SendQuestionsIn(BaseModel):
+    question_ids: list[str] = Field(min_length=1)
+    recipient: str = Field(min_length=1, max_length=120)
+
+
+def _replace_questions(
+    state: PipelineState, updated: dict[str, ClarificationQuestion]
+) -> PipelineState:
+    return state.model_copy(
+        update={"questions": tuple(updated.get(q.id, q) for q in state.questions)}
+    )
+
+
+@router.post("/{estimate_id}/questions/send")
+async def send_questions(
+    estimate_id: uuid.UUID, payload: SendQuestionsIn, session: SessionDep
+) -> dict[str, Any]:
+    """Record that a question set left for the customer.
+
+    Dispatch was never persisted, so the board could not show a Sent lane and
+    "waiting 3 days" had nothing to count from. Only OPEN questions move: re-sending
+    an answered one would reset a wait that already ended.
+    """
+    record = await _get_record(session, estimate_id)
+    state = PipelineState.model_validate(record.state)
+    by_id = {question.id: question for question in state.questions}
+    unknown = sorted(set(payload.question_ids) - set(by_id))
+    if unknown:
+        raise HTTPException(status_code=404, detail=f"unknown question ids: {unknown}")
+
+    now = dt.datetime.now(dt.UTC)
+    moved = {
+        qid: by_id[qid].model_copy(
+            update={"status": "sent", "sent_at": now, "recipient": payload.recipient}
+        )
+        for qid in payload.question_ids
+        if by_id[qid].status == "open"
+    }
+    record.state = _replace_questions(state, moved).model_dump(mode="json")
+    await session.commit()
+    return {"sent": len(moved), "skipped": len(payload.question_ids) - len(moved)}
+
+
+class AnswerIn(BaseModel):
+    answer: str = Field(min_length=1, max_length=4000)
+    answered_by: str = Field(min_length=1, max_length=120)
+
+
+@router.post("/{estimate_id}/questions/{question_id}/answer")
+async def record_answer(
+    estimate_id: uuid.UUID, question_id: str, payload: AnswerIn, session: SessionDep
+) -> dict[str, Any]:
+    """Record ONE customer answer, attributed, without rebuilding anything.
+
+    Recording and applying are deliberately separate: an answer arrives when it
+    arrives, but folding it into the estimate invalidates the draft and every band
+    recorded against it, which is a decision an estimator makes on purpose.
+    """
+    record = await _get_record(session, estimate_id)
+    state = PipelineState.model_validate(record.state)
+    question = next((q for q in state.questions if q.id == question_id), None)
+    if question is None:
+        raise HTTPException(status_code=404, detail="question not found")
+    if question.status == "applied":
+        raise HTTPException(status_code=409, detail="this answer is already applied")
+
+    updated = question.model_copy(
+        update={
+            "status": "answered",
+            "answer": payload.answer.strip(),
+            "answered_at": dt.datetime.now(dt.UTC),
+            "answered_by": payload.answered_by,
+        }
+    )
+    record.state = _replace_questions(state, {question_id: updated}).model_dump(mode="json")
+    await session.commit()
+    return {"status": "answered"}
+
+
+class NewQuestionIn(BaseModel):
+    requirement_id: str = Field(min_length=1, max_length=120)
+    question: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(default="manual", min_length=1, max_length=500)
+
+
+@router.post("/{estimate_id}/questions", status_code=status.HTTP_201_CREATED)
+async def add_question(
+    estimate_id: uuid.UUID, payload: NewQuestionIn, session: SessionDep
+) -> dict[str, str]:
+    """A question the gate did not raise. The gate is a filter, not an oracle — a
+    reader who spots an ambiguity it missed needs somewhere to put it."""
+    record = await _get_record(session, estimate_id)
+    state = PipelineState.model_validate(record.state)
+    if payload.requirement_id not in {req.id for req in state.requirements}:
+        raise HTTPException(status_code=404, detail="requirement not found")
+    # The gate folds answers into requirement text through a map keyed by REQUIREMENT
+    # (`{q.requirement_id: answers[q.id]}`), so two live questions on one requirement
+    # mean only the last answer ever reaches it — while both cards claim they were
+    # applied. One open question per requirement keeps that invariant true.
+    existing = next(
+        (
+            question
+            for question in state.questions
+            if question.requirement_id == payload.requirement_id and question.status != "applied"
+        ),
+        None,
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{payload.requirement_id} already has an unanswered question "
+                f"({existing.id}); answer or apply it first"
+            ),
+        )
+    question = ClarificationQuestion(
+        id=f"Q-MAN-{uuid.uuid4().hex[:8]}",
+        requirement_id=payload.requirement_id,
+        question=payload.question.strip(),
+        reason=payload.reason.strip(),
+    )
+    record.state = state.model_copy(update={"questions": (*state.questions, question)}).model_dump(
+        mode="json"
+    )
+    await session.commit()
+    return {"id": question.id}
+
+
+def _compile_letter(state: PipelineState, question_ids: list[str], locale: str) -> dict[str, Any]:
+    """The customer letter, compiled ONCE on the server.
+
+    The preview, the clipboard and the .docx all read this, because they used to
+    disagree: the panel showed a formal message while "Copy text" produced markdown
+    bullets, so the reader copied text the customer never saw.
+    """
+    selected = [q for q in state.questions if q.id in set(question_ids)]
+    turkish = locale != "en"
+    title = state.parsed.title if state.parsed else state.source_path
+    heading = ("Açıklama talebi — " if turkish else "Clarifications — ") + title
+    intro = (
+        f"Fiyatlandırabilmemiz için {len(selected)} noktada kararınıza ihtiyacımız var."
+        if turkish
+        else f"{len(selected)} point(s) need your decision before we can price them."
+    )
+    body = [f"{index}. {q.question}" for index, q in enumerate(selected, start=1)]
+    closing = (
+        "Yanıtlarınızı aldığımızda tahmini güncelleyip sizinle paylaşacağız."
+        if turkish
+        else "We will update the estimate and share it once your answers arrive."
+    )
+    return {
+        "heading": heading,
+        "paragraphs": [intro, *body, closing],
+        "text": "\n\n".join([heading, intro, *body, closing]),
+        "count": len(selected),
+    }
+
+
+@router.get("/{estimate_id}/questions/letter")
+async def question_letter(
+    estimate_id: uuid.UUID,
+    session: SessionDep,
+    ids: Annotated[str, Query(min_length=1)],
+    locale: Annotated[str, Query(pattern="^(en|tr)$")] = "tr",
+) -> dict[str, Any]:
+    record = await _get_record(session, estimate_id)
+    state = PipelineState.model_validate(record.state)
+    return _compile_letter(state, [part for part in ids.split(",") if part], locale)
 
 
 @router.post("/{estimate_id}/estimate")
@@ -271,6 +465,20 @@ async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, An
             detail="a draft already exists; apply answers to invalidate it before rebuilding",
         )
     state = PipelineState.model_validate(record.state)
+    # The ambiguity gate blocks requirements it scored; it knows nothing about a
+    # question a READER raised. Without this, the "New question" button changed
+    # nothing about whether a draft could be built and signed over the very
+    # ambiguity it recorded (PRINCIPLES #3, questions before numbers).
+    pending_manual = [
+        question.id
+        for question in state.questions
+        if question.id.startswith("Q-MAN-") and question.status != "applied"
+    ]
+    if pending_manual:
+        raise HTTPException(
+            status_code=409,
+            detail=f"manual questions are still unapplied: {pending_manual}",
+        )
     try:
         boe = await estimate_state(session, state)
     except ValueError as exc:

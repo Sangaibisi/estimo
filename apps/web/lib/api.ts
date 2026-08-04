@@ -133,6 +133,33 @@ export const api = {
       `/v1/estimates/${id}/estimate`,
       { method: "POST" },
     ),
+  sendQuestions: (id: string, question_ids: string[], recipient: string) =>
+    request<{ sent: number; skipped: number }>(
+      `/v1/estimates/${id}/questions/send`,
+      { method: "POST", body: JSON.stringify({ question_ids, recipient }) },
+    ),
+  answerQuestion: (
+    id: string,
+    questionId: string,
+    answer: string,
+    answered_by: string,
+  ) =>
+    request<{ status: string }>(
+      `/v1/estimates/${id}/questions/${questionId}/answer`,
+      { method: "POST", body: JSON.stringify({ answer, answered_by }) },
+    ),
+  addQuestion: (
+    id: string,
+    payload: { requirement_id: string; question: string },
+  ) =>
+    request<{ id: string }>(`/v1/estimates/${id}/questions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  questionLetter: (id: string, ids: string[], locale: string) =>
+    request<QuestionLetter>(
+      `/v1/estimates/${id}/questions/letter?ids=${encodeURIComponent(ids.join(","))}&locale=${locale}`,
+    ),
   source: (id: string) =>
     request<{
       blocks: DocBlock[];
@@ -414,4 +441,13 @@ export interface DocBlock {
   /** This block's own text was clipped by the parser's per-block cap. */
   text_truncated: boolean;
   anchors: { type: string; snippet: string }[];
+}
+
+/** The customer letter, compiled on the SERVER so the preview, the clipboard and
+ * any export are the same text — they used to disagree. */
+export interface QuestionLetter {
+  heading: string;
+  paragraphs: string[];
+  text: string;
+  count: number;
 }
