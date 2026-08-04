@@ -508,7 +508,7 @@ async def test_a_domain_slice_narrows_a_SEARCH_on_both_retrieval_paths(
         }
     )
 
-    params = {"q": "fatura kampanya", "domain": "billing", "limit": 5}
+    params: dict[str, str | int] = {"q": "fatura kampanya", "domain": "billing", "limit": 5}
     hybrid = (await client.get("/v1/ledger", params=params)).json()
     assert hybrid["retrieval"] == "hybrid", "the dense leg has to have run"
     assert [entry["id"] for entry in hybrid["entries"]] == [str(billing.id)]
