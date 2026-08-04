@@ -23,6 +23,21 @@ docker compose up --build -d  # db + migrate + api + web, built from this checko
   values target the `--profile mock` stub LLM, which is for development only).
 - Upgrades are `git pull && docker compose up --build -d` — the one-shot `migrate`
   service brings the schema to head before the API starts.
+
+> **Check that the build actually built.** `docker compose build` can print
+> `ERROR: ... DeadlineExceeded` (a registry timeout while resolving the base image)
+> and still **exit 0**, so `up --build -d` leaves the previous container running and
+> reports success. You then test code that is not deployed. Verify the artifact, not
+> the command's exit code:
+>
+> ```bash
+> docker compose exec api python -c "import estimo_api, pathlib; print(pathlib.Path(estimo_api.__file__).parent)"
+> ```
+>
+> …then grep that directory for something you just changed. If the base image cannot
+> be pulled, `docker pull python:<version>-slim-trixie` hangs with no output while
+> `curl https://registry-1.docker.io/v2/` from the host returns 401 — that is the
+> daemon's connectivity, not yours; restart Docker Desktop before trusting a build.
 - Optional profiles: `--profile mock` (a stub LLM for smoke tests),
   `--profile observability` (self-hosted Langfuse — see its resource note).
 
