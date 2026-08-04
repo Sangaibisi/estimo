@@ -14,6 +14,13 @@ cp .env.example .env          # then edit gateway + (optional) auth values
 docker compose up --build -d  # db + migrate + api + web, built from this checkout
 ```
 
+> **The gateway values in `.env.example` point at the stub LLM, which only runs under
+> `--profile mock`.** Copied unchanged, the command above brings up a deployment whose
+> gateway host does not exist — nothing fails at boot, and every model-backed feature
+> fails later with a connection error. For a first look use
+> `docker compose --profile mock up --build -d`; for real use, put your own endpoint in
+> `.env` (or in **Admin → Model gateway** after first start, which overrides it).
+
 - API on `http://localhost:8000`, web on `http://localhost:3000`.
 - Runs **open in single-tenant mode** — no OIDC required. Every row belongs to the
   implicit DEFAULT_TENANT.
