@@ -14,7 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_HEADER_RE = re.compile(r"<!--\s*prompt:\s*(?P<name>[\w-]+)\s+v(?P<version>\d+)\s*-->")
+HEADER_RE = re.compile(r"<!--\s*prompt:\s*(?P<name>[\w-]+)\s+v(?P<version>\d+)\s*-->")
+# Historical private name; estimo_estimate.prompts imported it before it was public.
+_HEADER_RE = HEADER_RE
 
 
 @dataclass(frozen=True)

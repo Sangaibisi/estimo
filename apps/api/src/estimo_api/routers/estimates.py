@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
+from estimo_connectors.graphstore import load_code_graphs
 from estimo_estimate import estimate_state, record_actual, render_boe_docx, review_boe
 from estimo_estimate.loop import origin_ref as make_origin_ref
 from estimo_knowledge import LedgerEntryRow
@@ -48,7 +49,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api import telemetry
-from estimo_api.auth import Principal, current_principal, require_signing
+from estimo_api.auth import Principal, clamp_acl_keys, current_principal, require_signing
 from estimo_api.db import get_session
 from estimo_api.estimates_models import (
     BoeVersionRow,
@@ -557,7 +558,10 @@ async def question_letter(
 
 @router.post("/{estimate_id}/estimate")
 async def build_boe(
-    estimate_id: uuid.UUID, session: SessionDep, request: Request
+    estimate_id: uuid.UUID,
+    session: SessionDep,
+    request: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict[str, Any]:
     record = await _get_record(session, estimate_id)
     if record.boe is not None:
@@ -581,8 +585,18 @@ async def build_boe(
             detail=f"manual questions are still unapplied: {pending_manual}",
         )
     client = await _pipeline_client(request, session)
+    # The persisted per-repo graphs (S13-2): RLS scopes the load to this tenant, and
+    # the caller's clamped ACL audiences pre-filter the worker's wiki searches —
+    # the same never-widening rule every retrieval surface applies.
+    graphs = await load_code_graphs(session)
     try:
-        boe = await estimate_state(session, state, client=client)
+        boe = await estimate_state(
+            session,
+            state,
+            client=client,
+            graphs=graphs,
+            acl_keys=clamp_acl_keys(principal, None),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     finally:

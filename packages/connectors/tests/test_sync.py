@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from estimo_connectors import Connection, SyncRun, run_sync
+from estimo_connectors.graphstore import load_code_graphs
 from estimo_knowledge import KnowledgeChunk
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +70,14 @@ async def test_git_sync_indexes_repo_with_connection_acl(
     assert run.stats is not None and run.stats["modules"] >= 3
     assert run.checkpoint is not None and len(run.checkpoint["head_sha"]) == 40
 
+    # S13-2: the graph the wiki generation used is persisted, keyed on the
+    # connection, at the synced commit — and its derived maps rebuild on load.
+    graphs = await load_code_graphs(session)
+    assert [g.repo for g in graphs] == ["meridyen-mini"]
+    assert graphs[0].commit == run.checkpoint["head_sha"]
+    assert graphs[0].symbol_terms
+    assert run.stats["graph"]["files"] == len(graphs[0].files)
+
     chunks = list(
         (
             await session.execute(
@@ -87,6 +96,8 @@ async def test_git_sync_indexes_repo_with_connection_acl(
     assert second.status == "succeeded", second.error
     runs = list((await session.execute(select(SyncRun))).scalars())
     assert len(runs) == 2
+    # The graph row is replaced in place, never accumulated per commit.
+    assert len(await load_code_graphs(session)) == 1
 
 
 async def test_failed_sync_records_error(

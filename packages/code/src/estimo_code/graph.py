@@ -15,8 +15,9 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from estimo_code.treesitter import ParsedFile, parse_repo
+from estimo_code.treesitter import ParsedFile, Symbol, parse_repo
 from estimo_core import Confidence, tr_lower
 
 _CAMEL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -40,7 +41,10 @@ class CodeGraph:
 
     @classmethod
     def build(cls, root: Path, *, repo: str, commit: str = "workdir") -> CodeGraph:
-        files = parse_repo(root)
+        return cls._assemble(repo, commit, parse_repo(root))
+
+    @classmethod
+    def _assemble(cls, repo: str, commit: str, files: list[ParsedFile]) -> CodeGraph:
         graph = cls(repo=repo, commit=commit, files=files)
         by_symbol_name: dict[str, set[str]] = defaultdict(set)
         for parsed in files:
@@ -62,6 +66,52 @@ class CodeGraph:
 
     def evidence_uri(self, path: str, start: int, end: int) -> str:
         return f"repo://{self.repo}@{self.commit}/{path}#L{start}-L{end}"
+
+    def to_payload(self) -> dict[str, Any]:
+        """JSON-serializable form for persistence (S13-2).
+
+        Only `files` is stored: `module_of`, `import_edges` and `symbol_terms` are
+        derived in `_assemble`, and storing them too would let the stored copy drift
+        from the derivation the code actually uses.
+        """
+        return {
+            "repo": self.repo,
+            "commit": self.commit,
+            "files": [
+                {
+                    "path": f.path,
+                    "language": f.language,
+                    "line_count": f.line_count,
+                    "imports": list(f.imports),
+                    "symbols": [
+                        {
+                            "name": s.name,
+                            "kind": s.kind,
+                            "path": s.path,
+                            "start_line": s.start_line,
+                            "end_line": s.end_line,
+                            "doc": s.doc,
+                        }
+                        for s in f.symbols
+                    ],
+                }
+                for f in self.files
+            ],
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> CodeGraph:
+        files = [
+            ParsedFile(
+                path=f["path"],
+                language=f["language"],
+                line_count=f["line_count"],
+                imports=tuple(f["imports"]),
+                symbols=tuple(Symbol(**s) for s in f["symbols"]),
+            )
+            for f in payload["files"]
+        ]
+        return cls._assemble(str(payload["repo"]), str(payload["commit"]), files)
 
 
 # Turkish query term → identifier-language synonyms (identifiers are English).

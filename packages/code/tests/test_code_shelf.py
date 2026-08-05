@@ -119,3 +119,21 @@ class TestS5ReviewRegressions:
         (repo_root / "Leak.java").symlink_to(outside)
         parsed = parse_repo(tmp_path / "repo")
         assert [f.path for f in parsed] == ["mod/Ok.java"]
+
+
+class TestPayloadRoundtrip:
+    """S13-2: a persisted graph must rebuild EXACTLY the derived maps."""
+
+    def test_roundtrip_preserves_derived_maps(self, graph: CodeGraph) -> None:
+        clone = CodeGraph.from_payload(graph.to_payload())
+        assert clone.repo == graph.repo and clone.commit == graph.commit
+        assert clone.module_of == graph.module_of
+        assert clone.import_edges == graph.import_edges
+        assert clone.symbol_terms == graph.symbol_terms
+
+    def test_payload_is_plain_json(self, graph: CodeGraph) -> None:
+        import json
+
+        payload = json.loads(json.dumps(graph.to_payload()))
+        clone = CodeGraph.from_payload(payload)
+        assert len(clone.files) == len(graph.files)

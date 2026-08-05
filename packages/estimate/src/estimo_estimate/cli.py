@@ -10,12 +10,33 @@ from pathlib import Path
 
 from estimo_code import CodeGraph
 from estimo_pipeline import PipelineState
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from estimo_estimate.boe_render import render_boe_docx
 from estimo_estimate.critic import review_boe
 from estimo_estimate.estimator import estimate_state
 from estimo_gateway import deployment_gateway_client
+
+
+async def _stored_graphs(session: AsyncSession) -> list[CodeGraph]:
+    """Persisted per-repo graphs (S13-2), via plain SQL.
+
+    Deliberately not `estimo_connectors.graphstore`: the estimation package must not
+    depend on the connector layer for one SELECT. A schema without the table (pre-
+    0017) is a deployment without graphs, not an error."""
+    try:
+        rows = await session.execute(text("SELECT payload FROM code_graphs ORDER BY repo"))
+    except Exception:  # noqa: BLE001
+        await session.rollback()
+        return []
+    graphs: list[CodeGraph] = []
+    for (payload,) in rows:
+        try:
+            graphs.append(CodeGraph.from_payload(payload))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return graphs
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -36,7 +57,8 @@ async def _run(args: argparse.Namespace) -> int:
     try:
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:
-            boe = await estimate_state(session, state, graph=graph, client=client)
+            stored = await _stored_graphs(session)
+            boe = await estimate_state(session, state, graph=graph, graphs=stored, client=client)
     finally:
         await engine.dispose()
         if client is not None:

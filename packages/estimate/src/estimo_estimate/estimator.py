@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 
-from estimo_code import CodeGraph, impact_for
+from estimo_code import CodeGraph
 from estimo_knowledge import AnalogyCard, find_analogs
 from estimo_parse import DATA_SYSTEM, fence, redact_anchors
 from estimo_pipeline import PipelineState
@@ -27,10 +28,12 @@ from estimo_core import (
     Confidence,
     EstimateLine,
     EvidenceRef,
+    ImpactAnalysis,
     ThreePoint,
 )
 from estimo_estimate.bands import BandResult, band_from_analogs
 from estimo_estimate.calibration import ErrorDistribution, transfer_distribution
+from estimo_estimate.impact_worker import analyze_impact
 from estimo_estimate.prompts import load_estimate_prompt
 from estimo_gateway import GatewayClient, GatewayError
 
@@ -117,7 +120,9 @@ async def estimate_state(
     state: PipelineState,
     *,
     graph: CodeGraph | None = None,
+    graphs: Sequence[CodeGraph] = (),
     client: GatewayClient | None = None,
+    acl_keys: Sequence[str] | None = None,
     analog_limit: int = 5,
 ) -> BoeDocument:
     if state.status != "ready_for_estimation":
@@ -130,8 +135,12 @@ async def estimate_state(
     prompt = load_estimate_prompt()
     distribution: ErrorDistribution = await transfer_distribution(session)
     answered = {q.requirement_id: q for q in state.questions if q.id in state.answers}
+    # `graph` is the CLI's local --repo build; `graphs` are the persisted per-repo
+    # graphs the deployed path loads. The worker sees them as one estate (S13-2).
+    all_graphs: list[CodeGraph] = [*graphs, *([graph] if graph is not None else [])]
 
     lines: list[EstimateLine] = []
+    analyses: list[ImpactAnalysis] = []
     global_assumptions: list[AssumptionRisk] = []
     global_risks: list[AssumptionRisk] = []
     # True once any work item's analog search lost its dense leg to an unreachable
@@ -167,24 +176,31 @@ async def estimate_state(
         assumptions: list[AssumptionRisk] = []
         risks: list[AssumptionRisk] = []
 
-        if graph is not None:
-            impacts = impact_for(graph, query)
-            for impact in impacts[:4]:
-                evidence.extend(
-                    EvidenceRef.from_uri(uri, label=f"{impact.module} ({impact.confidence})")
-                    for uri in impact.evidence_uris[:2]
-                )
-                if impact.discovery_suggested:
-                    risks.append(
-                        AssumptionRisk(
-                            kind="risk",
-                            text=(
-                                f"{impact.module} etkisi yalnız anahtar-kelime sinyaline "
-                                "dayanıyor; teknik keşif önerilir."
-                            ),
-                            contingency_pd=round((band.range.likely if band else 1.0) * 0.3, 1),
-                        )
+        if all_graphs or client is not None:
+            # Scope reasoning is the model's job now (ADR-0009): a tool-using loop
+            # over the repo graphs, the knowledge index and the analog ledger, with
+            # every claim's evidence verified before it is kept. Without a client
+            # (or on any malformed/unreachable turn) this IS the old deterministic
+            # graph heuristic, boxed as an analysis.
+            analysis = await analyze_impact(
+                session, item, query, all_graphs, client=client, acl_keys=acl_keys
+            )
+            analyses.append(analysis)
+            for claim in analysis.modules[:4]:
+                evidence.extend(claim.evidence[:2])
+            for claim in analysis.integration_points[:2]:
+                evidence.extend(claim.evidence[:1])
+            for claim in analysis.discovery_risks:
+                risks.append(
+                    AssumptionRisk(
+                        kind="risk",
+                        text=(
+                            f"Keşif riski ({claim.module or 'genel'}): {claim.text} "
+                            "— teknik keşif önerilir."
+                        ),
+                        contingency_pd=round((band.range.likely if band else 1.0) * 0.3, 1),
                     )
+                )
 
         for req_id in item.requirement_ids:
             if req_id in answered:
@@ -198,6 +214,16 @@ async def estimate_state(
                         text=f"Müşteri cevabı esas alındı: {state.answers[question.id][:200]}",
                     )
                 )
+
+        # The analog top-3 and the worker's ledger citations can name the same row;
+        # a line that lists one reference twice reads as more grounded than it is.
+        seen_uris: set[str] = set()
+        deduped: list[EvidenceRef] = []
+        for ref in evidence:
+            if ref.uri not in seen_uris:
+                seen_uris.add(ref.uri)
+                deduped.append(ref)
+        evidence = deduped
 
         if band is None:
             # No usable analogs: never invent a number silently (PRINCIPLES #7 spirit).
@@ -275,4 +301,5 @@ async def estimate_state(
         ),
         global_assumptions=tuple(global_assumptions),
         global_risks=tuple(global_risks),
+        impact=tuple(analyses),
     )

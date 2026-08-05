@@ -144,6 +144,29 @@ class TestEstimatorFlow:
         with pytest.raises(ValueError, match="ready_for_estimation"):
             await estimate_state(seeded, state)
 
+    async def test_persisted_graphs_feed_impact_evidence(self, seeded: AsyncSession) -> None:
+        """S13-2: with graphs and no client, the deterministic analysis still lands
+        repo:// evidence on the lines AND on the document's impact appendix."""
+        from estimo_code import CodeGraph
+
+        graph = CodeGraph.build(
+            REPO_ROOT / "fixtures" / "repo" / "meridyen-mini",
+            repo="meridyen-mini",
+            commit="c0ffee",
+        )
+        state = await run_brd(FIXTURES / "BRD-AUR-26-02-konsolide-fatura.docx")
+        boe = await estimate_state(seeded, state, graphs=[graph])
+        assert boe.impact
+        assert all(analysis.source == "deterministic" for analysis in boe.impact)
+        assert {analysis.work_item_id for analysis in boe.impact} == {
+            item.id for item in state.work_items
+        }
+        assert any(
+            ref.uri.startswith("repo://meridyen-mini@c0ffee/")
+            for line in boe.lines
+            for ref in line.evidence
+        )
+
     async def test_boe_docx_renders_turkish(self, seeded: AsyncSession, tmp_path: Path) -> None:
         state = await run_brd(FIXTURES / "BRD-AUR-26-02-konsolide-fatura.docx")
         boe = await estimate_state(seeded, state)

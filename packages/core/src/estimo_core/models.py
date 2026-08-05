@@ -225,6 +225,63 @@ class EstimateLine(EstimoModel):
         return self
 
 
+class ImpactClaim(EstimoModel):
+    """One claim of the impact analysis. Structurally cannot exist without evidence
+    (PRINCIPLES #2 — same rule as EstimateLine): the worker VERIFIES every ref
+    resolves before a claim is kept, and drops the claim otherwise."""
+
+    text: str = Field(min_length=1)
+    # Set for module-touchpoint claims so the Impact Map can dock the evidence
+    # under the module it belongs to; integration/risk claims may leave it None.
+    module: str | None = None
+    evidence: tuple[EvidenceRef, ...] = Field(min_length=1)
+
+
+class DisciplineShare(EstimoModel):
+    """A proposed share of one work item's effort for one discipline (S13-3).
+
+    Model-proposed until the discipline's calibration slice clears MIN_SAMPLES —
+    consumers render the split with a "model-proposed, uncalibrated" badge, the
+    S12-7 honest-silence pattern."""
+
+    discipline: Literal["frontend", "backend"]
+    share: float = Field(ge=0, le=1)
+    rationale: str | None = None
+
+
+class ImpactAnalysis(EstimoModel):
+    """Structured scope/impact reasoning for one work item (ADR-0009, S13-2).
+
+    Produced by the agentic worker (`source="agentic"`) or by the deterministic
+    graph heuristic when no model is available (`source="deterministic"`). Every
+    kept claim's evidence resolved at build time; `dropped_claims` counts what
+    verification removed, so a thin analysis is visibly thin rather than silently
+    filtered."""
+
+    work_item_id: str = Field(min_length=1)
+    repos: tuple[str, ...] = ()
+    modules: tuple[ImpactClaim, ...] = ()
+    integration_points: tuple[ImpactClaim, ...] = ()
+    discovery_risks: tuple[ImpactClaim, ...] = ()
+    composition: tuple[DisciplineShare, ...] = ()
+    confidence: Confidence = Confidence.LOW
+    source: Literal["agentic", "deterministic"]
+    dropped_claims: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _composition_shares_sum_to_one(self) -> Self:
+        if self.composition:
+            total = sum(share.share for share in self.composition)
+            if not 0.99 <= total <= 1.01:
+                msg = f"composition shares must sum to 1.0, got {total}"
+                raise ValueError(msg)
+            disciplines = [share.discipline for share in self.composition]
+            if len(disciplines) != len(set(disciplines)):
+                msg = "composition may not repeat a discipline"
+                raise ValueError(msg)
+        return self
+
+
 class Signature(EstimoModel):
     name: str = Field(min_length=1)
     role: str = Field(min_length=1)
@@ -244,6 +301,10 @@ class BoeDocument(EstimoModel):
     global_assumptions: tuple[AssumptionRisk, ...] = ()
     global_risks: tuple[AssumptionRisk, ...] = ()
     signatures: tuple[Signature, ...] = ()
+    # Per-work-item impact analyses (S13-2). Part of the document because they ARE
+    # basis-of-estimate material: versioned and frozen with the rest of the draft.
+    # Default () keeps every stored pre-S13 document valid on re-validation.
+    impact: tuple[ImpactAnalysis, ...] = ()
 
     @computed_field  # type: ignore[prop-decorator]
     @property

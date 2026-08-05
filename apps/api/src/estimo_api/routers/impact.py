@@ -140,6 +140,11 @@ async def impact_map(
             "requirement_ids": sorted(requirements[module]),
             "wiki": wiki,
             "analogs": analogs,
+            # Verified repo:// citations from the draft's impact analyses (S13-2) —
+            # the code references S12-4 shipped without. Present only once a draft
+            # exists; they are placement evidence, not bands, so the coverage gate
+            # above does not apply to them.
+            "code": _code_refs(record.boe, module),
         }
 
     return {
@@ -150,6 +155,30 @@ async def impact_map(
         ],
         "selected": selected,
     }
+
+
+def _code_refs(boe: dict[str, Any] | None, module: str) -> list[dict[str, Any]]:
+    """repo:// evidence the draft's impact analyses attached to this module.
+
+    Read straight off the stored document — these URIs were verified against the
+    loaded graphs when the analysis was built, so this is a projection, not a new
+    retrieval (and therefore needs no ACL leg: the reader is already allowed to see
+    the estimate the analyses belong to)."""
+    if not boe:
+        return []
+    refs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for analysis in boe.get("impact", []) or []:
+        for claim in analysis.get("modules", []) or []:
+            if claim.get("module") != module:
+                continue
+            for ref in claim.get("evidence", []) or []:
+                uri = str(ref.get("uri", ""))
+                if not uri.startswith("repo://") or uri in seen:
+                    continue
+                seen.add(uri)
+                refs.append({"uri": uri, "claim": claim.get("text", "")})
+    return refs[:EVIDENCE_LIMIT]
 
 
 def _query_for(module: str, items_for: dict[str, list[str]]) -> str:

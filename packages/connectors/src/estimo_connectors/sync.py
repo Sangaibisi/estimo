@@ -27,6 +27,7 @@ from estimo_connectors.base import connection_secret
 from estimo_connectors.confluence import ConfluenceConnector
 from estimo_connectors.db import Connection, SyncRun
 from estimo_connectors.gitrepo import clone_or_fetch
+from estimo_connectors.graphstore import upsert_code_graph
 from estimo_connectors.hosting import clone_username
 from estimo_connectors.jira import JiraConnector
 from estimo_gateway import GatewayClient
@@ -259,12 +260,16 @@ async def _sync_git(
             KnowledgeChunk.source_ref.not_in(current_refs),
         )
     )
+    # Persist the graph the wiki generation just used (S13-2): the estimator's
+    # impact worker loads it per tenant instead of re-parsing clones per request.
+    graph_stats = await upsert_code_graph(session, connection.id, connection.name, graph)
     run.checkpoint = {"head_sha": state.head_sha}
     await session.commit()
     return {
         "modules": len(wiki_pages),
         "pruned": int(getattr(pruned, "rowcount", 0) or 0),
         "head_sha": state.head_sha,
+        "graph": graph_stats,
     }
 
 

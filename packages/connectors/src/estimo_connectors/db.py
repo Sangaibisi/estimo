@@ -91,6 +91,36 @@ class SyncRun(TenantScoped, Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
+class CodeGraphRow(TenantScoped, Base):
+    """The CodeGraph a git sync built, persisted instead of discarded (S13-2).
+
+    Keyed on the CONNECTION, not the commit: a commit-keyed row would churn on every
+    push the way the commit-embedded code-wiki refs do (each sync would orphan the
+    previous graph), while "the current graph of this repo" is exactly one row that
+    the estimator's impact worker loads per tenant. `commit` is recorded so repo://
+    evidence URIs minted from the loaded graph resolve to the indexed revision.
+    """
+
+    __tablename__ = "code_graphs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "connection_id", name="uq_code_graphs_tenant_connection"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("connections.id", ondelete="CASCADE")
+    )
+    # The repo name evidence URIs carry (`repo://{repo}@{commit}/…`) — the
+    # connection's name at build time.
+    repo: Mapped[str] = mapped_column(String(120))
+    commit: Mapped[str] = mapped_column(String(80))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    built_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class CanonicalPage(TenantScoped, Base):
     """Curated distillation (S9-4): candidate → human approval → versioned page.
 

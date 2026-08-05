@@ -545,14 +545,6 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-2 Persist per-repo CodeGraphs + agentic impact worker (large).** Sync
-  builds a CodeGraph per repo and discards it after wiki generation; persist it (or
-  rebuild from the kept clones at ESTIMO_REPOS_DIR) and replace the 14-entry synonym
-  dictionary with a tool-using LLM loop per work item over (a) all repos' graphs,
-  (b) the knowledge index, (c) analog search — emitting a structured impact analysis
-  (repos touched, modules, integration points, discovery risks, discipline
-  composition) where **every claim carries a resolvable EvidenceRef**, verified
-  before rendering. Fills S12-4's missing code references at the same time.
 - [ ] **S13-3 Discipline (FE/BE) dimension end to end (medium).** Schema: composition
   on `WorkItem`, per-discipline sub-ranges on `EstimateLine`, per-discipline totals on
   the BoE ("X pd FE, Y pd BE"), discipline column on `ledger_entries` (+ actuals form

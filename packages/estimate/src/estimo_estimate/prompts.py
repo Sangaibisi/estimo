@@ -4,18 +4,24 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from estimo_pipeline.prompts import _HEADER_RE, Prompt
+from estimo_pipeline.prompts import HEADER_RE, Prompt
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
-def load_estimate_prompt() -> Prompt:
-    path = _PROMPTS_DIR / "estimate.md"
+def load_package_prompt(name: str) -> Prompt:
+    path = _PROMPTS_DIR / f"{name}.md"
     raw = path.read_text(encoding="utf-8")
-    match = _HEADER_RE.search(raw)
-    if match is None or match.group("name") != "estimate":
-        msg = f"prompt file {path.name} lacks a valid '<!-- prompt: estimate vN -->' header"
+    match = HEADER_RE.search(raw)
+    if match is None or match.group("name") != name:
+        msg = f"prompt file {path.name} lacks a valid '<!-- prompt: {name} vN -->' header"
         raise ValueError(msg)
-    return Prompt(
-        name="estimate", version=int(match.group("version")), text=raw[match.end() :].strip()
-    )
+    return Prompt(name=name, version=int(match.group("version")), text=raw[match.end() :].strip())
+
+
+def load_estimate_prompt() -> Prompt:
+    return load_package_prompt("estimate")
+
+
+def load_impact_prompt() -> Prompt:
+    return load_package_prompt("impact")

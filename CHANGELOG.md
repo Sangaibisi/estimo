@@ -9,6 +9,32 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-2 — per-repo CodeGraphs persist, and scope reasoning became an agentic
+  worker.** Sync built a CodeGraph on every git run, generated wiki pages from it,
+  and threw it away — while the deployed estimate path never received a graph at
+  all (`estimate_state` always ran `graph=None`, so `repo://` impact evidence and
+  the synonym dictionary were dead in production). The graph now persists per
+  connection (`code_graphs`, migration 0017, RLS'd, replaced in place on re-sync so
+  it cannot churn per commit), rebuilt from stored files on load so the derived
+  maps can never drift from the stored copy.
+
+  On top of it: an **agentic impact worker** per work item — a tool-using LLM loop
+  over every repo graph, the knowledge index (caller's ACL pre-filtered) and the
+  analog ledger, speaking a JSON-action protocol over plain chat completions
+  (deliberately not provider tool-calling: works against any OpenAI-compatible
+  endpoint, zero gateway surgery). The model does the Turkish→identifier-English
+  bridging the 14-entry synonym dictionary used to approximate; the dictionary
+  survives only inside the deterministic fallback. **The model proposes, the
+  verifier disposes**: every claim must cite evidence URIs, and a URI is kept only
+  if a tool actually returned it this run or it independently resolves inside a
+  loaded graph (right repo, right commit, real file, real lines) — fabricated
+  citations delete the claim and are counted on the analysis. Analyses land on the
+  BoE document (`impact`, versioned and frozen with the draft), module claims feed
+  line evidence, discovery-risk claims feed the risk register with contingency, and
+  the Impact Map's evidence panel gains the verified `repo://` code references
+  S12-4 shipped without. Two unparseable turns, an unreachable gateway, or a
+  missing client all degrade to the old deterministic graph heuristic — boxed as an
+  analysis marked `deterministic`, never silently.
 - **S13-1 (remainder) — every CLI now resolves the gateway the way the deployment does.**
   `estimo-embed` had grown a private copy of the panel-override read that silently
   diverged from the API's merge on three counts: it dropped panel-tuned timeouts and

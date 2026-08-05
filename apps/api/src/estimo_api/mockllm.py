@@ -33,13 +33,37 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+_IMPACT_FINALIZE = (
+    '{"action": "finalize", "analysis": {"repos": [], "modules": [], '
+    '"integration_points": [], "discovery_risks": [], '
+    '"composition": [{"discipline": "frontend", "share": 0.5, "rationale": "mock"}, '
+    '{"discipline": "backend", "share": 0.5, "rationale": "mock"}], '
+    '"confidence": "low"}}'
+)
+
+
+def _scripted_reply(messages: list[dict[str, Any]]) -> str | None:
+    """Protocol-aware canned replies, keyed on prompt sentinels.
+
+    The impact worker (S13-2) speaks a JSON-action protocol; a free-text reply would
+    cost it two strikes per work item before it falls back. The mock finalizes
+    immediately with an empty-but-valid analysis (claims need real evidence the mock
+    cannot cite; an empty analysis exercises the whole loop + verifier honestly)."""
+    system = str(next((m.get("content", "") for m in messages if m.get("role") == "system"), ""))
+    if "ESTIMO-IMPACT-PROTOCOL" in system:
+        return _IMPACT_FINALIZE
+    return None
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest) -> dict[str, Any]:
     last_user = next(
         (m.get("content", "") for m in reversed(request.messages) if m.get("role") == "user"),
         "",
     )
-    text = "ok" if "ok" in str(last_user).lower() else f"mock response to: {last_user}"[:200]
+    text = _scripted_reply(request.messages)
+    if text is None:
+        text = "ok" if "ok" in str(last_user).lower() else f"mock response to: {last_user}"[:200]
     return {
         "id": "chatcmpl-mock-1",
         "object": "chat.completion",
