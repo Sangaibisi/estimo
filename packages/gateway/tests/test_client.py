@@ -11,6 +11,8 @@ from pydantic import SecretStr
 from estimo_gateway import (
     GatewayClient,
     GatewayConfig,
+    GatewayConnectionError,
+    GatewayError,
     GatewayRateLimitedError,
     GatewayStatusError,
     UnknownStageError,
@@ -154,3 +156,87 @@ def test_redact_headers_strips_credentials() -> None:
     redacted = redact_headers(headers)
     assert "authorization" not in {k.lower() for k in redacted}
     assert redacted.get("x-request-id") == "1"
+
+
+class TestUnreachableLatch:
+    """The latch exists so a dead gateway costs one attempt per RUN, not per node.
+
+    Its blast radius has to be exactly that: a gateway that cannot be reached. A
+    timeout is a different fact — the endpoint answered, it was slow for that call —
+    and latching on it would mute every remaining model-assisted step of a request
+    because one completion ran long.
+    """
+
+    def _config(self) -> GatewayConfig:
+        return GatewayConfig(
+            base_url="http://gw.invalid/v1",
+            api_key=SecretStr("sk-test"),
+            profiles={"default": "m"},
+        )
+
+    @respx.mock
+    async def test_a_connection_failure_latches_the_rest_of_the_run(self) -> None:
+        route = respx.post("http://gw.invalid/v1/chat/completions").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        client = GatewayClient(self._config())
+        with pytest.raises(GatewayConnectionError):
+            await client.complete("default", [{"role": "user", "content": "x"}])
+        # The SDK's own retries belong to the FIRST attempt; what matters is that
+        # nothing after it touches the wire at all.
+        after_first = route.call_count
+        for _ in range(5):
+            with pytest.raises(GatewayConnectionError):
+                await client.complete("default", [{"role": "user", "content": "x"}])
+        assert route.call_count == after_first, "a dead gateway was retried per call"
+
+    @respx.mock
+    async def test_a_timeout_does_not_latch(self) -> None:
+        """APITimeoutError subclasses APIConnectionError — the trap this pins."""
+        route = respx.post("http://gw.invalid/v1/chat/completions").mock(
+            side_effect=httpx.ReadTimeout("slow")
+        )
+        client = GatewayClient(self._config())
+        with pytest.raises(GatewayConnectionError):
+            await client.complete("default", [{"role": "user", "content": "x"}])
+        # Measured AFTER the first call: the SDK's own retries belong to it, so a
+        # raw count would be satisfied by them alone and the test would pass with
+        # the guard removed.
+        after_first = route.call_count
+        for _ in range(2):
+            with pytest.raises(GatewayConnectionError):
+                await client.complete("default", [{"role": "user", "content": "x"}])
+        assert route.call_count > after_first, "one slow call muted the rest of the run"
+
+    @respx.mock
+    async def test_a_200_that_is_not_a_completion_is_a_gateway_error(self) -> None:
+        """Proxies and WAFs answer 200 with an interstitial; misrouted gateways answer
+        `{"choices": []}`. Reading .choices[0] blind raised IndexError out of the SDK —
+        a type no caller catches, so a degradable step became a 500."""
+        respx.post("http://gw.invalid/v1/chat/completions").respond(
+            json={"id": "x", "object": "chat.completion", "created": 0, "model": "m", "choices": []}
+        )
+        client = GatewayClient(self._config())
+        with pytest.raises(GatewayError):
+            await client.complete("default", [{"role": "user", "content": "x"}])
+
+    @respx.mock
+    async def test_the_unreachable_warning_does_not_log_the_url_credentials(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Operators front gateways with basic-auth proxies, and str(HttpUrl) keeps
+        `user:password@` — the warning would put the password in the log it exists to
+        be read from."""
+        respx.post("http://gw.invalid/v1/chat/completions").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        config = GatewayConfig(
+            base_url="http://ops:hunter2@gw.invalid/v1",
+            api_key=SecretStr("sk-test"),
+            profiles={"default": "m"},
+        )
+        client = GatewayClient(config)
+        with caplog.at_level("WARNING"), pytest.raises(GatewayConnectionError):
+            await client.complete("default", [{"role": "user", "content": "x"}])
+        assert "hunter2" not in caplog.text
+        assert "gw.invalid" in caplog.text

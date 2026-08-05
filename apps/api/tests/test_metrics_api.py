@@ -44,7 +44,7 @@ async def session(database_url: str) -> AsyncIterator[AsyncSession]:
     engine = create_async_engine(database_url)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as sess:
-        await sess.execute(text("TRUNCATE ledger_entries, estimates CASCADE"))
+        await sess.execute(text("TRUNCATE ledger_entries, estimates, runtime_settings CASCADE"))
         await sess.commit()
         yield sess
     await engine.dispose()

@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 import pytest
+import respx
 from _helpers import make_settings
 from alembic import command
 from alembic.config import Config
@@ -39,8 +40,11 @@ async def client(database_url: str) -> AsyncIterator[httpx.AsyncClient]:
     async with maker() as session:
         await session.execute(
             text(
+                # runtime_settings is deployment config, not tenant data — but a
+                # panel-saved gateway left by another module made these tests run
+                # against a deployment they never configured.
                 "TRUNCATE estimates, ledger_entries, knowledge_chunks, "
-                "calibration_snapshots CASCADE"
+                "calibration_snapshots, runtime_settings CASCADE"
             )
         )
         await session.commit()
@@ -1177,3 +1181,193 @@ async def test_a_second_reviewer_signature_is_not_swallowed(
     # Both names reach the exported artefact.
     export = await client.get(f"/v1/estimates/{estimate_id}/boe.docx")
     assert export.status_code == 200
+
+
+@respx.mock
+async def test_the_estimation_pipeline_actually_calls_the_gateway(
+    client: httpx.AsyncClient,
+) -> None:
+    """S13-1 / ADR-0009: the whole BRD -> BoE path used to run with `client=None`.
+
+    Every LLM-assisted step existed and none of them executed in production — the
+    ambiguity blend, the question wording, decomposition refinement, the within-band
+    nudge, and the dense leg of the estimator's own analog retrieval. The product was
+    a deterministic keyword machine wearing an AI product's clothes, and no test could
+    tell, because the deterministic fallbacks produce a perfectly valid draft.
+
+    This test fails if the gateway is never reached.
+    """
+    chat = respx.post("http://mock-llm.invalid/v1/chat/completions").respond(
+        json={
+            "id": "cmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "mock-small",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "{}"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+    )
+    respx.post("http://mock-llm.invalid/v1/embeddings").respond(
+        json={
+            "object": "list",
+            "model": "mock-small",
+            "data": [{"object": "embedding", "index": 0, "embedding": [1.0, 0.0, 0.0, 0.0]}],
+            "usage": {"prompt_tokens": 1, "total_tokens": 1},
+        }
+    )
+
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    assert chat.called, "the parse/gate/decompose pass never reached the gateway"
+    calls_after_upload = chat.call_count
+
+    built = await client.post(f"/v1/estimates/{summary['id']}/estimate")
+    assert built.status_code == 200, built.text
+    assert chat.call_count > calls_after_upload, "the estimator never reached the gateway"
+
+
+@respx.mock
+async def test_an_unreachable_gateway_does_not_stop_a_draft_from_being_built(
+    client: httpx.AsyncClient,
+) -> None:
+    """A configured-but-down endpoint must cost precision, not the whole feature.
+
+    The dense leg of analog retrieval calls the gateway to embed the query, so an
+    unreachable endpoint raised straight out of `estimate_state`: "your bands come
+    from a narrower analog set" became "the estimate cannot be built at all". Every
+    other node already degraded; this one did not.
+    """
+    respx.post("http://mock-llm.invalid/v1/chat/completions").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+    respx.post("http://mock-llm.invalid/v1/embeddings").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+
+    summary = await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    assert summary["status"] == "ready_for_estimation"
+    built = await client.post(f"/v1/estimates/{summary['id']}/estimate")
+    assert built.status_code == 200, built.text
+    assert built.json()["status"] == "boe_draft"
+    assert built.json()["version"] == 1
+    # A real draft with real lines exists behind the independent-first gate.
+    detail = (await client.get(f"/v1/estimates/{summary['id']}")).json()
+    assert detail["summary"]["has_boe"] is True
+
+
+@respx.mock
+async def test_a_dead_gateway_is_tried_once_per_run_not_once_per_requirement(
+    client: httpx.AsyncClient,
+) -> None:
+    """The latch. Without it a single BRD pays connect-timeout x retries for every
+    requirement, every question and every work item — minutes of waiting to produce
+    exactly the deterministic output it would have produced instantly."""
+    chat = respx.post("http://mock-llm.invalid/v1/chat/completions").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+    respx.post("http://mock-llm.invalid/v1/embeddings").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+
+    await _upload(client, "BRD-AUR-26-02-konsolide-fatura.docx")
+    # One attempt for the run (the SDK's own retries may add a few); the BRD has six
+    # requirements plus questions and work items, so an unlatched client would be far
+    # above this.
+    assert chat.call_count <= 3, f"the dead gateway was retried per node ({chat.call_count})"
+
+
+@respx.mock
+async def test_the_pipeline_uses_the_PANEL_gateway_not_only_the_environment(
+    database_url: str,
+) -> None:
+    """The env-configured client fixture cannot tell these two apart.
+
+    Every other test in this file runs against settings that already carry a gateway,
+    so a `_pipeline_client` that read `settings.gateway` directly — ignoring the panel
+    entirely — passes them all. That exact regression was written into the source
+    during review and shipped into a built image before anything caught it. This test
+    is the one that fails: the environment holds NOTHING, the gateway exists only
+    because an operator saved it in Admin → Model gateway (ADR-0008), and the upload
+    still has to reach it.
+    """
+    from estimo_api.settings import Settings
+
+    chat = respx.post("http://panel-gw.invalid/v1/chat/completions").respond(
+        json={
+            "id": "cmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "panel-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "{}"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+    )
+
+    settings = Settings(database_url=database_url)
+    assert settings.gateway is None, "this test is vacuous unless the environment is empty"
+    app = create_app(settings)
+    async with LifespanManager(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+            saved = await http.put(
+                "/v1/system/gateway",
+                json={
+                    "base_url": "http://panel-gw.invalid/v1",
+                    "api_key": "sk-panel",
+                    "profiles": {"default": "panel-model"},
+                },
+            )
+            assert saved.json()["configured"] is True
+            await _upload(http, "BRD-AUR-26-02-konsolide-fatura.docx")
+
+    assert chat.called, "the pipeline ignored the panel-configured gateway"
+
+
+@respx.mock
+async def test_applying_answers_also_reaches_the_gateway(
+    client: httpx.AsyncClient,
+) -> None:
+    """The third call site. Of the three S13-1 wires, this one is the easiest to drop
+    silently: answers re-run the gate and decomposition, and both degrade so cleanly
+    that a missing client looks exactly like a well-behaved deterministic pass."""
+    respx.post("http://mock-llm.invalid/v1/chat/completions").respond(
+        json={
+            "id": "cmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "mock-small",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "{}"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+    )
+    summary = await _upload(client, "BRD-AUR-26-01-taksitlendirme.docx")
+    state = (await client.get(f"/v1/estimates/{summary['id']}")).json()["state"]
+    question = state["questions"][0]
+    # Measured as a DELTA, not against a reset: respx.calls.reset() left the upload's
+    # own sixteen calls in place, so the assertion below passed with the client
+    # removed — a vacuous test for the one call site most likely to lose its wire.
+    before = respx.calls.call_count
+
+    applied = await client.post(
+        f"/v1/estimates/{summary['id']}/answers",
+        json={"answers": {question["id"]: "Kapsam: yalnız bireysel abone."}},
+    )
+    assert applied.status_code == 200, applied.text
+    assert respx.calls.call_count > before, "applying answers never reached the gateway"

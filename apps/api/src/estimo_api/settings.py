@@ -22,7 +22,31 @@ class Settings(BaseSettings):
     # Unset => those paths use the main connection (correct in single-tenant; in
     # multi-tenant they degrade to the app role's own-tenant view, documented).
     owner_database_url: PostgresDsn | None = None
-    gateway: GatewayConfig
+    # OPTIONAL, and optional on purpose (ADR-0008): the model gateway is the one piece
+    # of config an operator is most likely to get wrong at install time, and it is fully
+    # manageable from Admin → Model gateway. Requiring it here meant a fresh deployment
+    # could not BOOT without pasting an API key into a file — the opposite of what the
+    # panel is for. Unset = the product runs deterministically (parsing, the ambiguity
+    # gate, decomposition and calibrated bands all work) and every LLM-assisted step
+    # degrades, visibly, until someone configures it in the panel.
+    gateway: GatewayConfig | None = None
+
+    @field_validator("gateway", mode="before")
+    @classmethod
+    def _tolerate_half_configured_gateway(cls, value: object) -> object:
+        """A half-filled ESTIMO_GATEWAY__* block must not stop the process.
+
+        pydantic builds the nested model from whichever sub-keys are present, so an
+        `.env` carrying only `ESTIMO_GATEWAY__BASE_URL` (or only the key — the shape
+        the commented escape hatch invites) raised a startup ValidationError. That is
+        the worst possible failure for the one setting the Admin panel exists to fix:
+        the process that owns the panel refuses to start. Treated as "not configured"
+        instead, and the boot log says so.
+        """
+        if isinstance(value, dict) and not (value.get("base_url") and value.get("api_key")):
+            return None
+        return value
+
     # OIDC auth (ESTIMO_AUTH__ISSUER, …). Empty issuer => single-tenant open mode.
     auth: AuthSettings = Field(default_factory=AuthSettings)
     log_level: str = "INFO"

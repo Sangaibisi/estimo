@@ -14,7 +14,7 @@ import json
 import logging
 
 from estimo_code import CodeGraph, impact_for
-from estimo_knowledge import find_analogs
+from estimo_knowledge import AnalogyCard, find_analogs
 from estimo_parse import DATA_SYSTEM, fence, redact_anchors
 from estimo_pipeline import PipelineState
 from estimo_pipeline.prompts import Prompt
@@ -35,6 +35,33 @@ from estimo_estimate.prompts import load_estimate_prompt
 from estimo_gateway import GatewayClient, GatewayError
 
 logger = logging.getLogger("estimo.estimate")
+
+
+async def _analogs_for(
+    session: AsyncSession,
+    query: str,
+    *,
+    client: GatewayClient | None,
+    limit: int,
+) -> tuple[list[AnalogyCard], bool]:
+    """Analog retrieval that degrades instead of failing the whole draft.
+
+    The dense leg calls the gateway to embed the query, so an unreachable endpoint
+    used to raise straight out of `estimate_state` — a temporarily-down model turned
+    "your bands are computed from a narrower analog set" into "the estimate cannot be
+    built at all". The lexical leg is a plain SQL query and always answers; the ledger
+    screen learned the same lesson and takes the same fallback.
+
+    Returns (cards, degraded). The flag is not decoration: a different analog set is
+    a DIFFERENT BAND — measured at up to ±26% on `likely` for the same BRD, ledger and
+    calibration — so a draft built this way has to say so on its face, or the document
+    claims a grounding it did not have.
+    """
+    try:
+        return await find_analogs(session, query, client=client, limit=limit), False
+    except GatewayError:
+        logger.warning("analog retrieval fell back to the lexical leg", exc_info=True)
+        return await find_analogs(session, query, limit=limit), True
 
 
 async def _llm_adjust_likely(
@@ -107,6 +134,10 @@ async def estimate_state(
     lines: list[EstimateLine] = []
     global_assumptions: list[AssumptionRisk] = []
     global_risks: list[AssumptionRisk] = []
+    # True once any work item's analog search lost its dense leg to an unreachable
+    # gateway. Recorded on the document, because the alternative is a BoE whose bands
+    # came from a narrower reference class than the one it appears to claim.
+    degraded_retrieval = False
 
     if distribution.prior_based:
         global_assumptions.append(
@@ -123,7 +154,10 @@ async def estimate_state(
         # Redact at query construction: every downstream boundary (embed, lexical
         # FTS, impact keywords, chat) must see quarantined text (PRINCIPLES #5).
         query = redact_anchors(f"{item.title} {item.description or ''}")
-        analogs = await find_analogs(session, query, client=client, limit=analog_limit)
+        analogs, retrieval_degraded = await _analogs_for(
+            session, query, client=client, limit=analog_limit
+        )
+        degraded_retrieval = degraded_retrieval or retrieval_degraded
         band = band_from_analogs(analogs, distribution)
 
         evidence: list[EvidenceRef] = [
@@ -214,6 +248,19 @@ async def estimate_state(
                 assumptions=tuple(assumptions),
                 risks=tuple(risks),
                 basis_note=band.basis + (f"; LLM: {rationale}" if rationale else ""),
+            )
+        )
+
+    if degraded_retrieval:
+        global_risks.append(
+            AssumptionRisk(
+                kind="risk",
+                text=(
+                    "Bu taslak kurulurken model geçidine ulaşılamadı: analog arama "
+                    "yalnız sözlük bacağıyla çalıştı, bant hesabı daha dar bir "
+                    "referans kümesine dayanıyor. Geçit erişilebilir olduğunda "
+                    "yeniden kurun."
+                ),
             )
         )
 

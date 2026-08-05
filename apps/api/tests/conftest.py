@@ -21,6 +21,10 @@ _TENANT_TABLES = (
     "sync_runs",
     "canonical_pages",
     "runs",
+    # Deployment config, not tenant data — but it leaks between tests exactly like
+    # tenant data does: a panel-saved gateway from one test made the next one see a
+    # configured deployment it never configured.
+    "runtime_settings",
 )
 
 

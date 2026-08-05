@@ -20,7 +20,7 @@ from typing import Annotated, Any
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, SecretStr, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from estimo_api.db import get_session
@@ -33,7 +33,7 @@ from estimo_api.runtime_config import (
     write_gateway_override,
 )
 from estimo_core.secrets import encryption_available, seal
-from estimo_gateway import GatewayClient, GatewayError
+from estimo_gateway import GatewayClient, GatewayConfig, GatewayError
 from estimo_gateway.client import (
     GatewayConnectionError,
     GatewayRateLimitedError,
@@ -79,9 +79,34 @@ def _sanitized_gateway_error(exc: GatewayError) -> str:
     return f"gateway call failed: {type(exc).__name__}"
 
 
-def _gateway_view(config: Any, *, source: str, key_readable: bool = True) -> dict[str, Any]:
-    """The one redacted serialization of gateway config (GET and PUT share it)."""
+def _gateway_view(
+    config: Any, *, source: str, key_readable: bool = True, env_present: bool = False
+) -> dict[str, Any]:
+    """The one redacted serialization of gateway config (GET and PUT share it).
+
+    `config is None` is a real, expected state — a fresh deployment that has not been
+    given a model endpoint yet (ADR-0008/0009: the gateway is panel-managed, and the
+    API boots without it). The panel renders "not configured" from `configured: false`
+    rather than from a missing field, so nothing downstream has to guess.
+    """
+    if config is None:
+        return {
+            "configured": False,
+            "base_url": None,
+            "api_key_present": False,
+            "profiles": {},
+            "timeout_seconds": None,
+            "connect_timeout_seconds": None,
+            "max_retries": None,
+            "source": source,
+            # Is there an environment gateway UNDERNEATH the override? Decides whether
+            # dropping the panel override reverts to something or removes the gateway.
+            "env_present": env_present,
+            "secrets_encrypted": encryption_available(),
+            "stored_key_readable": key_readable,
+        }
     return {
+        "configured": True,
         "base_url": _display_url(str(config.base_url)),
         "api_key_present": bool(config.api_key.get_secret_value()),
         "profiles": config.profiles,
@@ -90,6 +115,7 @@ def _gateway_view(config: Any, *, source: str, key_readable: bool = True) -> dic
         "max_retries": config.max_retries,
         # "panel" = a runtime_settings override is active; "environment" = pure env.
         "source": source,
+        "env_present": env_present,
         # False = stored secrets carry a legible plain: prefix; the panel shows a
         # warning telling the operator to set ESTIMO_SECRET_KEY.
         "secrets_encrypted": encryption_available(),
@@ -111,6 +137,7 @@ async def system_info(request: Request, session: SessionDep) -> dict[str, Any]:
     db = settings.database_url
     override = await read_gateway_override(session)
     gateway = merge_gateway(settings.gateway, override)
+    gateway_source = "panel" if override else ("environment" if settings.gateway else "unset")
 
     return {
         "version": version("estimo-api"),
@@ -126,8 +153,12 @@ async def system_info(request: Request, session: SessionDep) -> dict[str, Any]:
         },
         "gateway": _gateway_view(
             gateway,
-            source="panel" if override else "environment",
+            # "unset" is its own answer: neither the panel nor the environment has
+            # one. Reporting "environment" there would name a source that holds
+            # nothing, and an operator would go looking in the wrong place.
+            source=gateway_source,
             key_readable=gateway_key_readable(override),
+            env_present=settings.gateway is not None,
         ),
         "database": {
             "host": db.hosts()[0]["host"] if db.hosts() else None,
@@ -180,16 +211,27 @@ async def put_gateway_override(
     if body.reset:
         await write_gateway_override(session, None)
         invalidate_gateway_cache(request)
-        return _gateway_view(settings.gateway, source="environment")
+        return _gateway_view(
+            settings.gateway,
+            source="environment" if settings.gateway else "unset",
+            env_present=settings.gateway is not None,
+        )
 
+    # PATCH semantics over the STORED document, not a rebuild from the body.
+    #
+    # The body carries only the fields the operator changed — the panel deliberately
+    # omits an unchanged base_url, because the value in that field came from
+    # /v1/system with userinfo stripped and echoing it back would persist a redacted
+    # URL over a working one. Rebuilding `doc` from the body therefore DELETED the
+    # endpoint on every save after the first: change a timeout, lose the gateway.
     existing = await read_gateway_override(session) or {}
-    doc: dict[str, Any] = {}
+    doc: dict[str, Any] = dict(existing)
     if body.base_url is not None:
         doc["base_url"] = body.base_url
     if body.api_key is not None:
         doc["api_key"] = seal(body.api_key)
-    elif not body.clear_api_key and existing.get("api_key"):
-        doc["api_key"] = existing["api_key"]
+    elif body.clear_api_key:
+        doc.pop("api_key", None)
     if body.profiles is not None:
         doc["profiles"] = body.profiles
     if body.timeout_seconds is not None:
@@ -199,6 +241,15 @@ async def put_gateway_override(
     if body.max_retries is not None:
         doc["max_retries"] = body.max_retries
 
+    # Validate the ENDPOINT itself, always — not only when a full config happens to
+    # be constructible. merge_gateway returns None for a gateway with no credential,
+    # which used to skip the only check a panel-supplied URL ever got, so a typo was
+    # persisted with HTTP 200 and surfaced later as a 500 from a different request.
+    if doc.get("base_url"):
+        try:
+            GatewayConfig(base_url=doc["base_url"], api_key=SecretStr("validation-only"))
+        except ValidationError as exc:
+            raise _sanitized_422(exc) from exc
     try:
         merged = merge_gateway(settings.gateway, doc)
     except ValidationError as exc:
@@ -206,7 +257,11 @@ async def put_gateway_override(
 
     await write_gateway_override(session, doc or None)
     invalidate_gateway_cache(request)
-    return _gateway_view(merged, source="panel" if doc else "environment")
+    return _gateway_view(
+        merged,
+        source="panel" if doc else ("environment" if settings.gateway else "unset"),
+        env_present=settings.gateway is not None,
+    )
 
 
 @router.post("/system/gateway-check")
@@ -218,7 +273,20 @@ async def gateway_check(request: Request, session: SessionDep) -> dict[str, Any]
     contract holds for ANY failure, including a gateway that answers 200 with a
     body the client cannot parse — hence the broad catch below.
     """
-    client = GatewayClient(await effective_gateway(request, session))
+    config = await effective_gateway(request, session)
+    if config is None:
+        # Not a failure of the gateway — there is no gateway. Same 200 contract, and
+        # the panel shows the same "reason" line it shows for a refused connection.
+        return {
+            "ok": False,
+            "latency_ms": 0,
+            # A CODE as well as a sentence: the panel is bilingual, and an English
+            # string invented by the API cannot be translated by the screen that
+            # renders it. The sentence stays for API/CLI callers.
+            "reason": "not-configured",
+            "error": "no model gateway is configured",
+        }
+    client = GatewayClient(config)
     try:
         started = time.perf_counter()
         try:

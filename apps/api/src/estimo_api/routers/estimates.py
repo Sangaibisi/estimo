@@ -22,6 +22,7 @@ person who never saw it.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import io
 import itertools
@@ -57,7 +58,9 @@ from estimo_api.estimates_models import (
     LineSignature,
     UiEvent,
 )
+from estimo_api.runtime_config import effective_gateway, gateway_client
 from estimo_core import BoeDocument, ClarificationQuestion, Signature
+from estimo_gateway import GatewayClient
 
 router = APIRouter(prefix="/v1/estimates", tags=["estimates"])
 
@@ -180,6 +183,44 @@ async def _ever_fully_signed(session: AsyncSession, record: EstimateRecord) -> b
     return False
 
 
+async def _close(client: GatewayClient | None) -> None:
+    """Release the client's sockets when the run that owns them ends.
+
+    One client per request means one httpx pool per request, and without this its
+    keep-alive connections to the gateway stay ESTABLISHED until the garbage
+    collector happens to run — under load, an fd leak that looks like the gateway
+    refusing connections.
+    """
+    if client is not None:
+        with contextlib.suppress(Exception):
+            await client.aclose()
+
+
+async def _pipeline_client(request: Request, session: AsyncSession) -> GatewayClient | None:
+    """The model gateway for the estimation pipeline, or None.
+
+    This was the single largest gap between the architecture and the deployment: the
+    whole BRD -> BoE path ran with `client=None`, so the LLM ambiguity blend, the LLM
+    question wording, decomposition refinement, the within-band nudge — and the dense
+    leg of the estimator's OWN analog retrieval — were all dormant in production while
+    the ledger browse screen got hybrid search. The product was a deterministic
+    keyword machine wearing an AI product's clothes (ADR-0009).
+
+    `None` stays a first-class answer: no gateway configured, or an unusable one, and
+    every node falls back to the deterministic path it already had.
+
+    Read on its OWN short-lived session. On a cache miss this issues a SELECT, and
+    doing that on the request session would open a transaction that stays open for
+    the entire pipeline — minutes, holding a pooled connection and an idle-in-
+    transaction backend while the model works. `runtime_settings` is deployment-wide
+    with no RLS, so it needs none of the request session's tenant binding.
+    """
+    del session  # deliberately not used; see the docstring
+    sessionmaker = request.app.state.sessionmaker
+    async with sessionmaker() as config_session:
+        return gateway_client(await effective_gateway(request, config_session))
+
+
 def _bound_identity(request: Request, principal: Principal, claimed: str) -> str:
     """The estimator/signer identity of record.
 
@@ -194,7 +235,9 @@ def _bound_identity(request: Request, principal: Principal, claimed: str) -> str
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_estimate(file: UploadFile, session: SessionDep) -> EstimateSummary:
+async def create_estimate(
+    file: UploadFile, session: SessionDep, request: Request
+) -> EstimateSummary:
     if not (file.filename or "").lower().endswith(".docx"):
         raise HTTPException(status_code=422, detail="a .docx BRD is required")
     # Enforce the size limit while streaming — an unsized read() would materialise a
@@ -210,10 +253,17 @@ async def create_estimate(file: UploadFile, session: SessionDep) -> EstimateSumm
     with tempfile.TemporaryDirectory() as tmp:
         brd_path = Path(tmp) / (Path(file.filename or "brd.docx").name)
         brd_path.write_bytes(payload)
+        # Built OUTSIDE the try: the except turns ValueError into a 422 whose detail
+        # is `str(exc)`, and a pydantic ValidationError from a bad stored gateway
+        # config is a ValueError — so a config problem would be echoed to the caller
+        # as if the BRD were malformed, with the offending config text in the body.
+        client = await _pipeline_client(request, session)
         try:
-            state = await run_brd(brd_path, thread_id=f"api-{uuid.uuid4()}")
+            state = await run_brd(brd_path, client=client, thread_id=f"api-{uuid.uuid4()}")
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await _close(client)
     brd_ref = state.parsed.brd_ref if state.parsed else brd_path.stem
     title = state.parsed.title if state.parsed else brd_path.stem
     record = EstimateRecord(
@@ -286,7 +336,7 @@ class AnswersIn(BaseModel):
 
 @router.post("/{estimate_id}/answers")
 async def apply_answers(
-    estimate_id: uuid.UUID, payload: AnswersIn, session: SessionDep
+    estimate_id: uuid.UUID, payload: AnswersIn, session: SessionDep, request: Request
 ) -> EstimateSummary:
     # An empty answer is "no answer" — merging it would silently close the question.
     answers = {key: value for key, value in payload.answers.items() if value.strip()}
@@ -294,10 +344,13 @@ async def apply_answers(
         raise HTTPException(status_code=422, detail="no non-empty answers submitted")
     record = await _get_record(session, estimate_id)
     state = PipelineState.model_validate(record.state)
+    client = await _pipeline_client(request, session)
     try:
-        state = await resume_with_answers(state, answers)
+        state = await resume_with_answers(state, answers, client=client)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        await _close(client)
     # The questions whose answers were just folded in are APPLIED — the board's last
     # lane was unreachable while nothing ever advanced the status.
     applied = {
@@ -503,7 +556,9 @@ async def question_letter(
 
 
 @router.post("/{estimate_id}/estimate")
-async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
+async def build_boe(
+    estimate_id: uuid.UUID, session: SessionDep, request: Request
+) -> dict[str, Any]:
     record = await _get_record(session, estimate_id)
     if record.boe is not None:
         raise HTTPException(
@@ -525,10 +580,13 @@ async def build_boe(estimate_id: uuid.UUID, session: SessionDep) -> dict[str, An
             status_code=409,
             detail=f"manual questions are still unapplied: {pending_manual}",
         )
+    client = await _pipeline_client(request, session)
     try:
-        boe = await estimate_state(session, state)
+        boe = await estimate_state(session, state, client=client)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    finally:
+        await _close(client)
     findings = review_boe(boe, state)
     # Computed fields (total) serialize but are rejected on re-validation
     # (extra="forbid") — persist the storable projection only.

@@ -38,10 +38,9 @@ class _BodyTooLarge(Exception):
 # endpoint) is the largest legitimate payload; the headroom covers multipart framing.
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 
-# The host `.env.example` ships. Deliberately a .invalid domain (RFC 2606): it can
-# never resolve, so a deployment that forgot to configure the gateway fails loudly
-# instead of reaching something real by accident.
-PLACEHOLDER_GATEWAY_HOST = "replace-me.invalid"
+# Hosts that mean "nobody configured this": the RFC 2606 .invalid TLD can never
+# resolve, so a value carrying it is a leftover template, not an endpoint.
+PLACEHOLDER_GATEWAY_SUFFIX = ".invalid"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -82,15 +81,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "OIDC auth enabled (issuer=%s)", app_settings.auth.issuer
             )
 
-        # A deployment still holding the .env.example placeholder gets told at BOOT.
-        # Otherwise the first symptom is a connection error inside a feature, minutes
-        # later, to a host nobody recognises — and on someone else's machine.
-        if PLACEHOLDER_GATEWAY_HOST in str(app_settings.gateway.base_url):
+        # Say at BOOT what an operator would otherwise discover inside a feature,
+        # minutes later, on someone else's machine. Not an error: the product runs
+        # deterministically without a model, and the gateway is panel-managed by
+        # design (ADR-0008) — but "runs degraded" must never be silent.
+        env_gateway = app_settings.gateway
+        if env_gateway is None:
+            logging.getLogger("estimo.api").info(
+                "no model gateway in the environment — the API will use whatever is "
+                "saved under Admin -> Model gateway; until something is, every "
+                "model-assisted step degrades to its deterministic path"
+            )
+        elif (env_gateway.base_url.host or "").endswith(PLACEHOLDER_GATEWAY_SUFFIX):
             logging.getLogger("estimo.api").warning(
-                "the model gateway is still the .env.example placeholder (%s) — set "
-                "ESTIMO_GATEWAY__* or configure it under Admin -> Model gateway; every "
-                "model-backed feature will fail until you do",
-                app_settings.gateway.base_url,
+                "the model gateway points at a non-resolvable placeholder host (%s) — "
+                "configure it under Admin -> Model gateway (or ESTIMO_GATEWAY__*); "
+                "every model-assisted step will degrade until you do",
+                env_gateway.base_url,
             )
 
         # A crashed process leaves sync runs 'running' forever, which would block every

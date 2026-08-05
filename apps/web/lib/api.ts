@@ -342,13 +342,21 @@ export const api = {
 };
 
 export interface GatewayView {
-  base_url: string;
+  /** False on a fresh deployment: no endpoint anywhere yet. The API still boots and
+   * every model-assisted step degrades to its deterministic path (ADR-0008/0009). */
+  configured: boolean;
+  base_url: string | null;
   api_key_present: boolean;
   profiles: Record<string, string>;
-  timeout_seconds: number;
-  connect_timeout_seconds: number;
-  max_retries: number;
-  source: "panel" | "environment";
+  timeout_seconds: number | null;
+  connect_timeout_seconds: number | null;
+  max_retries: number | null;
+  /** "unset" = neither the panel nor the environment holds one — naming
+   * "environment" there would send an operator to look in an empty file. */
+  source: "panel" | "environment" | "unset";
+  /** Is there an environment gateway underneath the panel override? Decides whether
+   * dropping the override reverts to something or removes the gateway entirely. */
+  env_present: boolean;
   secrets_encrypted: boolean;
   stored_key_readable: boolean;
 }
@@ -372,6 +380,9 @@ export interface GatewayCheckResult {
   ok: boolean;
   model?: string;
   latency_ms: number;
+  /** A machine-readable cause the panel can translate. The `error` sentence beside
+   * it is for API/CLI callers and is never invented in the user's language. */
+  reason?: "not-configured";
   error?: string;
 }
 

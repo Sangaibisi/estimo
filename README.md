@@ -27,9 +27,11 @@ cp .env.dev.example .env                       # demo lane: the stub LLM in this
 docker compose --profile mock up --build
 ```
 
-For a real deployment the file and the command are different — `cp .env.example .env`,
-point the gateway at your own endpoint, and `docker compose up --build -d`, which starts
-db + migrate + api + web and nothing else. See [docs/DEPLOY.md](docs/DEPLOY.md).
+For a real deployment the file and the command are different — `cp .env.example .env`
+and `docker compose up --build -d`, which starts db + migrate + api + web and nothing
+else. The model gateway is not in that file: the API boots without one and you point it
+at your endpoint from **Admin → Model gateway** ([ADR-0008](docs/adr/0008-runtime-config-in-db.md)).
+See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 The web app comes up on <http://localhost:3000> and the API on <http://localhost:8000>
 (OpenAPI at `/docs`), both bound to loopback. A `migrate` service runs Alembic to head

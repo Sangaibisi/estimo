@@ -545,14 +545,11 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-1 Wire the gateway into the production estimate path (small, FIRST).**
-  `run_brd` (:214), `resume_with_answers` (:298) and `estimate_state` (:529) in
-  `routers/estimates.py` all run with `client=None` — no LLM gate blend, no LLM
-  question wording, no decomposition refinement, no within-band nudge, and the
-  estimator's own analog retrieval is lexical-only while the ledger browse screen gets
-  hybrid. Thread `gateway_client(await effective_gateway(...))` through, with the
-  existing degradation paths (every GatewayError already falls back deterministic).
-  Regression test: a respx-mocked gateway must be CALLED by a BRD upload.
+- [ ] **S13-1 remainder (small):** the CLIs other than `estimo-embed` still read
+  `ESTIMO_GATEWAY__*` only, so on a panel-configured deployment `estimo-boe` and the
+  pipeline CLI report "gateway is not configured" about a deployment whose Admin screen
+  shows a working one. `estimo-embed` reads the panel override; the others need the
+  same treatment (or a shared helper in `packages/gateway`).
 - [ ] **S13-2 Persist per-repo CodeGraphs + agentic impact worker (large).** Sync
   builds a CodeGraph per repo and discards it after wiki generation; persist it (or
   rebuild from the kept clones at ESTIMO_REPOS_DIR) and replace the 14-entry synonym

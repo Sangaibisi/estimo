@@ -8,6 +8,52 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Added
+- **S13-1 — the model gateway is panel-managed, and the estimate path finally uses it.**
+  Two facts landed together. First, `Settings.gateway` became optional: the API boots
+  with nothing in `.env`, and the endpoint, key, stage→model profiles and timeouts are
+  set in **Admin → Model gateway** where the key is encrypted at rest. `.env.example`
+  no longer configures a gateway at all — the vars survive commented out as an
+  air-gapped escape hatch. `/v1/system` gained `configured`, `env_present` and a
+  `source` of `unset`, the panel renders that state calmly instead of two red chips and
+  a "every model call will fail" that describes a breakage that has not happened, and
+  a half-filled `ESTIMO_GATEWAY__*` block no longer aborts startup — the worst possible
+  failure for the one setting the panel exists to fix.
+
+  Second, the production BRD→BoE path passes a gateway client. It never had: `run_brd`,
+  `resume_with_answers` and `estimate_state` all ran with `client=None`, so the LLM
+  ambiguity blend, question wording, decomposition refinement, the within-band nudge and
+  the **dense leg of the estimator's own analog retrieval** were dormant while the
+  ledger browse screen got hybrid search. The product was a deterministic keyword
+  machine wearing an AI product's clothes (ADR-0009).
+
+  **What the multi-role review then found — the live-run blockers.** The panel's second
+  save DELETED the endpoint: the handler rebuilt the stored document from the request
+  body, and the panel deliberately omits an unchanged base URL (the value it holds came
+  back from `/v1/system` with userinfo stripped, so echoing it would persist a redacted
+  URL over a working one). Saves are a patch over the stored row now. A panel-supplied
+  URL was only validated as a side effect of constructing a full config — which is
+  skipped when there is no credential yet — so a typo was persisted with HTTP 200 and
+  surfaced later as a 500 from a different request, with the URL's embedded proxy
+  password echoed into a 422 body; the endpoint is validated on its own, and the client
+  is built outside the `try` that turns `ValueError` into an echoing 422. An empty
+  `ESTIMO_GATEWAY__API_KEY` counted as configured. The unreachable latch fired on
+  `APITimeoutError` too — one slow completion muted every remaining model-assisted step
+  of the request — and logged the raw base URL, credentials and all. A gateway answering
+  200 with an HTML interstitial or `{"choices": []}` raised `IndexError`/`AttributeError`
+  out of the SDK, a type no caller catches, so a degradable step became a 500 that lost
+  the upload. Per-request clients were never closed. And a draft built while the gateway
+  was down came out with materially different bands and said nothing — it now carries a
+  risk line saying the analog search ran on its lexical leg alone.
+
+  **A near-miss worth recording, again.** A review agent rewrote `_pipeline_client` to
+  read the environment instead of the effective config, marked it `# MUTANT`, and left
+  it there; the working tree was restored but the mutation had already been baked into
+  a built image. Every test stayed green, because they all run against settings that
+  carry an env gateway — the mutant is invisible to them. There is now a test that
+  configures the gateway ONLY through the panel, on an app whose environment is empty,
+  and asserts the upload reaches it.
+
 ### Decided
 - **ADR-0009 — LLM-led scope reasoning, calibration-led numbers.** The deployment target
   sharpened to a single company's center: BRD in → person-days out **with an FE/BE

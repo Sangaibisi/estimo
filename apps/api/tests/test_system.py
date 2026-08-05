@@ -28,7 +28,9 @@ pytestmark = pytest.mark.db
 def _gateway_key(database_url: str) -> str:
     """Derived from the same Settings the fixture builds — a hardcoded copy could
     drift and quietly turn every "key is absent" assertion vacuous."""
-    return make_settings(database_url).gateway.api_key.get_secret_value()
+    gateway = make_settings(database_url).gateway
+    assert gateway is not None, "the shared test settings are supposed to carry one"
+    return gateway.api_key.get_secret_value()
 
 
 def _keys(obj: object, prefix: str = "") -> set[str]:
@@ -53,6 +55,12 @@ SYSTEM_SHAPE = {
     "auth.tenant_claim",
     "auth.acl_claim",
     "gateway",
+    # False = neither the panel nor the environment holds one; the API still boots
+    # (ADR-0008/0009 — the gateway is panel-managed) and the panel says so.
+    "gateway.configured",
+    # Is there an env gateway underneath a panel override — decides whether dropping
+    # the override reverts to something or removes the gateway entirely.
+    "gateway.env_present",
     "gateway.base_url",
     "gateway.api_key_present",
     "gateway.profiles",
@@ -220,3 +228,120 @@ async def test_gateway_check_reports_an_unreachable_gateway_as_a_finding(
     assert body["ok"] is False
     assert body["error"]
     assert _gateway_key(database_url) not in response.text
+
+
+@pytest.fixture
+async def bare_client(database_url: str, clean_tables: None) -> AsyncIterator[httpx.AsyncClient]:
+    """A deployment with NO gateway in the environment — the fresh-install shape."""
+    from estimo_api.settings import Settings
+
+    settings = Settings(database_url=database_url)
+    assert settings.gateway is None, "the environment must not be required to hold one"
+    app = create_app(settings)
+    async with LifespanManager(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+            yield http
+
+
+async def test_the_api_boots_with_no_gateway_anywhere(bare_client: httpx.AsyncClient) -> None:
+    """ADR-0008/0009: the gateway is panel-managed, so a fresh deployment must not
+    need an API key in a file to START. Requiring it meant the one setting most
+    likely to be wrong at install time could stop the process that owns the screen
+    for fixing it."""
+    response = await bare_client.get("/v1/system")
+    assert response.status_code == 200, response.text
+    gateway = response.json()["gateway"]
+    assert gateway["configured"] is False
+    assert gateway["api_key_present"] is False
+    assert gateway["base_url"] is None
+    # "unset" is its own answer: naming "environment" would send an operator to look
+    # in a file that holds nothing.
+    assert gateway["source"] == "unset"
+
+
+async def test_the_gateway_check_says_there_is_no_gateway_rather_than_500ing(
+    bare_client: httpx.AsyncClient,
+) -> None:
+    response = await bare_client.post("/v1/system/gateway-check")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False
+    assert "no model gateway is configured" in body["error"]
+
+
+async def test_the_panel_alone_is_a_complete_configuration(
+    bare_client: httpx.AsyncClient,
+) -> None:
+    """The whole point of ADR-0008: an operator with an empty .env can stand the
+    product up and give it a model from the Admin screen."""
+    saved = await bare_client.put(
+        "/v1/system/gateway",
+        json={
+            "base_url": "http://panel-only.invalid/v1",
+            "api_key": "sk-from-the-panel",
+            "profiles": {"default": "panel-model"},
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["configured"] is True
+
+    gateway = (await bare_client.get("/v1/system")).json()["gateway"]
+    assert gateway["configured"] is True
+    assert gateway["source"] == "panel"
+    assert gateway["base_url"] == "http://panel-only.invalid/v1"
+    assert gateway["api_key_present"] is True
+    assert gateway["profiles"] == {"default": "panel-model"}
+    # The key never comes back out, panel-set or not.
+    assert "sk-from-the-panel" not in (await bare_client.get("/v1/system")).text
+
+
+async def test_a_half_configured_gateway_is_reported_as_unconfigured(
+    bare_client: httpx.AsyncClient,
+) -> None:
+    """An endpoint with no credential is not a gateway that half-works — it is one
+    that cannot work, and saying so is what lets every consumer take its documented
+    degraded path instead of building a client that will fail on first use."""
+    saved = await bare_client.put(
+        "/v1/system/gateway", json={"base_url": "http://panel-only.invalid/v1"}
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["configured"] is False
+
+
+async def test_a_second_save_does_not_delete_the_endpoint(
+    bare_client: httpx.AsyncClient,
+) -> None:
+    """The panel omits an unchanged base_url on purpose — the value in that field came
+    from /v1/system with userinfo STRIPPED, so echoing it back would persist a redacted
+    URL over a working one. The handler used to rebuild the stored document from the
+    body, so the second save — change a timeout, change a profile — deleted the
+    gateway. This is the shape of every save after the first."""
+    first = await bare_client.put(
+        "/v1/system/gateway",
+        json={
+            "base_url": "http://panel-only.invalid/v1",
+            "api_key": "sk-1",
+            "profiles": {"default": "m"},
+        },
+    )
+    assert first.json()["configured"] is True
+
+    # A realistic second save: only the timeout changed.
+    second = await bare_client.put("/v1/system/gateway", json={"timeout_seconds": 42})
+    assert second.status_code == 200, second.text
+    assert second.json()["configured"] is True, "the second save dropped the endpoint"
+    assert second.json()["base_url"] == "http://panel-only.invalid/v1"
+    assert second.json()["timeout_seconds"] == 42
+    assert second.json()["api_key_present"] is True
+
+
+async def test_an_invalid_endpoint_is_refused_even_without_a_key(
+    bare_client: httpx.AsyncClient,
+) -> None:
+    """The endpoint check used to ride on constructing a full config, which is skipped
+    when there is no credential — so a typo was persisted with HTTP 200 and surfaced
+    later as a 500 from an unrelated request."""
+    response = await bare_client.put("/v1/system/gateway", json={"base_url": "not-a-url-at-all"})
+    assert response.status_code == 422, response.text
+    assert (await bare_client.get("/v1/system")).json()["gateway"]["source"] == "unset"

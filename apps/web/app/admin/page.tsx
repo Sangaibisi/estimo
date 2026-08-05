@@ -9,20 +9,27 @@
  * config: what it saves overrides the environment immediately. */
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type ConnectionEntry, type GatewayCheckResult, type SystemInfo } from "@/lib/api";
+import {
+  api,
+  type ConnectionEntry,
+  type GatewayCheckResult,
+  type SystemInfo,
+} from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
 import { IconAdmin } from "@/components/icons";
 
 const KINDS = ["confluence", "bitbucket", "github", "gitlab", "git", "jira"];
 
-const ROLE_ROWS: { role: "roleAnalyst" | "roleReviewer" | "roleSigning" | "roleAdmin"; sign: "maySignNothing" | "maySignLines" | "maySignFull" }[] =
-  [
-    { role: "roleAnalyst", sign: "maySignNothing" },
-    { role: "roleReviewer", sign: "maySignNothing" },
-    { role: "roleSigning", sign: "maySignLines" },
-    { role: "roleAdmin", sign: "maySignFull" },
-  ];
+const ROLE_ROWS: {
+  role: "roleAnalyst" | "roleReviewer" | "roleSigning" | "roleAdmin";
+  sign: "maySignNothing" | "maySignLines" | "maySignFull";
+}[] = [
+  { role: "roleAnalyst", sign: "maySignNothing" },
+  { role: "roleReviewer", sign: "maySignNothing" },
+  { role: "roleSigning", sign: "maySignLines" },
+  { role: "roleAdmin", sign: "maySignFull" },
+];
 
 export default function AdminPage() {
   const [locale, setLocale] = useState<Locale>("en");
@@ -31,7 +38,9 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [system, setSystem] = useState<SystemInfo | null>(null);
-  const [gatewayResult, setGatewayResult] = useState<GatewayCheckResult | null>(null);
+  const [gatewayResult, setGatewayResult] = useState<GatewayCheckResult | null>(
+    null,
+  );
   const [checking, setChecking] = useState(false);
 
   const [kind, setKind] = useState("bitbucket");
@@ -48,7 +57,9 @@ export default function AdminPage() {
   const [gwTimeout, setGwTimeout] = useState("");
   const [gwConnectTimeout, setGwConnectTimeout] = useState("");
   const [gwRetries, setGwRetries] = useState("");
-  const [gwProfiles, setGwProfiles] = useState<{ stage: string; profile: string }[]>([]);
+  const [gwProfiles, setGwProfiles] = useState<
+    { stage: string; profile: string }[]
+  >([]);
   const [gwSaved, setGwSaved] = useState(false);
 
   const loadSystem = useCallback(() => {
@@ -56,12 +67,30 @@ export default function AdminPage() {
       .systemInfo()
       .then((info) => {
         setSystem(info);
-        setGwBaseUrl(info.gateway.base_url);
-        setGwTimeout(String(info.gateway.timeout_seconds));
-        setGwConnectTimeout(String(info.gateway.connect_timeout_seconds));
-        setGwRetries(String(info.gateway.max_retries));
+        // An unconfigured deployment leaves the form EMPTY rather than
+        // pre-filling invented defaults — the operator is typing their endpoint
+        // for the first time, not correcting ours.
+        setGwBaseUrl(info.gateway.base_url ?? "");
+        setGwTimeout(
+          info.gateway.timeout_seconds === null
+            ? ""
+            : String(info.gateway.timeout_seconds),
+        );
+        setGwConnectTimeout(
+          info.gateway.connect_timeout_seconds === null
+            ? ""
+            : String(info.gateway.connect_timeout_seconds),
+        );
+        setGwRetries(
+          info.gateway.max_retries === null
+            ? ""
+            : String(info.gateway.max_retries),
+        );
         setGwProfiles(
-          Object.entries(info.gateway.profiles).map(([stage, profile]) => ({ stage, profile })),
+          Object.entries(info.gateway.profiles).map(([stage, profile]) => ({
+            stage,
+            profile,
+          })),
         );
         setGwApiKey("");
       })
@@ -69,7 +98,10 @@ export default function AdminPage() {
   }, []);
 
   const refresh = useCallback(() => {
-    api.listConnections().then(setConnections).catch((err) => setError(String(err)));
+    api
+      .listConnections()
+      .then(setConnections)
+      .catch((err) => setError(String(err)));
   }, []);
 
   useEffect(() => {
@@ -95,7 +127,8 @@ export default function AdminPage() {
   function numeric(raw: string, label: string): number | null {
     if (!raw.trim()) return null;
     const value = Number(raw.trim().replace(",", "."));
-    if (!Number.isFinite(value)) throw new Error(`${label}: not a number — "${raw}"`);
+    if (!Number.isFinite(value))
+      throw new Error(`${label}: not a number — "${raw}"`);
     return value;
   }
 
@@ -121,12 +154,16 @@ export default function AdminPage() {
         }
         const filled = rows.filter((row) => row.stage && row.profile);
         const duplicate = filled.find(
-          (row, index) => filled.findIndex((other) => other.stage === row.stage) !== index,
+          (row, index) =>
+            filled.findIndex((other) => other.stage === row.stage) !== index,
         );
         if (duplicate) throw new Error(`duplicate stage: "${duplicate.stage}"`);
 
         const timeout = numeric(gwTimeout, t(locale, "timeoutShort"));
-        const connectTimeout = numeric(gwConnectTimeout, t(locale, "timeoutShort"));
+        const connectTimeout = numeric(
+          gwConnectTimeout,
+          t(locale, "timeoutShort"),
+        );
         const retries = numeric(gwRetries, t(locale, "retriesShort"));
 
         await api.putGateway({
@@ -137,9 +174,13 @@ export default function AdminPage() {
             ? { base_url: gwBaseUrl.trim() }
             : {}),
           ...(gwApiKey ? { api_key: gwApiKey } : {}),
-          profiles: Object.fromEntries(filled.map((row) => [row.stage, row.profile])),
+          profiles: Object.fromEntries(
+            filled.map((row) => [row.stage, row.profile]),
+          ),
           ...(timeout !== null ? { timeout_seconds: timeout } : {}),
-          ...(connectTimeout !== null ? { connect_timeout_seconds: connectTimeout } : {}),
+          ...(connectTimeout !== null
+            ? { connect_timeout_seconds: connectTimeout }
+            : {}),
           ...(retries !== null ? { max_retries: retries } : {}),
         });
       }
@@ -184,7 +225,11 @@ export default function AdminPage() {
         <BandHeader
           title={t(locale, "connections")}
           right={
-            <button type="button" className="btn" onClick={() => setShowForm(!showForm)}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setShowForm(!showForm)}
+            >
               {t(locale, "addConnection")}
             </button>
           }
@@ -213,11 +258,29 @@ export default function AdminPage() {
               background: "var(--surf2)",
             }}
           >
-            <div style={{ fontSize: 12.5, color: "var(--ink2)", marginBottom: 10, textWrap: "pretty" }}>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: "var(--ink2)",
+                marginBottom: 10,
+                textWrap: "pretty",
+              }}
+            >
               {t(locale, "secretEnvHint")}
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <select aria-label="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <select
+                aria-label="kind"
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+              >
                 {KINDS.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -254,7 +317,10 @@ export default function AdminPage() {
                 onChange={(e) => setAclKeys(e.target.value)}
               />
               <input
-                style={{ minWidth: 220, borderColor: configValid ? undefined : "var(--crit)" }}
+                style={{
+                  minWidth: 220,
+                  borderColor: configValid ? undefined : "var(--crit)",
+                }}
                 placeholder='config JSON — {"space_keys": ["AUR"]}'
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
@@ -273,7 +339,10 @@ export default function AdminPage() {
                       secret_env: secretEnv || null,
                       secret: secretValue || null,
                       acl_keys: aclKeys
-                        ? aclKeys.split(",").map((key) => key.trim()).filter(Boolean)
+                        ? aclKeys
+                            .split(",")
+                            .map((key) => key.trim())
+                            .filter(Boolean)
                         : null,
                     });
                     setName("");
@@ -293,7 +362,11 @@ export default function AdminPage() {
         )}
 
         {connections.length === 0 ? (
-          <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>—</div>
+          <div
+            style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}
+          >
+            —
+          </div>
         ) : (
           <div
             style={{
@@ -324,22 +397,39 @@ export default function AdminPage() {
                       gap: 8,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{connection.name}</span>
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>
+                      {connection.name}
+                    </span>
                     {failed ? (
-                      <StatusChip status="crit">{t(locale, "errorWord")}</StatusChip>
+                      <StatusChip status="crit">
+                        {t(locale, "errorWord")}
+                      </StatusChip>
                     ) : running ? (
-                      <StatusChip status="warn">{t(locale, "firstSync")}</StatusChip>
+                      <StatusChip status="warn">
+                        {t(locale, "firstSync")}
+                      </StatusChip>
                     ) : run_ ? (
-                      <StatusChip status="ok">{t(locale, "connected")}</StatusChip>
+                      <StatusChip status="ok">
+                        {t(locale, "connected")}
+                      </StatusChip>
                     ) : (
                       <Chip>{t(locale, "neverSynced")}</Chip>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      marginTop: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <Chip>{connection.kind}</Chip>
                     {connection.secret_env && !connection.secret_present && (
-                      <StatusChip status="crit">{t(locale, "secretMissing")}</StatusChip>
+                      <StatusChip status="crit">
+                        {t(locale, "secretMissing")}
+                      </StatusChip>
                     )}
                     {(connection.acl_keys ?? []).slice(0, 2).map((key) => (
                       <Chip key={key}>{key}</Chip>
@@ -368,9 +458,21 @@ export default function AdminPage() {
                           overflow: "hidden",
                         }}
                       >
-                        <div style={{ width: "38%", height: "100%", background: "var(--acc)" }} />
+                        <div
+                          style={{
+                            width: "38%",
+                            height: "100%",
+                            background: "var(--acc)",
+                          }}
+                        />
                       </div>
-                      <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 8 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--ink2)",
+                          marginTop: 8,
+                        }}
+                      >
                         {t(locale, "firstSyncHint")}
                       </div>
                     </>
@@ -384,7 +486,9 @@ export default function AdminPage() {
                     >
                       {run_
                         ? `${t(locale, "lastSyncAgo")} ${new Date(run_.started_at).toLocaleString(locale)}${
-                            run_.stats ? ` · ${JSON.stringify(run_.stats).slice(1, 60)}` : ""
+                            run_.stats
+                              ? ` · ${JSON.stringify(run_.stats).slice(1, 60)}`
+                              : ""
                           }`
                         : t(locale, "neverSynced")}
                     </div>
@@ -406,7 +510,10 @@ export default function AdminPage() {
                       onClick={() => {
                         if (
                           window.confirm(
-                            t(locale, "confirmDeleteConnection").replace("{name}", connection.name),
+                            t(locale, "confirmDeleteConnection").replace(
+                              "{name}",
+                              connection.name,
+                            ),
                           )
                         ) {
                           run(() => api.deleteConnection(connection.id));
@@ -437,10 +544,17 @@ export default function AdminPage() {
                   </StatusChip>
                 ) : (
                   <StatusChip status="crit">
-                    {(gatewayResult.error ?? "error").slice(0, 90)}
+                    {gatewayResult.reason === "not-configured"
+                      ? t(locale, "gatewayUnset")
+                      : (gatewayResult.error ?? "error").slice(0, 90)}
                   </StatusChip>
                 ))}
-              <button type="button" className="btn" disabled={checking} onClick={checkGateway}>
+              <button
+                type="button"
+                className="btn"
+                disabled={checking}
+                onClick={checkGateway}
+              >
                 {checking ? t(locale, "testing") : t(locale, "testGateway")}
               </button>
             </div>
@@ -449,25 +563,66 @@ export default function AdminPage() {
         <div style={{ padding: "14px 18px" }}>
           {system ? (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
                 {system.gateway.source === "panel" ? (
-                  <StatusChip status="ok">{t(locale, "sourcePanel")}</StatusChip>
+                  <StatusChip status="ok">
+                    {t(locale, "sourcePanel")}
+                  </StatusChip>
+                ) : system.gateway.source === "unset" ? (
+                  <StatusChip status="warn">
+                    {t(locale, "gatewayUnset")}
+                  </StatusChip>
                 ) : (
                   <Chip>{t(locale, "sourceEnv")}</Chip>
                 )}
+                {/* "API key missing" is a PROBLEM only when a gateway exists without
+                    one. On a fresh deployment it is just the second half of "nothing
+                    is configured yet", and two red chips for one fact read as two
+                    faults. */}
                 {system.gateway.api_key_present ? (
-                  <StatusChip status="ok">{t(locale, "keyConfigured")}</StatusChip>
+                  <StatusChip status="ok">
+                    {t(locale, "keyConfigured")}
+                  </StatusChip>
                 ) : (
-                  <StatusChip status="crit">{t(locale, "keyMissing")}</StatusChip>
+                  system.gateway.configured && (
+                    <StatusChip status="crit">
+                      {t(locale, "keyMissing")}
+                    </StatusChip>
+                  )
                 )}
                 {!system.gateway.secrets_encrypted && (
-                  <StatusChip status="warn">{t(locale, "unencryptedWarn")}</StatusChip>
+                  <StatusChip status="warn">
+                    {t(locale, "unencryptedWarn")}
+                  </StatusChip>
                 )}
                 {!system.gateway.stored_key_readable && (
-                  <StatusChip status="crit">{t(locale, "keyUnreadable")}</StatusChip>
+                  <StatusChip status="crit">
+                    {t(locale, "keyUnreadable")}
+                  </StatusChip>
                 )}
-                {gwSaved && <StatusChip status="ok">{t(locale, "savedOk")}</StatusChip>}
+                {gwSaved && (
+                  <StatusChip status="ok">{t(locale, "savedOk")}</StatusChip>
+                )}
               </div>
+              {!system.gateway.configured && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12.5,
+                    color: "var(--ink2)",
+                    textWrap: "pretty",
+                  }}
+                >
+                  {t(locale, "gatewayUnsetHint")}
+                </div>
+              )}
 
               <div
                 style={{
@@ -540,7 +695,9 @@ export default function AdminPage() {
                           onChange={(e) =>
                             setGwProfiles(
                               gwProfiles.map((r, i) =>
-                                i === index ? { ...r, stage: e.target.value } : r,
+                                i === index
+                                  ? { ...r, stage: e.target.value }
+                                  : r,
                               ),
                             )
                           }
@@ -553,7 +710,9 @@ export default function AdminPage() {
                           onChange={(e) =>
                             setGwProfiles(
                               gwProfiles.map((r, i) =>
-                                i === index ? { ...r, profile: e.target.value } : r,
+                                i === index
+                                  ? { ...r, profile: e.target.value }
+                                  : r,
                               ),
                             )
                           }
@@ -564,7 +723,11 @@ export default function AdminPage() {
                           type="button"
                           className="btn"
                           aria-label="remove profile"
-                          onClick={() => setGwProfiles(gwProfiles.filter((_, i) => i !== index))}
+                          onClick={() =>
+                            setGwProfiles(
+                              gwProfiles.filter((_, i) => i !== index),
+                            )
+                          }
                         >
                           ✕
                         </button>
@@ -573,29 +736,62 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+              {/* Same rule: with no gateway, "every model call will fail" describes a
+                  breakage that has not happened — nothing is calling anything. It is a
+                  real warning only once an endpoint exists with no routing. */}
               {gwProfiles.length === 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <StatusChip status="crit">{t(locale, "noProfiles")}</StatusChip>
+                  {system.gateway.configured ? (
+                    <StatusChip status="crit">
+                      {t(locale, "noProfiles")}
+                    </StatusChip>
+                  ) : (
+                    <Lbl>{t(locale, "noProfilesYet")}</Lbl>
+                  )}
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 12,
+                  alignItems: "center",
+                }}
+              >
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => setGwProfiles([...gwProfiles, { stage: "", profile: "" }])}
+                  onClick={() =>
+                    setGwProfiles([...gwProfiles, { stage: "", profile: "" }])
+                  }
                 >
                   {t(locale, "addProfile")}
                 </button>
                 <div style={{ flex: 1 }} />
+                {/* Two different acts wearing one label. With an environment
+                    gateway underneath, dropping the override REVERTS to it. Without
+                    one — the default now that the gateway is panel-managed — the
+                    same click leaves the deployment with no gateway at all, so it
+                    says that instead and asks first. */}
                 {system.gateway.source === "panel" && (
                   <button
                     type="button"
                     className="btn"
                     disabled={busy}
-                    onClick={() => saveGateway(true)}
+                    onClick={() => {
+                      if (
+                        !system.gateway.env_present &&
+                        !window.confirm(t(locale, "clearGatewayConfirm"))
+                      ) {
+                        return;
+                      }
+                      void saveGateway(true);
+                    }}
                   >
-                    {t(locale, "revertEnv")}
+                    {system.gateway.env_present
+                      ? t(locale, "revertEnv")
+                      : t(locale, "clearGateway")}
                   </button>
                 )}
                 <button
@@ -635,29 +831,45 @@ export default function AdminPage() {
                 }}
               >
                 <Lbl>{t(locale, "authModeLabel")}</Lbl>
-                <span style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
                   {system.auth.mode === "oidc" ? (
                     <>
-                      <StatusChip status="ok">{t(locale, "authModeOidc")}</StatusChip>
+                      <StatusChip status="ok">
+                        {t(locale, "authModeOidc")}
+                      </StatusChip>
                       <Mn>{system.auth.issuer}</Mn>
-                      {system.auth.audience && <Chip>aud {system.auth.audience}</Chip>}
+                      {system.auth.audience && (
+                        <Chip>aud {system.auth.audience}</Chip>
+                      )}
                       <Chip>roles ← {system.auth.role_claim}</Chip>
                       <Chip>tenant ← {system.auth.tenant_claim}</Chip>
                       {system.auth.acl_claim ? (
                         <Chip>acl ← {system.auth.acl_claim}</Chip>
                       ) : (
-                        <StatusChip status="warn">{t(locale, "aclClaimUnset")}</StatusChip>
+                        <StatusChip status="warn">
+                          {t(locale, "aclClaimUnset")}
+                        </StatusChip>
                       )}
                     </>
                   ) : (
-                    <StatusChip status="warn">{t(locale, "authModeOpen")}</StatusChip>
+                    <StatusChip status="warn">
+                      {t(locale, "authModeOpen")}
+                    </StatusChip>
                   )}
                 </span>
                 <Lbl>{t(locale, "apiVersionLabel")}</Lbl>
                 <Mn>{system.version}</Mn>
                 <Lbl>{t(locale, "databaseLabel")}</Lbl>
                 <Mn>
-                  {system.database.role}@{system.database.host}/{system.database.name}
+                  {system.database.role}@{system.database.host}/
+                  {system.database.name}
                 </Mn>
                 <Lbl>{t(locale, "corsLabel")}</Lbl>
                 <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -690,7 +902,9 @@ export default function AdminPage() {
             <tbody>
               {ROLE_ROWS.map((row) => (
                 <tr key={row.role}>
-                  <td style={{ color: "var(--ink2)" }}>{t(locale, row.role)}</td>
+                  <td style={{ color: "var(--ink2)" }}>
+                    {t(locale, row.role)}
+                  </td>
                   <td>
                     {row.sign === "maySignNothing" ? (
                       <Mn style={{ color: "var(--mut)" }}>—</Mn>

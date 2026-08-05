@@ -398,6 +398,12 @@ const dict = {
       "Every model call flows through this one OpenAI-compatible endpoint — LiteLLM in production. Env vars are only bootstrap defaults: what you save here overrides them immediately, no restart.",
     saveGateway: "Save",
     revertEnv: "Revert to environment",
+    clearGateway: "Remove gateway",
+    clearGatewayConfirm:
+      "There is no gateway in the environment to fall back to, so this removes the model gateway entirely. Parsing, the ambiguity gate, decomposition, questions and calibrated bands keep working; the model-assisted steps stop. Continue?",
+    gatewayUnset: "no model gateway yet",
+    gatewayUnsetHint:
+      "Nothing is configured, and the product still runs: parsing, the ambiguity gate, decomposition, questions and calibrated bands are all deterministic. Set an endpoint here to switch the model-assisted steps on.",
     sourcePanel: "configured in panel",
     sourceEnv: "from environment",
     apiKeyLabel: "API key",
@@ -415,6 +421,8 @@ const dict = {
     keyConfigured: "API key configured",
     keyMissing: "API key missing",
     noProfiles: "No profiles configured — every model call will fail.",
+    noProfilesYet:
+      'Add one row per stage once you have an endpoint (start with "default").',
     testGateway: "Test gateway",
     testing: "Testing…",
     gatewayOk: "round-trip ok",
@@ -890,6 +898,12 @@ const dict = {
       "Tüm model çağrıları bu tek OpenAI-uyumlu uçtan geçer — üretimde LiteLLM. Env değişkenleri yalnız açılış varsayılanıdır: burada kaydettiğiniz anında geçerli olur, yeniden başlatma gerekmez.",
     saveGateway: "Kaydet",
     revertEnv: "Environment'a geri dön",
+    clearGateway: "Geçidi kaldır",
+    clearGatewayConfirm:
+      "Ortamda geri dönülecek bir geçit yok, bu işlem model geçidini tamamen kaldırır. Ayrıştırma, belirsizlik kapısı, iş kırılımı, sorular ve kalibre bantlar çalışmaya devam eder; model destekli adımlar durur. Devam edilsin mi?",
+    gatewayUnset: "model geçidi henüz yok",
+    gatewayUnsetHint:
+      "Hiçbir şey tanımlı değil ve ürün yine de çalışıyor: ayrıştırma, belirsizlik kapısı, iş kırılımı, sorular ve kalibre bantlar deterministik. Model destekli adımları açmak için buraya bir uç nokta girin.",
     sourcePanel: "panelden yapılandırıldı",
     sourceEnv: "environment'tan",
     apiKeyLabel: "API anahtarı",
@@ -907,6 +921,8 @@ const dict = {
     keyConfigured: "API anahtarı tanımlı",
     keyMissing: "API anahtarı eksik",
     noProfiles: "Profil tanımlı değil — tüm model çağrıları başarısız olur.",
+    noProfilesYet:
+      'Uç noktayı girdikten sonra her aşama için bir satır ekleyin ("default" ile başlayın).',
     testGateway: "Gateway'i test et",
     testing: "Test ediliyor…",
     gatewayOk: "gidiş-dönüş tamam",
