@@ -171,3 +171,134 @@ export function IconMoon(props: IconProps) {
     </Svg>
   );
 }
+
+/* ---------------- Connector marks (S13 polish) ----------------
+ *
+ * Per-provider identity for the Admin → Connections tiles. Hand-drawn,
+ * simplified renditions on the same 16px grid — NOT the providers' official
+ * assets — with one fixed accent per provider. These are the single exception
+ * to the currentColor rule: a connector's identity color must not re-tint with
+ * the rail state, or every provider looks like "the active one".
+ */
+
+const CONNECTOR_ACCENTS: Record<string, string> = {
+  github: "#8b949e",
+  gitlab: "#fc6d26",
+  bitbucket: "#2684ff",
+  git: "#f05033",
+  confluence: "#2684ff",
+  jira: "#2684ff",
+};
+
+function markGlyph(kind: string): React.ReactNode {
+  switch (kind) {
+    case "github":
+      // Cat-head silhouette, simplified: round head, two ears.
+      return (
+        <path
+          d="M8 2.6c-3 0-5.4 2.4-5.4 5.4 0 2.4 1.5 4.4 3.7 5.1v-1.8c-.5.1-1.1 0-1.4-.5-.2-.3-.4-.7-.7-.9.5-.2 1 .2 1.3.6.4.6 1 .5 1.4.4.1-.4.3-.7.5-.9-1.7-.2-2.9-.9-2.9-2.7 0-.6.2-1.1.6-1.5-.1-.2-.3-.9.1-1.6 0 0 .5-.2 1.7.6a5.7 5.7 0 0 1 2.9 0c1.2-.8 1.7-.6 1.7-.6.4.7.2 1.4.1 1.6.4.4.6.9.6 1.5 0 1.8-1.2 2.5-2.9 2.7.3.3.5.7.5 1.3v2c2.2-.7 3.7-2.7 3.7-5.1 0-3-2.4-5.4-5.4-5.4z"
+          fill="currentColor"
+          stroke="none"
+        />
+      );
+    case "gitlab":
+      // The tanuki reduced to its pentagon-arrow silhouette.
+      return (
+        <path
+          d="M8 13.6 2.8 9.8c-.3-.2-.4-.6-.3-.9l1.1-3.4 1.5 4h5.8l1.5-4 1.1 3.4c.1.3 0 .7-.3.9L8 13.6z"
+          fill="currentColor"
+          stroke="none"
+        />
+      );
+    case "bitbucket":
+      // The tilted-bucket mark: outer wedge with a knocked-out center.
+      return (
+        <path
+          d="M2.9 3h10.2c.3 0 .5.3.5.6l-1.7 9c-.1.3-.3.5-.6.5H4.7c-.3 0-.5-.2-.6-.5l-1.7-9c0-.3.2-.6.5-.6zm3.6 3.4.6 3.4h1.8l.6-3.4H6.5z"
+          fill="currentColor"
+          stroke="none"
+          fillRule="evenodd"
+        />
+      );
+    case "confluence":
+      // Two converging waves.
+      return (
+        <>
+          <path d="M2.5 11.5c1.6-2.6 3-3.2 5.5-2l3 1.4" fill="none" />
+          <path d="M13.5 4.5c-1.6 2.6-3 3.2-5.5 2L5 5.1" fill="none" />
+        </>
+      );
+    case "jira":
+      // Two stacked diamonds converging on the mark's point.
+      return (
+        <>
+          <path
+            d="M8 2.5 11.3 5.8 8 9 4.7 5.8 8 2.5z"
+            fill="currentColor"
+            stroke="none"
+          />
+          <path
+            d="M8 9.6l2.2 2.2L8 14l-2.2-2.2L8 9.6z"
+            fill="currentColor"
+            stroke="none"
+            opacity={0.55}
+          />
+        </>
+      );
+    default:
+      // Plain git (or unknown): a branch fork.
+      return (
+        <>
+          <circle cx="4.5" cy="3.8" r="1.4" fill="none" />
+          <circle cx="4.5" cy="12.2" r="1.4" fill="none" />
+          <circle cx="11.5" cy="6" r="1.4" fill="none" />
+          <path d="M4.5 5.2v5.6M11.5 7.4c0 2.4-3 2.2-5 3.2" fill="none" />
+        </>
+      );
+  }
+}
+
+/** Provider badge: tinted rounded square + the provider glyph in its accent. */
+export function ConnectorMark({ kind, size = 26 }: { kind: string; size?: number }) {
+  const accent = CONNECTOR_ACCENTS[kind] ?? "var(--mut)";
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 7,
+        flex: "none",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: accent,
+        background: `color-mix(in srgb, ${accent} 13%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)`,
+      }}
+    >
+      <svg
+        width={size - 10}
+        height={size - 10}
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {markGlyph(kind)}
+      </svg>
+    </span>
+  );
+}
+
+/** Proper display names for connector kinds ("github" → "GitHub"). */
+export const CONNECTOR_LABELS: Record<string, string> = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  bitbucket: "Bitbucket",
+  git: "Git",
+  confluence: "Confluence",
+  jira: "Jira",
+};

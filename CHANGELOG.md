@@ -8,6 +8,16 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Changed
+- **Admin → Connections got a professional identity layer.** Each connection tile
+  now leads with a per-provider mark — hand-drawn simplified renditions of the
+  GitHub / GitLab / Bitbucket / Confluence / Jira / plain-git marks on the icon
+  set's own 16px grid, each in its provider accent on a tinted badge (the one
+  deliberate exception to the currentColor icon rule: a provider's identity must
+  not re-tint with UI state). The tile header becomes mark + name + proper
+  provider label with the sync cadence beside it; the redundant kind chip left the
+  chips row.
+
 ### Added
 - **S13-6 — the frontier eval arm.** `estimo-effort-eval --frontier` runs a
   free-form LLM band per held-out ledger row (no analogs, no band constraint,

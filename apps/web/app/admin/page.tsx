@@ -17,7 +17,11 @@ import {
 } from "@/lib/api";
 import { detectLocale, t, type Locale } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
-import { IconAdmin } from "@/components/icons";
+import {
+  CONNECTOR_LABELS,
+  ConnectorMark,
+  IconAdmin,
+} from "@/components/icons";
 
 const KINDS = ["confluence", "bitbucket", "github", "gitlab", "git", "jira"];
 
@@ -400,8 +404,41 @@ export default function AdminPage() {
                       gap: 8,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>
-                      {connection.name}
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 9,
+                        minWidth: 0,
+                      }}
+                    >
+                      <ConnectorMark kind={connection.kind} />
+                      <span style={{ minWidth: 0 }}>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 14,
+                            fontWeight: 500,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {connection.name}
+                        </span>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 11.5,
+                            color: "var(--mut)",
+                          }}
+                        >
+                          {CONNECTOR_LABELS[connection.kind] ?? connection.kind}
+                          {connection.sync_cadence_minutes
+                            ? ` · ${connection.sync_cadence_minutes} ${t(locale, "minShort")}`
+                            : ""}
+                        </span>
+                      </span>
                     </span>
                     {failed ? (
                       <StatusChip status="crit">
@@ -428,7 +465,6 @@ export default function AdminPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <Chip>{connection.kind}</Chip>
                     {connection.secret_env && !connection.secret_present && (
                       <StatusChip status="crit">
                         {t(locale, "secretMissing")}

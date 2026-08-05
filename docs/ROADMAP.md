@@ -538,12 +538,14 @@ picked up — the design HTML is the source of truth (docs/design/README.md).
 
 ---
 
-## S13 — LLM-led reasoning, calibrated numbers · `Status: 🟡 In progress` ([ADR-0009](adr/0009-llm-led-reasoning-calibrated-numbers.md))
+## S13 — LLM-led reasoning, calibrated numbers · `Status: 🟢 Done (S13-7 deferred)` ([ADR-0009](adr/0009-llm-led-reasoning-calibrated-numbers.md))
 
 The architecture decision this sprint implements is recorded in ADR-0009: grow the LLM
 enormously in scope/impact **reasoning**, keep the **number** anchored on the ledger's
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
+S13-1 through S13-6 shipped (see CHANGELOG); only the flag-gated discovery leg below
+remains, behind its own trigger conditions.
 
 - [ ] **S13-7 Atlassian MCP discovery leg (deferred, flag-gated).** Teamwork Graph MCP
   may *discover* candidate page IDs / issue keys — refs only, never text — feeding the
