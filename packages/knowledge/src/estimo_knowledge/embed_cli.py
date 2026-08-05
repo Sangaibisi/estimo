@@ -19,16 +19,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import os
 import sys
 from typing import Any
 
-from pydantic import SecretStr
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from estimo_gateway import GatewayClient, GatewaySettings
+from estimo_gateway import GatewayClient, deployment_gateway_config
 from estimo_knowledge.embedding import DEFAULT_BATCH_SIZE, embed_pending
 
 
@@ -49,55 +47,15 @@ def _bind_tenant(session: Any, tenant: str) -> None:
     event.listen(session.sync_session, "after_begin", _apply)
 
 
-async def _gateway_config(engine: Any) -> Any:
-    """The gateway this deployment actually uses: the panel override first.
-
-    The environment is only the bootstrap default (ADR-0008), and on a panel-managed
-    deployment it is usually empty — so reading `GatewaySettings()` alone made the CLI
-    report "gateway is not configured" about a deployment whose Admin screen showed a
-    working one. The row is plain JSON in a global table; the seal is unwrapped with
-    the same helper the API uses.
-    """
-    from sqlalchemy import text as _text
-
-    from estimo_core.secrets import SealedSecretError, unseal
-    from estimo_gateway import GatewayConfig
-
-    stored: dict[str, Any] = {}
-    try:
-        async with engine.connect() as connection:
-            row = await connection.execute(
-                _text("SELECT value FROM runtime_settings WHERE key = 'gateway'")
-            )
-            found = row.first()
-            stored = dict(found[0]) if found else {}
-    except Exception:  # noqa: BLE001 - an old schema simply has no override
-        stored = {}
-
-    env: Any = None
-    with contextlib.suppress(Exception):
-        env = GatewaySettings()
-
-    base_url = stored.get("base_url") or (str(env.base_url) if env else None)
-    api_key: Any = env.api_key if env else None
-    if stored.get("api_key"):
-        try:
-            api_key = SecretStr(unseal(stored["api_key"]))
-        except SealedSecretError:
-            pass
-    if not base_url or api_key is None or not api_key.get_secret_value():
-        return None
-    profiles = stored.get("profiles") or (env.profiles if env else {})
-    return GatewayConfig(base_url=base_url, api_key=api_key, profiles=profiles)
-
-
 async def _run(batch_size: int, limit: int | None, refresh: bool, tenant: str | None) -> int:
     database_url = os.environ.get("ESTIMO_DATABASE_URL")
     if not database_url:
         print("error: ESTIMO_DATABASE_URL is not set", file=sys.stderr)
         return 2
     engine = create_async_engine(database_url)
-    config = await _gateway_config(engine)
+    # Panel override first, env as bootstrap (ADR-0008) — the shared helper carries
+    # the API's exact per-field merge, including timeouts and cleared-profile rows.
+    config = await deployment_gateway_config(engine)
     if config is None:
         print(
             "error: no model gateway is configured — set it in Admin -> Model gateway "

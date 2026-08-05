@@ -538,18 +538,13 @@ picked up — the design HTML is the source of truth (docs/design/README.md).
 
 ---
 
-## S13 — LLM-led reasoning, calibrated numbers · `Status: 🔴 Not started` ([ADR-0009](adr/0009-llm-led-reasoning-calibrated-numbers.md))
+## S13 — LLM-led reasoning, calibrated numbers · `Status: 🟡 In progress` ([ADR-0009](adr/0009-llm-led-reasoning-calibrated-numbers.md))
 
 The architecture decision this sprint implements is recorded in ADR-0009: grow the LLM
 enormously in scope/impact **reasoning**, keep the **number** anchored on the ledger's
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-1 remainder (small):** the CLIs other than `estimo-embed` still read
-  `ESTIMO_GATEWAY__*` only, so on a panel-configured deployment `estimo-boe` and the
-  pipeline CLI report "gateway is not configured" about a deployment whose Admin screen
-  shows a working one. `estimo-embed` reads the panel override; the others need the
-  same treatment (or a shared helper in `packages/gateway`).
 - [ ] **S13-2 Persist per-repo CodeGraphs + agentic impact worker (large).** Sync
   builds a CodeGraph per repo and discards it after wiki generation; persist it (or
   rebuild from the kept clones at ESTIMO_REPOS_DIR) and replace the 14-entry synonym

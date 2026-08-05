@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from estimo_estimate.boe_render import render_boe_docx
 from estimo_estimate.critic import review_boe
 from estimo_estimate.estimator import estimate_state
-from estimo_gateway import GatewayClient, GatewaySettings
+from estimo_gateway import deployment_gateway_client
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -29,10 +29,10 @@ async def _run(args: argparse.Namespace) -> int:
     if args.repo is not None:
         graph = CodeGraph.build(args.repo, repo=args.repo.name)
 
-    client = (
-        GatewayClient(GatewaySettings()) if os.environ.get("ESTIMO_GATEWAY__BASE_URL") else None
-    )
     engine = create_async_engine(database_url)
+    # Panel override first, env as bootstrap (ADR-0008): on a panel-configured
+    # deployment this CLI must reach the same model the Admin screen shows.
+    client = await deployment_gateway_client(engine)
     try:
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:

@@ -5,6 +5,7 @@ description = "The ONLY Estimo module that talks to the LLM endpoint (OpenAI-com
 requires-python = ">=3.13"
 license = "Apache-2.0"
 dependencies = [
+    "estimo-core",
     "openai>=2.52,<3",
     "httpx>=0.28,<0.29",
     "pydantic>=2.13.4,<3",

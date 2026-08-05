@@ -10,6 +10,10 @@ dependencies = [
     "estimo-gateway",
     "langgraph>=1.2,<2",
     "pydantic>=2.13.4,<3",
+    # The CLI reads the panel-saved gateway override (ADR-0008) when
+    # ESTIMO_DATABASE_URL is present; same pins as estimo-knowledge.
+    "sqlalchemy[asyncio]>=2.0.51,<2.1",
+    "asyncpg>=0.31,<0.32",
 ]
 
 [project.scripts]

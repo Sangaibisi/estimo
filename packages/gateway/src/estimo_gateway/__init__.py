@@ -16,6 +16,12 @@ from estimo_gateway.client import (
     UnknownStageError,
 )
 from estimo_gateway.config import GatewayConfig, GatewaySettings
+from estimo_gateway.runtime import (
+    deployment_gateway_client,
+    deployment_gateway_config,
+    merge_gateway,
+    stored_gateway_override,
+)
 
 __all__ = [
     "CompletionResult",
@@ -28,4 +34,8 @@ __all__ = [
     "GatewaySettings",
     "GatewayStatusError",
     "UnknownStageError",
+    "deployment_gateway_client",
+    "deployment_gateway_config",
+    "merge_gateway",
+    "stored_gateway_override",
 ]

@@ -14,17 +14,30 @@ import os
 import sys
 from pathlib import Path
 
-from estimo_gateway import GatewayClient, GatewaySettings
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from estimo_gateway import GatewayClient, deployment_gateway_client
 from estimo_pipeline.graph import resume_with_answers, run_brd
 from estimo_pipeline.state import PipelineState
 
 
-def _client_from_env() -> GatewayClient | None:
-    """Use the configured gateway when present; the offline deterministic floor
-    otherwise. This makes the LLM blend live in the shipped entry point."""
-    if not os.environ.get("ESTIMO_GATEWAY__BASE_URL"):
-        return None
-    return GatewayClient(GatewaySettings())
+async def _resolve_client() -> GatewayClient | None:
+    """The deployment's gateway: panel override first, env as bootstrap (ADR-0008).
+
+    On a panel-configured deployment `ESTIMO_GATEWAY__*` is usually empty, so an
+    env-only read reported "no gateway" about a deployment whose Admin screen showed
+    a working one. `ESTIMO_DATABASE_URL` is optional here on purpose — a laptop run
+    against a bare .docx has no database, and None is the documented deterministic
+    floor, not an error.
+    """
+    engine = None
+    if os.environ.get("ESTIMO_DATABASE_URL"):
+        engine = create_async_engine(os.environ["ESTIMO_DATABASE_URL"])
+    try:
+        return await deployment_gateway_client(engine)
+    finally:
+        if engine is not None:
+            await engine.dispose()
 
 
 def _print_summary(state: PipelineState) -> None:
@@ -37,7 +50,7 @@ def _print_summary(state: PipelineState) -> None:
 
 
 async def _run(args: argparse.Namespace) -> int:
-    client = _client_from_env()
+    client = await _resolve_client()
     try:
         state = await run_brd(args.path, client=client)
     finally:
@@ -53,7 +66,7 @@ async def _resume(args: argparse.Namespace) -> int:
     answers: dict[str, str] = {}
     if args.answers is not None:
         answers = json.loads(args.answers.read_text(encoding="utf-8"))
-    client = _client_from_env()
+    client = await _resolve_client()
     try:
         state = await resume_with_answers(state, answers, client=client)
     finally:

@@ -9,6 +9,20 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-1 (remainder) — every CLI now resolves the gateway the way the deployment does.**
+  `estimo-embed` had grown a private copy of the panel-override read that silently
+  diverged from the API's merge on three counts: it dropped panel-tuned timeouts and
+  retries, resurrected deliberately-cleared profile rows (`or` where the API uses
+  `.get` with a default), and swallowed an unsealable key without a log line. The
+  merge now lives once, in `estimo_gateway.runtime` (`merge_gateway`,
+  `deployment_gateway_config`, `deployment_gateway_client`); the API re-exports it,
+  and `estimo-embed`, `estimo-boe` and `estimo-pipeline` all consult the panel
+  override before falling back to `ESTIMO_GATEWAY__*` — so a panel-configured
+  deployment's CLIs stop reporting "gateway is not configured" about a deployment
+  whose Admin screen shows a working one. `estimo-pipeline` treats a missing
+  `ESTIMO_DATABASE_URL` as the laptop case and stays env-only; the DB read is
+  duck-typed over whatever engine the caller has, so the gateway package still has
+  no database dependency.
 - **S13-1 — the model gateway is panel-managed, and the estimate path finally uses it.**
   Two facts landed together. First, `Settings.gateway` became optional: the API boots
   with nothing in `.env`, and the endpoint, key, stage→model profiles and timeouts are
