@@ -10,12 +10,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type CanonicalEntry } from "@/lib/api";
-import { detectLocale, t, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
 import { IconKnowledge } from "@/components/icons";
 
 export default function KnowledgePage() {
-  const [locale, setLocale] = useState<Locale>("en");
   const [pages, setPages] = useState<CanonicalEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [topic, setTopic] = useState("");
@@ -34,7 +33,6 @@ export default function KnowledgePage() {
   }, []);
 
   useEffect(() => {
-    setLocale(detectLocale());
     refresh();
   }, [refresh]);
 
@@ -60,21 +58,21 @@ export default function KnowledgePage() {
     <section className="scr">
       <div className="page-h">
         <IconKnowledge size={18} />
-        <h2>{t(locale, "knowledge")}</h2>
-        <span className="sub">{t(locale, "knowledgeSubtitle")}</span>
+        <h2>{t("knowledge")}</h2>
+        <span className="sub">{t("knowledgeSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
         <BandHeader
-          title={t(locale, "canonicalTitle")}
+          title={t("canonicalTitle")}
           right={
             <>
               <Chip>
-                {t(locale, "queueWord")} {drafts}
+                {t("queueWord")} {drafts}
               </Chip>
-              {drifted > 0 && <StatusChip status="warn">{t(locale, "driftedWord")} {drifted}</StatusChip>}
+              {drifted > 0 && <StatusChip status="warn">{t("driftedWord")} {drifted}</StatusChip>}
               <Chip>
-                {t(locale, "publishedWord")} {published}
+                {t("publishedWord")} {published}
               </Chip>
             </>
           }
@@ -108,12 +106,12 @@ export default function KnowledgePage() {
             }}
           >
             <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
-              <Lbl>{t(locale, "candidateQueue")}</Lbl>
+              <Lbl>{t("candidateQueue")}</Lbl>
             </div>
             <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
               {pages.length === 0 && (
                 <p style={{ fontSize: 12.5, color: "var(--ink2)", margin: 0 }}>
-                  {t(locale, "noCandidates")}
+                  {t("noCandidates")}
                 </p>
               )}
               {pages.map((page) => (
@@ -141,7 +139,7 @@ export default function KnowledgePage() {
                   </div>
                   {page.stale && (
                     <div style={{ marginTop: 6 }}>
-                      <StatusChip status="crit">{t(locale, "staleSource")}</StatusChip>
+                      <StatusChip status="crit">{t("staleSource")}</StatusChip>
                     </div>
                   )}
                 </button>
@@ -154,10 +152,10 @@ export default function KnowledgePage() {
                 padding: "12px 14px",
               }}
             >
-              <Lbl>{t(locale, "newCandidate")}</Lbl>
+              <Lbl>{t("newCandidate")}</Lbl>
               <input
                 style={{ width: "100%", marginTop: 7 }}
-                placeholder={t(locale, "canonicalTopic")}
+                placeholder={t("canonicalTopic")}
                 value={topic}
                 onChange={(event) => setTopic(event.target.value)}
               />
@@ -173,7 +171,7 @@ export default function KnowledgePage() {
                   })
                 }
               >
-                {t(locale, "generateCandidate")}
+                {t("generateCandidate")}
               </button>
             </div>
           </div>
@@ -193,8 +191,8 @@ export default function KnowledgePage() {
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
                   <Lbl>
-                    {t(locale, "sourceWord")} ·{" "}
-                    {selected.source_refs?.length ?? 0} {t(locale, "pagesMerged")}
+                    {t("sourceWord")} ·{" "}
+                    {selected.source_refs?.length ?? 0} {t("pagesMerged")}
                   </Lbl>
                 </div>
                 <div
@@ -207,7 +205,7 @@ export default function KnowledgePage() {
                   }}
                 >
                   {(selected.source_refs ?? []).length === 0 ? (
-                    <p style={{ margin: 0 }}>{t(locale, "noSources")}</p>
+                    <p style={{ margin: 0 }}>{t("noSources")}</p>
                   ) : (
                     (selected.source_refs ?? []).map((ref) => (
                       <p key={ref} style={{ margin: "0 0 10px" }}>
@@ -229,7 +227,7 @@ export default function KnowledgePage() {
                 <div
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
-                  <Lbl style={{ color: "var(--acc)" }}>{t(locale, "candidateDistilled")}</Lbl>
+                  <Lbl style={{ color: "var(--acc)" }}>{t("candidateDistilled")}</Lbl>
                   <Chip>
                     v{selected.version} {selected.status}
                   </Chip>
@@ -249,7 +247,7 @@ export default function KnowledgePage() {
                 {selected.status !== "approved" && (
                   <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
                     <input
-                      placeholder={t(locale, "estimatorName")}
+                      placeholder={t("estimatorName")}
                       value={approver}
                       onChange={(event) => setApprover(event.target.value)}
                       style={{ width: 140 }}
@@ -262,7 +260,7 @@ export default function KnowledgePage() {
                         run(() => api.approveCanonical(selected.id, approver.trim()))
                       }
                     >
-                      {t(locale, "approvePublish")} v{selected.version + 1}
+                      {t("approvePublish")} v{selected.version + 1}
                     </button>
                   </div>
                 )}
@@ -274,13 +272,13 @@ export default function KnowledgePage() {
                     textWrap: "pretty",
                   }}
                 >
-                  {t(locale, "versionFootnote")}
+                  {t("versionFootnote")}
                 </div>
               </div>
             </div>
           ) : (
             <div style={{ flex: 1, padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
-              {t(locale, "selectCandidate")}
+              {t("selectCandidate")}
             </div>
           )}
         </div>

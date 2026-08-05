@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: oklch(0.155 0.012 295); }
+  * { box-sizing: border-box; }
+  a { color: oklch(0.74 0.15 300); text-decoration: none; }
+  a:hover { color: oklch(0.84 0.13 300); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: oklch(0.30 0.02 295); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.40 0.05 300); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes om-pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+</style>
+</helmet>
+<div style="display:flex;height:100vh;width:100%;background:oklch(0.155 0.012 295);color:oklch(0.93 0.01 295);font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;overflow:hidden">
+
+  <div style="flex:0 0 250px;display:flex;flex-direction:column;border-right:1px solid oklch(0.26 0.02 295);background:linear-gradient(180deg, oklch(0.185 0.016 295), oklch(0.165 0.012 295));overflow:auto">
+    <div style="display:flex;align-items:center;gap:11px;padding:16px 18px;border-bottom:1px solid oklch(0.24 0.02 295)">
+      <div style="width:9px;height:9px;border-radius:50%;background:oklch(0.72 0.16 300);box-shadow:0 0 12px oklch(0.72 0.16 300);flex:0 0 9px"></div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="font-size:13px;font-weight:700;letter-spacing:-0.01em">Integration Map</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:oklch(0.56 0.03 295);letter-spacing:0.16em">MULTI-TENANT</div>
+      </div>
+    </div>
+
+    <div style="padding:16px 14px 8px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.18em;color:oklch(0.54 0.03 295)">TENANTS</div>
+    <div style="display:flex;flex-direction:column;gap:4px;padding:0 10px 8px">
+      <sc-for list="{{ tenants }}" as="t" hint-placeholder-count="2">
+        <div onClick="{{ t.onClick }}" style="{{ t.style }}">
+          <div style="{{ t.avatar }}">{{ t.short }}</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+            <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:oklch(0.54 0.02 295)">{{ t.meta }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="height:1px;background:oklch(0.24 0.02 295);margin:6px 14px 0"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 14px 8px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.18em;color:oklch(0.54 0.03 295)">PROJECTS</span>
+      <button onClick="{{ toggleAddProject }}" style="border:1px solid oklch(0.30 0.02 295);background:oklch(0.21 0.015 295);color:oklch(0.70 0.02 295);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1;padding:4px 7px;cursor:pointer" style-hover="border-color:oklch(0.60 0.14 300);color:oklch(0.95 0.01 295)">+</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;padding:0 10px 14px">
+      <sc-if value="{{ showAddProject }}">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:11px;border:1px solid oklch(0.32 0.04 300);border-radius:10px;background:oklch(0.20 0.02 300);margin-bottom:4px">
+          <input value="{{ projectDraft }}" onChange="{{ onProjectDraft }}" placeholder="Project name" style="padding:8px 10px;border:1px solid oklch(0.30 0.02 295);border-radius:7px;background:oklch(0.15 0.012 295);color:oklch(0.95 0.008 295);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none" style-focus="border-color:oklch(0.60 0.14 300)" />
+          <div style="display:flex;gap:6px">
+            <button onClick="{{ addProject }}" style="flex:1;padding:7px;border:0;border-radius:7px;background:oklch(0.70 0.16 300);color:oklch(0.18 0.04 300);font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;cursor:pointer">Create</button>
+            <button onClick="{{ toggleAddProject }}" style="padding:7px 10px;border:1px solid oklch(0.30 0.02 295);border-radius:7px;background:transparent;color:oklch(0.64 0.02 295);font-family:'JetBrains Mono',monospace;font-size:10.5px;cursor:pointer">Cancel</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-for list="{{ projects }}" as="p" hint-placeholder-count="2">
+        <div onClick="{{ p.onClick }}" style="{{ p.style }}">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span style="{{ p.marker }}"></span>
+            <span style="flex:1;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding-left:16px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.08em;color:oklch(0.52 0.02 295)">{{ p.key }}</span>
+            <span style="flex:1"></span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:oklch(0.52 0.02 295)">{{ p.meta }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+    <div style="display:flex;align-items:center;gap:14px;min-height:62px;flex:0 0 auto;flex-wrap:wrap;padding:9px 20px;border-bottom:1px solid oklch(0.26 0.02 295);background:linear-gradient(180deg, oklch(0.20 0.018 295), oklch(0.175 0.014 295))">
+      <div style="display:flex;align-items:center;gap:9px;flex:0 0 auto;white-space:nowrap">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.56 0.02 295)">{{ crumbTenant }}</span>
+        <span style="color:oklch(0.42 0.03 300);font-size:12px">/</span>
+        <span style="font-size:13.5px;font-weight:700;letter-spacing:-0.01em">{{ crumbProject }}</span>
+      </div>
+
+      <div style="display:flex;gap:9px;align-items:center;flex:0 0 auto;flex-wrap:wrap">
+        <sc-if value="{{ apiModeOff }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ startApiLink }}" style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.21 0.015 295);color:oklch(0.74 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;transition:all .15s" style-hover="border-color:oklch(0.60 0.14 300);color:oklch(0.95 0.01 295);box-shadow:0 0 18px -6px oklch(0.62 0.16 300)">
+            <span style="width:15px;height:2px;border-radius:2px;background:oklch(0.72 0.16 300);display:block"></span>Link API call
+          </button>
+        </sc-if>
+        <sc-if value="{{ apiModeOn }}">
+          <button onClick="{{ cancelLink }}" style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid oklch(0.66 0.16 300);border-radius:8px;background:oklch(0.30 0.08 300);color:oklch(0.94 0.04 300);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;box-shadow:0 0 22px -6px oklch(0.66 0.18 300)">
+            <span style="width:15px;height:2px;border-radius:2px;background:oklch(0.85 0.14 300);display:block;animation:om-pulse 1.2s ease-in-out infinite"></span>Linking… cancel
+          </button>
+        </sc-if>
+        <sc-if value="{{ dataModeOff }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ startDataLink }}" style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.21 0.015 295);color:oklch(0.74 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;transition:all .15s" style-hover="border-color:oklch(0.62 0.13 200);color:oklch(0.95 0.01 295);box-shadow:0 0 18px -6px oklch(0.66 0.13 200)">
+            <span style="width:15px;height:0;border-top:2px dashed oklch(0.74 0.13 200);display:block"></span>Link data flow
+          </button>
+        </sc-if>
+        <sc-if value="{{ dataModeOn }}">
+          <button onClick="{{ cancelLink }}" style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid oklch(0.66 0.13 200);border-radius:8px;background:oklch(0.30 0.06 200);color:oklch(0.94 0.04 200);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;box-shadow:0 0 22px -6px oklch(0.66 0.14 200)">
+            <span style="width:15px;height:0;border-top:2px dashed oklch(0.86 0.12 200);display:block;animation:om-pulse 1.2s ease-in-out infinite"></span>Linking… cancel
+          </button>
+        </sc-if>
+        <button onClick="{{ toggleAdd }}" style="padding:7px 13px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.21 0.015 295);color:oklch(0.74 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;transition:all .15s" style-hover="border-color:oklch(0.46 0.03 295);color:oklch(0.95 0.01 295)">+ Repository</button>
+        <button onClick="{{ autoLayout }}" style="padding:7px 13px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.21 0.015 295);color:oklch(0.74 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;flex:0 0 auto;cursor:pointer;transition:all .15s" style-hover="border-color:oklch(0.46 0.03 295);color:oklch(0.95 0.01 295)">Auto layout</button>
+      </div>
+
+      <div style="flex:1 0 0"></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.55 0.02 295);white-space:nowrap;flex:0 0 auto">{{ counts }}</div>
+    </div>
+
+    <sc-if value="{{ hintOn }}">
+      <div style="flex:0 0 34px;display:flex;align-items:center;padding:0 20px;background:oklch(0.23 0.04 300);border-bottom:1px solid oklch(0.32 0.05 300);font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.84 0.05 300)">{{ hintText }}</div>
+    </sc-if>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <div style="flex:1;overflow:auto;position:relative;background:radial-gradient(120% 90% at 30% 0%, oklch(0.22 0.035 300) 0%, oklch(0.155 0.012 295) 62%)">
+        <div style="{{ canvasStyle }}">
+          <div style="position:absolute;inset:0;background-image:linear-gradient(oklch(0.24 0.02 295) 1px, transparent 1px),linear-gradient(90deg, oklch(0.24 0.02 295) 1px, transparent 1px);background-size:64px 64px;opacity:0.5;pointer-events:none"></div>
+
+          <sc-for list="{{ columns }}" as="col" hint-placeholder-count="5">
+            <div style="{{ col.style }}">
+              <span style="display:block;width:22px;height:1px;background:oklch(0.42 0.06 300);margin-bottom:9px"></span>{{ col.label }}
+            </div>
+          </sc-for>
+
+          <svg width="{{ canvasW }}" height="{{ canvasH }}" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none">
+            <defs>
+              <marker id="arrowApi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="oklch(0.74 0.16 300)"></path>
+              </marker>
+              <marker id="arrowData" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="oklch(0.76 0.13 200)"></path>
+              </marker>
+              <filter id="edgeGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="3.2" result="b"></feGaussianBlur>
+                <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+              </filter>
+            </defs>
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="0">
+              <path d="{{ e.d }}" fill="none" stroke="{{ e.stroke }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" opacity="{{ e.op }}" marker-end="{{ e.marker }}" filter="{{ e.filter }}" onClick="{{ e.onClick }}" style="pointer-events:stroke;cursor:pointer"></path>
+            </sc-for>
+          </svg>
+
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="16">
+            <div style="{{ n.pos }}" onMouseDown="{{ n.onMouseDown }}">
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:8px;height:100%;padding:12px 14px;border-radius:11px;background:linear-gradient(180deg, oklch(0.245 0.018 295), oklch(0.205 0.014 295));border:1px solid oklch(0.31 0.02 295);box-shadow:0 10px 26px -12px rgba(0,0,0,0.85), inset 0 1px 0 oklch(0.34 0.02 295);transition:border-color .18s" style-hover="border-color:oklch(0.56 0.12 300)">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <div style="{{ n.badge }}">{{ n.short }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;color:oklch(0.95 0.008 295);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.name }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="{{ n.dot }}"></span>
+                  <span style="font-size:10px;letter-spacing:0.07em;color:oklch(0.60 0.02 295);text-transform:uppercase">{{ n.typeLabel }}</span>
+                  <span style="flex:1"></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:oklch(0.48 0.02 295)">{{ n.degree }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ emptyProject }}">
+            <div style="position:absolute;left:60px;top:120px;max-width:420px;padding:20px;border:1px dashed oklch(0.32 0.03 300);border-radius:12px;background:oklch(0.19 0.02 300);font-size:12.5px;line-height:1.65;color:oklch(0.64 0.02 295)">This project has no repositories yet. Use <span style="color:oklch(0.82 0.13 300)">+ Repository</span> to add the first one, then link it to the middleware layer.</div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="flex:0 0 336px;border-left:1px solid oklch(0.26 0.02 295);background:linear-gradient(180deg, oklch(0.195 0.016 295), oklch(0.175 0.012 295));overflow:auto;display:flex;flex-direction:column">
+
+        <sc-if value="{{ showAdd }}">
+          <div style="padding:18px 20px 20px;border-bottom:1px solid oklch(0.26 0.02 295);display:flex;flex-direction:column;gap:12px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">{{ addTitle }}</div>
+            <input value="{{ draftName }}" onChange="{{ onDraftName }}" placeholder="repository-name" style="padding:10px 12px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.15 0.012 295);color:oklch(0.95 0.008 295);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none" style-focus="border-color:oklch(0.60 0.14 300)" />
+            <select value="{{ draftProvider }}" onChange="{{ onDraftProvider }}" style="padding:10px 12px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.15 0.012 295);color:oklch(0.90 0.008 295);font-family:'JetBrains Mono',monospace;font-size:12px">
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+              <option value="bitbucket">Bitbucket</option>
+            </select>
+            <select value="{{ draftType }}" onChange="{{ onDraftType }}" style="padding:10px 12px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.15 0.012 295);color:oklch(0.90 0.008 295);font-family:'JetBrains Mono',monospace;font-size:12px">
+              <option value="fe">Frontend</option>
+              <option value="mobile">Mobile</option>
+              <option value="middleware">Middleware / WSO2</option>
+              <option value="be">Backend</option>
+              <option value="db">Database schema</option>
+              <option value="lib">Shared library</option>
+              <option value="infra">Infra / IaC</option>
+            </select>
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ addRepo }}" style="flex:1;padding:10px;border:0;border-radius:8px;background:oklch(0.70 0.16 300);color:oklch(0.18 0.04 300);font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:700;cursor:pointer;box-shadow:0 0 24px -8px oklch(0.70 0.18 300)">Add</button>
+              <button onClick="{{ toggleAdd }}" style="padding:10px 14px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:transparent;color:oklch(0.66 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer">Cancel</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasEdgeSel }}">
+          <div style="padding:22px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">RELATION</div>
+            <div style="display:flex;flex-direction:column;gap:10px;padding:15px;border:1px solid oklch(0.29 0.02 295);border-radius:11px;background:oklch(0.225 0.018 295)">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px">{{ edgeFrom }}</div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ edgeSwatch }}"></span>
+                <span style="font-size:11px;color:oklch(0.68 0.02 295);letter-spacing:0.03em">{{ edgeKindLabel }}</span>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px">{{ edgeTo }}</div>
+            </div>
+            <button onClick="{{ deleteSelectedEdge }}" style="padding:10px;border:1px solid oklch(0.38 0.09 20);border-radius:8px;background:transparent;color:oklch(0.72 0.12 20);font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer" style-hover="background:oklch(0.26 0.07 20)">Delete relation</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasNodeSel }}">
+          <div style="padding:22px 20px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:center;gap:11px">
+                <div style="{{ selBadge }}">{{ selShort }}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;word-break:break-all">{{ selName }}</div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <span style="padding:4px 10px;border:1px solid oklch(0.30 0.02 295);border-radius:20px;font-size:10.5px;color:oklch(0.66 0.02 295);letter-spacing:0.04em">{{ selProvider }}</span>
+                <span style="{{ selChip }}">{{ selType }}</span>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.52 0.02 295);word-break:break-all">{{ selPath }}</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.14em;color:oklch(0.56 0.03 295)">CONSUMES →</div>
+              <sc-for list="{{ outgoing }}" as="r" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid oklch(0.28 0.02 295);border-radius:9px;background:oklch(0.22 0.016 295)" style-hover="border-color:oklch(0.42 0.06 300)">
+                  <span style="{{ r.swatch }}"></span>
+                  <span onClick="{{ r.onClick }}" style="flex:1;font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="color:oklch(0.82 0.13 300)">{{ r.name }}</span>
+                  <button onClick="{{ r.onDelete }}" style="border:0;background:transparent;color:oklch(0.52 0.02 295);font-size:14px;line-height:1;cursor:pointer;padding:2px 4px" style-hover="color:oklch(0.75 0.13 20)">×</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noOutgoing }}">
+                <div style="font-size:11.5px;color:oklch(0.46 0.02 295);padding:2px 0">No outgoing relations.</div>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.14em;color:oklch(0.56 0.03 295)">← CONSUMED BY</div>
+              <sc-for list="{{ incoming }}" as="r" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid oklch(0.28 0.02 295);border-radius:9px;background:oklch(0.22 0.016 295)" style-hover="border-color:oklch(0.42 0.06 300)">
+                  <span style="{{ r.swatch }}"></span>
+                  <span onClick="{{ r.onClick }}" style="flex:1;font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="color:oklch(0.82 0.13 300)">{{ r.name }}</span>
+                  <button onClick="{{ r.onDelete }}" style="border:0;background:transparent;color:oklch(0.52 0.02 295);font-size:14px;line-height:1;cursor:pointer;padding:2px 4px" style-hover="color:oklch(0.75 0.13 20)">×</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noIncoming }}">
+                <div style="font-size:11.5px;color:oklch(0.46 0.02 295);padding:2px 0">No incoming relations.</div>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ startApiFromSel }}" style="flex:1;padding:10px;border:1px solid oklch(0.30 0.02 295);border-radius:8px;background:oklch(0.21 0.015 295);color:oklch(0.74 0.02 295);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer" style-hover="border-color:oklch(0.60 0.14 300);box-shadow:0 0 18px -6px oklch(0.62 0.16 300)">+ Relation</button>
+              <button onClick="{{ deleteSelectedNode }}" style="padding:10px 12px;border:1px solid oklch(0.34 0.06 20);border-radius:8px;background:transparent;color:oklch(0.68 0.10 20);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer" style-hover="background:oklch(0.26 0.07 20)">Remove</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:22px 20px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">PROJECT</div>
+              <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em">{{ crumbProject }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <span style="padding:4px 10px;border:1px solid oklch(0.30 0.02 295);border-radius:20px;font-family:'JetBrains Mono',monospace;font-size:10px;color:oklch(0.68 0.02 295);letter-spacing:0.08em">{{ projectKey }}</span>
+                <span style="padding:4px 10px;border:1px solid oklch(0.30 0.02 295);border-radius:20px;font-size:10.5px;color:oklch(0.66 0.02 295)">{{ crumbTenant }}</span>
+              </div>
+            </div>
+            <div style="height:1px;background:oklch(0.26 0.02 295)"></div>
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">LEGEND</div>
+              <div style="display:flex;align-items:center;gap:11px"><span style="width:22px;height:2px;border-radius:2px;background:oklch(0.72 0.16 300);box-shadow:0 0 10px oklch(0.72 0.16 300);display:block"></span><span style="font-size:11.5px;color:oklch(0.72 0.02 295)">API call / service consumption</span></div>
+              <div style="display:flex;align-items:center;gap:11px"><span style="width:22px;height:0;border-top:2px dashed oklch(0.74 0.13 200);display:block"></span><span style="font-size:11.5px;color:oklch(0.72 0.02 295)">Data flow</span></div>
+            </div>
+            <div style="height:1px;background:oklch(0.26 0.02 295)"></div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">PROVIDERS</div>
+              <sc-for list="{{ providerStats }}" as="p" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <div style="{{ p.badge }}">{{ p.short }}</div>
+                  <span style="flex:1;font-size:12px;color:oklch(0.80 0.01 295)">{{ p.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.52 0.02 295)">{{ p.count }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="height:1px;background:oklch(0.26 0.02 295)"></div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.14em;color:oklch(0.58 0.03 295)">LAYERS</div>
+              <sc-for list="{{ typeStats }}" as="t" hint-placeholder-count="7">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="{{ t.dot }}"></span>
+                  <span style="flex:1;font-size:11.5px;color:oklch(0.74 0.01 295)">{{ t.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:oklch(0.52 0.02 295)">{{ t.count }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:14px;border:1px solid oklch(0.26 0.02 295);border-radius:11px;background:oklch(0.20 0.02 300);font-size:11.5px;line-height:1.6;color:oklch(0.62 0.02 295)">Drag any card to reposition it, click to inspect, or use <span style="color:oklch(0.80 0.13 300)">Link</span> to draw a relation.</div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560,&quot;height&quot;:900}}">
+const PROVIDERS = {
+  github: { label: 'GitHub', short: 'GH', color: 'oklch(0.82 0.02 295)', host: 'github.com' },
+  gitlab: { label: 'GitLab', short: 'GL', color: 'oklch(0.78 0.13 60)', host: 'gitlab.acme.io' },
+  bitbucket: { label: 'Bitbucket', short: 'BB', color: 'oklch(0.74 0.13 245)', host: 'bitbucket.acme.io' }
+};
+const TYPES = {
+  fe: { label: 'Frontend', layer: 'client', hue: 300 },
+  mobile: { label: 'Mobile', layer: 'client', hue: 330 },
+  middleware: { label: 'Middleware / WSO2', layer: 'middleware', hue: 270 },
+  be: { label: 'Backend', layer: 'service', hue: 230 },
+  db: { label: 'Database schema', layer: 'data', hue: 200 },
+  lib: { label: 'Shared library', layer: 'platform', hue: 160 },
+  infra: { label: 'Infra / IaC', layer: 'platform', hue: 130 }
+};
+const LAYERS = [['client', 'CLIENTS'], ['middleware', 'MIDDLEWARE'], ['service', 'SERVICES'], ['data', 'DATA']];
+const KIND = {
+  api: { label: 'API call / service consumption', color: 'oklch(0.74 0.16 300)', dash: '0', marker: 'url(#arrowApi)' },
+  data: { label: 'Data flow', color: 'oklch(0.76 0.13 200)', dash: '7 6', marker: 'url(#arrowData)' }
+};
+const W = 214, H = 76;
+
+const TENANTS = [
+  { id: 't1', name: 'Acme Bank', short: 'AB', slug: 'acme' },
+  { id: 't2', name: 'Northwind Retail', short: 'NR', slug: 'northwind' }
+];
+const PROJECTS = [
+  { id: 'p1', tenantId: 't1', name: 'Core Integration Platform', key: 'CIP' },
+  { id: 'p2', tenantId: 't1', name: 'Loyalty Program', key: 'LOY' },
+  { id: 'p3', tenantId: 't2', name: 'E-Commerce Suite', key: 'ECS' }
+];
+const REPOS = [
+  { id: 'r1', p: 'p1', name: 'mobile-customer-app', provider: 'github', type: 'mobile' },
+  { id: 'r2', p: 'p1', name: 'web-portal-ui', provider: 'github', type: 'fe' },
+  { id: 'r3', p: 'p1', name: 'admin-console-ui', provider: 'gitlab', type: 'fe' },
+  { id: 'r4', p: 'p1', name: 'integration-gateway', provider: 'bitbucket', type: 'middleware' },
+  { id: 'r5', p: 'p1', name: 'wso2-apim-artifacts', provider: 'gitlab', type: 'middleware' },
+  { id: 'r6', p: 'p1', name: 'wso2-esb-config', provider: 'gitlab', type: 'middleware' },
+  { id: 'r7', p: 'p1', name: 'payments-service', provider: 'github', type: 'be' },
+  { id: 'r8', p: 'p1', name: 'identity-service', provider: 'github', type: 'be' },
+  { id: 'r9', p: 'p1', name: 'billing-service', provider: 'bitbucket', type: 'be' },
+  { id: 'r10', p: 'p1', name: 'notification-service', provider: 'gitlab', type: 'be' },
+  { id: 'r11', p: 'p1', name: 'core-db-schema', provider: 'bitbucket', type: 'db' },
+  { id: 'r12', p: 'p1', name: 'reporting-db-schema', provider: 'gitlab', type: 'db' },
+  { id: 'r13', p: 'p1', name: 'shared-dto-lib', provider: 'github', type: 'lib' },
+  { id: 'r14', p: 'p1', name: 'ui-kit', provider: 'github', type: 'lib' },
+  { id: 'r15', p: 'p1', name: 'platform-iac', provider: 'gitlab', type: 'infra' },
+  { id: 'r16', p: 'p1', name: 'ci-templates', provider: 'bitbucket', type: 'infra' },
+  { id: 'r20', p: 'p2', name: 'loyalty-web-ui', provider: 'github', type: 'fe' },
+  { id: 'r21', p: 'p2', name: 'loyalty-esb-config', provider: 'gitlab', type: 'middleware' },
+  { id: 'r22', p: 'p2', name: 'loyalty-api', provider: 'bitbucket', type: 'be' },
+  { id: 'r23', p: 'p2', name: 'points-db-schema', provider: 'gitlab', type: 'db' },
+  { id: 'r24', p: 'p2', name: 'loyalty-iac', provider: 'gitlab', type: 'infra' },
+  { id: 'r30', p: 'p3', name: 'storefront-ui', provider: 'gitlab', type: 'fe' },
+  { id: 'r31', p: 'p3', name: 'wso2-apim-retail', provider: 'gitlab', type: 'middleware' },
+  { id: 'r32', p: 'p3', name: 'order-service', provider: 'github', type: 'be' },
+  { id: 'r33', p: 'p3', name: 'inventory-service', provider: 'bitbucket', type: 'be' },
+  { id: 'r34', p: 'p3', name: 'catalog-db-schema', provider: 'bitbucket', type: 'db' },
+  { id: 'r35', p: 'p3', name: 'retail-ci-templates', provider: 'bitbucket', type: 'infra' }
+];
+const EDGES = [
+  ['r1', 'r4', 'api'], ['r2', 'r4', 'api'], ['r3', 'r5', 'api'], ['r4', 'r6', 'api'], ['r5', 'r6', 'api'],
+  ['r6', 'r7', 'api'], ['r6', 'r8', 'api'], ['r6', 'r9', 'api'], ['r6', 'r10', 'api'],
+  ['r7', 'r11', 'data'], ['r8', 'r11', 'data'], ['r9', 'r11', 'data'], ['r10', 'r12', 'data'],
+  ['r13', 'r7', 'api'], ['r14', 'r2', 'api'], ['r15', 'r6', 'data'], ['r16', 'r9', 'data'],
+  ['r20', 'r21', 'api'], ['r21', 'r22', 'api'], ['r22', 'r23', 'data'], ['r24', 'r21', 'data'],
+  ['r30', 'r31', 'api'], ['r31', 'r32', 'api'], ['r31', 'r33', 'api'],
+  ['r32', 'r34', 'data'], ['r33', 'r34', 'data'], ['r35', 'r32', 'data']
+].map((e, i) => ({ id: 'e' + i, from: e[0], to: e[1], kind: e[2] }));
+
+class Component extends DCLogic {
+  state = {
+    tenants: TENANTS, projects: PROJECTS, repos: REPOS, edges: EDGES,
+    tenantId: 't1', projectId: 'p1',
+    custom: {}, dragging: null,
+    selectedId: null, selectedEdgeId: null,
+    linkKind: null, linkFrom: null,
+    showAdd: false, showAddProject: false, projectDraft: '',
+    draft: { name: '', provider: 'github', type: 'be' },
+    seq: 100
+  };
+
+  badge(provider, size) {
+    const p = PROVIDERS[provider], s = size || 24;
+    return {
+      width: s + 'px', height: s + 'px', flex: '0 0 ' + s + 'px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', borderRadius: '7px', border: '1px solid color-mix(in oklab, ' + p.color + ' 55%, transparent)',
+      color: p.color, background: 'color-mix(in oklab, ' + p.color + ' 10%, transparent)',
+      fontFamily: "'JetBrains Mono', monospace", fontSize: (s * 0.42) + 'px', fontWeight: 700
+    };
+  }
+  dot(type) {
+    const c = 'oklch(0.74 0.13 ' + TYPES[type].hue + ')';
+    return { width: '7px', height: '7px', borderRadius: '50%', display: 'block', flex: '0 0 7px', background: c, boxShadow: '0 0 9px ' + c };
+  }
+
+  projectRepos() { return this.state.repos.filter(r => r.p === this.state.projectId); }
+
+  positions() {
+    const repos = this.projectRepos();
+    const pos = {}, columns = [];
+    const colX = { client: 60, middleware: 402, service: 744, data: 1086 };
+    const groups = {};
+    repos.forEach(r => { const l = TYPES[r.type].layer; (groups[l] = groups[l] || []).push(r); });
+    let maxY = 0;
+    LAYERS.forEach(([key, label]) => {
+      const items = groups[key] || [];
+      const step = 108;
+      const startY = Math.max(110, 340 - ((items.length - 1) * step) / 2);
+      items.forEach((r, i) => { pos[r.id] = { x: colX[key], y: startY + i * step }; maxY = Math.max(maxY, startY + i * step); });
+      columns.push({
+        label,
+        style: { position: 'absolute', left: colX[key] + 'px', top: '44px', width: W + 'px', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', letterSpacing: '0.2em', color: 'oklch(0.56 0.05 300)' }
+      });
+    });
+    const plat = groups.platform || [];
+    const platY = maxY + 168;
+    plat.forEach((r, i) => { pos[r.id] = { x: 60 + i * (W + 52), y: platY }; });
+    if (plat.length) columns.push({
+      label: 'PLATFORM',
+      style: { position: 'absolute', left: '60px', top: (platY - 42) + 'px', width: '400px', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', letterSpacing: '0.2em', color: 'oklch(0.56 0.05 300)' }
+    });
+    let w = Math.max(colX.data + W + 70, 60 + plat.length * (W + 52));
+    let h = platY + H + 90;
+    repos.forEach(r => {
+      const c = this.state.custom[r.id];
+      if (c) { pos[r.id] = c; }
+      const p = pos[r.id];
+      if (p) { w = Math.max(w, p.x + W + 70); h = Math.max(h, p.y + H + 70); }
+    });
+    this._pos = pos;
+    return { pos, columns, w, h };
+  }
+
+  pathFor(s, t) {
+    let sx = s.x + W, sy = s.y + H / 2, tx = t.x, ty = t.y + H / 2;
+    if (t.x + W / 2 < s.x + W / 2) { sx = s.x; tx = t.x + W; }
+    const dir = tx >= sx ? 1 : -1;
+    const c = Math.max(56, Math.abs(tx - sx) * 0.45);
+    return 'M' + sx + ',' + sy + ' C' + (sx + c * dir) + ',' + sy + ' ' + (tx - c * dir) + ',' + ty + ' ' + tx + ',' + ty;
+  }
+
+  onNodeDown = (id) => (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    const start = (this._pos && this._pos[id]) || { x: 0, y: 0 };
+    this._drag = { id: id, sx: ev.clientX, sy: ev.clientY, ox: start.x, oy: start.y, moved: 0 };
+    window.addEventListener('mousemove', this.onDragMove);
+    window.addEventListener('mouseup', this.onDragEnd);
+    this.setState({ dragging: id });
+  };
+  onDragMove = (ev) => {
+    const d = this._drag;
+    if (!d) return;
+    const dx = ev.clientX - d.sx, dy = ev.clientY - d.sy;
+    d.moved = Math.max(d.moved, Math.abs(dx) + Math.abs(dy));
+    if (d.moved < 4) return;
+    const np = { x: Math.max(8, d.ox + dx), y: Math.max(8, d.oy + dy) };
+    this.setState(s => {
+      const custom = Object.assign({}, s.custom);
+      custom[d.id] = np;
+      return { custom: custom };
+    });
+  };
+  onDragEnd = () => {
+    const d = this._drag;
+    window.removeEventListener('mousemove', this.onDragMove);
+    window.removeEventListener('mouseup', this.onDragEnd);
+    this._drag = null;
+    this.setState({ dragging: null });
+    if (d && d.moved < 4) this.select(d.id);
+  };
+  componentWillUnmount() {
+    window.removeEventListener('mousemove', this.onDragMove);
+    window.removeEventListener('mouseup', this.onDragEnd);
+  }
+
+  select = (id) => {
+    if (this.state.linkKind) {
+      if (!this.state.linkFrom) { this.setState({ linkFrom: id }); return; }
+      if (this.state.linkFrom === id) { this.setState({ linkFrom: null }); return; }
+      const from = this.state.linkFrom, kind = this.state.linkKind;
+      const exists = this.state.edges.some(e => e.from === from && e.to === id && e.kind === kind);
+      this.setState(s => ({
+        edges: exists ? s.edges : s.edges.concat([{ id: 'e' + s.seq, from: from, to: id, kind: kind }]),
+        seq: s.seq + 1, linkKind: null, linkFrom: null, selectedId: id, selectedEdgeId: null
+      }));
+      return;
+    }
+    this.setState(s => ({ selectedId: s.selectedId === id ? null : id, selectedEdgeId: null }));
+  };
+
+  openProject = (id) => this.setState({ projectId: id, selectedId: null, selectedEdgeId: null, linkKind: null, linkFrom: null, showAdd: false });
+  openTenant = (id) => {
+    const first = this.state.projects.find(p => p.tenantId === id);
+    this.setState({ tenantId: id, projectId: first ? first.id : null, selectedId: null, selectedEdgeId: null, linkKind: null, linkFrom: null, showAdd: false, showAddProject: false });
+  };
+
+  renderVals() {
+    const st = this.state;
+    const { pos, columns, w, h } = this.positions();
+    const repos = this.projectRepos();
+    const ids = {};
+    repos.forEach(r => { ids[r.id] = r; });
+    const projEdges = st.edges.filter(e => ids[e.from] && ids[e.to]);
+    const project = st.projects.find(p => p.id === st.projectId);
+    const tenant = st.tenants.find(t => t.id === st.tenantId);
+    const sel = st.selectedId;
+    const related = new Set();
+    if (sel) {
+      related.add(sel);
+      projEdges.forEach(e => { if (e.from === sel) related.add(e.to); if (e.to === sel) related.add(e.from); });
+    }
+
+    const nodes = repos.map(r => {
+      const p = pos[r.id] || { x: 0, y: 0 };
+      const on = !sel || related.has(r.id);
+      const isSel = r.id === sel, isFrom = r.id === st.linkFrom, isDrag = r.id === st.dragging;
+      const deg = projEdges.filter(e => e.from === r.id || e.to === r.id).length;
+      const ring = isFrom ? 'oklch(0.82 0.16 300)' : isSel ? 'oklch(0.70 0.16 300)' : 'transparent';
+      return {
+        id: r.id, name: r.name, short: PROVIDERS[r.provider].short, typeLabel: TYPES[r.type].label,
+        degree: deg ? '×' + deg : '—', badge: this.badge(r.provider), dot: this.dot(r.type),
+        pos: {
+          position: 'absolute', left: p.x + 'px', top: p.y + 'px', width: W + 'px', height: H + 'px',
+          cursor: isDrag ? 'grabbing' : 'grab', userSelect: 'none',
+          transition: isDrag ? 'none' : 'opacity .2s, box-shadow .2s, left .18s, top .18s',
+          opacity: on ? 1 : 0.22, borderRadius: '12px',
+          outline: '1.5px solid ' + ring, outlineOffset: '3px',
+          boxShadow: isDrag ? '0 22px 44px -14px rgba(0,0,0,0.9), 0 0 44px -8px oklch(0.70 0.18 300)'
+            : (isSel || isFrom ? '0 0 40px -8px oklch(0.70 0.18 300)' : 'none'),
+          zIndex: isDrag ? 5 : isSel ? 3 : 2
+        },
+        onMouseDown: this.onNodeDown(r.id)
+      };
+    });
+
+    const edges = projEdges.filter(e => pos[e.from] && pos[e.to]).map(e => {
+      const k = KIND[e.kind];
+      const hot = sel && (e.from === sel || e.to === sel);
+      const on = !sel || hot;
+      return {
+        id: e.id, d: this.pathFor(pos[e.from], pos[e.to]), stroke: k.color, dash: k.dash, marker: k.marker,
+        w: e.id === st.selectedEdgeId ? 3 : hot ? 2.6 : 1.6,
+        op: on ? (sel ? 1 : 0.62) : 0.07,
+        filter: hot || e.id === st.selectedEdgeId ? 'url(#edgeGlow)' : 'none',
+        onClick: () => this.setState({ selectedEdgeId: e.id, selectedId: null })
+      };
+    });
+
+    const selRepo = sel ? ids[sel] : null;
+    const rel = (e, otherId) => ({
+      name: ids[otherId] ? ids[otherId].name : '',
+      swatch: { width: '11px', height: '2px', borderRadius: '2px', display: 'block', flex: '0 0 11px', background: KIND[e.kind].color, boxShadow: '0 0 8px ' + KIND[e.kind].color },
+      onClick: () => this.setState({ selectedId: otherId, selectedEdgeId: null }),
+      onDelete: () => this.setState(s => ({ edges: s.edges.filter(x => x.id !== e.id) }))
+    });
+    const outgoing = sel ? projEdges.filter(e => e.from === sel).map(e => rel(e, e.to)) : [];
+    const incoming = sel ? projEdges.filter(e => e.to === sel).map(e => rel(e, e.from)) : [];
+    const selEdge = projEdges.find(e => e.id === st.selectedEdgeId);
+
+    const tenants = st.tenants.map(t => {
+      const active = t.id === st.tenantId;
+      const projCount = st.projects.filter(p => p.tenantId === t.id).length;
+      const repoCount = st.repos.filter(r => st.projects.some(p => p.tenantId === t.id && p.id === r.p)).length;
+      return {
+        name: t.name, short: t.short, meta: projCount + ' projects · ' + repoCount + ' repos',
+        avatar: {
+          width: '28px', height: '28px', flex: '0 0 28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', fontWeight: 700,
+          color: active ? 'oklch(0.20 0.04 300)' : 'oklch(0.74 0.06 300)',
+          background: active ? 'oklch(0.72 0.16 300)' : 'oklch(0.26 0.03 300)',
+          boxShadow: active ? '0 0 20px -4px oklch(0.72 0.18 300)' : 'none'
+        },
+        style: {
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '10px', cursor: 'pointer',
+          border: '1px solid ' + (active ? 'oklch(0.38 0.07 300)' : 'transparent'),
+          background: active ? 'oklch(0.235 0.03 300)' : 'transparent'
+        },
+        onClick: () => this.openTenant(t.id)
+      };
+    });
+
+    const projects = st.projects.filter(p => p.tenantId === st.tenantId).map(p => {
+      const active = p.id === st.projectId;
+      const rc = st.repos.filter(r => r.p === p.id).length;
+      const ec = st.edges.filter(e => st.repos.some(r => r.p === p.id && r.id === e.from) && st.repos.some(r => r.p === p.id && r.id === e.to)).length;
+      return {
+        name: p.name, key: p.key, meta: rc + ' repos · ' + ec + ' rel',
+        marker: {
+          width: '8px', height: '8px', flex: '0 0 8px', borderRadius: '3px', display: 'block',
+          background: active ? 'oklch(0.74 0.16 300)' : 'oklch(0.36 0.03 300)',
+          boxShadow: active ? '0 0 10px oklch(0.74 0.16 300)' : 'none'
+        },
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 11px', borderRadius: '10px', cursor: 'pointer',
+          border: '1px solid ' + (active ? 'oklch(0.36 0.06 300)' : 'oklch(0.24 0.02 295)'),
+          background: active ? 'oklch(0.225 0.025 300)' : 'oklch(0.185 0.014 295)'
+        },
+        onClick: () => this.openProject(p.id)
+      };
+    });
+
+    const providerStats = Object.keys(PROVIDERS).map(p => ({
+      short: PROVIDERS[p].short, label: PROVIDERS[p].label, badge: this.badge(p, 24),
+      count: repos.filter(r => r.provider === p).length
+    }));
+    const typeStats = Object.keys(TYPES).map(t => ({
+      label: TYPES[t].label, dot: this.dot(t), count: repos.filter(r => r.type === t).length
+    })).filter(t => t.count > 0);
+
+    const host = (r) => PROVIDERS[r.provider].host + '/' + (tenant ? tenant.slug : '') + '/' + (project ? project.key.toLowerCase() : '') + '/' + r.name;
+
+    return {
+      canvasStyle: { position: 'relative', width: w + 'px', height: h + 'px', minWidth: '100%' },
+      canvasW: w, canvasH: h, columns, nodes, edges, tenants, projects,
+      emptyProject: repos.length === 0,
+      crumbTenant: tenant ? tenant.name : '', crumbProject: project ? project.name : 'No project',
+      projectKey: project ? project.key : '',
+      counts: repos.length + ' repositories · ' + projEdges.length + ' relations',
+      apiModeOn: st.linkKind === 'api', apiModeOff: st.linkKind !== 'api',
+      dataModeOn: st.linkKind === 'data', dataModeOff: st.linkKind !== 'data',
+      startApiLink: () => this.setState({ linkKind: 'api', linkFrom: null }),
+      startDataLink: () => this.setState({ linkKind: 'data', linkFrom: null }),
+      startApiFromSel: () => this.setState({ linkKind: 'api', linkFrom: sel }),
+      cancelLink: () => this.setState({ linkKind: null, linkFrom: null }),
+      autoLayout: () => this.setState(s => {
+        const custom = Object.assign({}, s.custom);
+        repos.forEach(r => { delete custom[r.id]; });
+        return { custom: custom };
+      }),
+      hintOn: !!st.linkKind,
+      hintText: st.linkKind ? (st.linkFrom && ids[st.linkFrom]
+        ? 'Source: ' + ids[st.linkFrom].name + ' — now click the target repository.'
+        : 'Click the source repository, then the target.') : '',
+      showAdd: st.showAdd,
+      addTitle: 'NEW REPOSITORY IN ' + (project ? project.key : ''),
+      toggleAdd: () => this.setState(s => ({ showAdd: !s.showAdd })),
+      draftName: st.draft.name, draftProvider: st.draft.provider, draftType: st.draft.type,
+      onDraftName: (ev) => { const v = ev.target.value; this.setState(s => ({ draft: Object.assign({}, s.draft, { name: v }) })); },
+      onDraftProvider: (ev) => { const v = ev.target.value; this.setState(s => ({ draft: Object.assign({}, s.draft, { provider: v }) })); },
+      onDraftType: (ev) => { const v = ev.target.value; this.setState(s => ({ draft: Object.assign({}, s.draft, { type: v }) })); },
+      addRepo: () => this.setState(s => {
+        const name = (s.draft.name || '').trim();
+        if (!name || !s.projectId) return {};
+        const id = 'r' + s.seq;
+        return {
+          repos: s.repos.concat([{ id: id, p: s.projectId, name: name, provider: s.draft.provider, type: s.draft.type }]),
+          seq: s.seq + 1, showAdd: false, selectedId: id, draft: { name: '', provider: s.draft.provider, type: s.draft.type }
+        };
+      }),
+      showAddProject: st.showAddProject, projectDraft: st.projectDraft,
+      toggleAddProject: () => this.setState(s => ({ showAddProject: !s.showAddProject, projectDraft: '' })),
+      onProjectDraft: (ev) => { const v = ev.target.value; this.setState({ projectDraft: v }); },
+      addProject: () => this.setState(s => {
+        const name = (s.projectDraft || '').trim();
+        if (!name) return {};
+        const id = 'p' + s.seq;
+        const key = name.replace(/[^a-zA-Z ]/g, '').split(' ').filter(Boolean).map(x => x[0]).join('').slice(0, 4).toUpperCase() || 'PRJ';
+        return {
+          projects: s.projects.concat([{ id: id, tenantId: s.tenantId, name: name, key: key }]),
+          seq: s.seq + 1, projectId: id, showAddProject: false, projectDraft: '', selectedId: null, selectedEdgeId: null
+        };
+      }),
+      hasNodeSel: !!selRepo && !selEdge, noSelection: !selRepo && !selEdge,
+      selName: selRepo ? selRepo.name : '',
+      selShort: selRepo ? PROVIDERS[selRepo.provider].short : '',
+      selBadge: selRepo ? this.badge(selRepo.provider, 30) : {},
+      selProvider: selRepo ? PROVIDERS[selRepo.provider].label : '',
+      selType: selRepo ? TYPES[selRepo.type].label : '',
+      selChip: selRepo ? {
+        padding: '4px 10px', borderRadius: '20px', fontSize: '10.5px', letterSpacing: '0.04em',
+        color: 'oklch(0.84 0.10 ' + TYPES[selRepo.type].hue + ')',
+        border: '1px solid oklch(0.42 0.08 ' + TYPES[selRepo.type].hue + ')',
+        background: 'oklch(0.26 0.05 ' + TYPES[selRepo.type].hue + ')'
+      } : {},
+      selPath: selRepo ? host(selRepo) : '',
+      outgoing: outgoing, incoming: incoming,
+      noOutgoing: !!selRepo && outgoing.length === 0, noIncoming: !!selRepo && incoming.length === 0,
+      deleteSelectedNode: () => this.setState(s => ({
+        repos: s.repos.filter(r => r.id !== sel), edges: s.edges.filter(e => e.from !== sel && e.to !== sel), selectedId: null
+      })),
+      hasEdgeSel: !!selEdge,
+      edgeFrom: selEdge && ids[selEdge.from] ? ids[selEdge.from].name : '',
+      edgeTo: selEdge && ids[selEdge.to] ? ids[selEdge.to].name : '',
+      edgeKindLabel: selEdge ? KIND[selEdge.kind].label : '',
+      edgeSwatch: selEdge ? { width: '18px', height: '2px', borderRadius: '2px', display: 'block', background: KIND[selEdge.kind].color, boxShadow: '0 0 10px ' + KIND[selEdge.kind].color } : {},
+      deleteSelectedEdge: () => this.setState(s => ({ edges: s.edges.filter(e => e.id !== s.selectedEdgeId), selectedEdgeId: null })),
+      providerStats: providerStats, typeStats: typeStats
+    };
+  }
+}
+
+</script>
+</body>
+</html>

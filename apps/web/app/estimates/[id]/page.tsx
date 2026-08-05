@@ -24,10 +24,9 @@ import {
   type QuestionLetter,
 } from "@/lib/api";
 import {
-  detectLocale,
+  DATE_LOCALE,
   issueSentence,
   t,
-  type Locale,
   type MessageKey,
 } from "@/lib/i18n";
 import {
@@ -118,7 +117,6 @@ export default function EstimateWorkspace({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [locale, setLocaleState] = useState<Locale>("en");
   const [summary, setSummary] = useState<EstimateSummary | null>(null);
   const [state, setState] = useState<StateShape | null>(null);
   const [stage, setStage] = useState<StageKey>("reading");
@@ -136,8 +134,6 @@ export default function EstimateWorkspace({
   const [actuals, setActuals] = useState<ActualEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => setLocaleState(detectLocale()), []);
 
   const refresh = useCallback(async () => {
     const detail = await api.getEstimate(id);
@@ -211,11 +207,11 @@ export default function EstimateWorkspace({
   );
 
   const stages: { key: StageKey; label: string }[] = [
-    { key: "reading", label: t(locale, "stageReading") },
-    { key: "questions", label: t(locale, "stageQuestions") },
-    { key: "impact", label: t(locale, "stageImpact") },
-    { key: "desk", label: t(locale, "stageEstimate") },
-    { key: "boe", label: t(locale, "stageBoe") },
+    { key: "reading", label: t("stageReading") },
+    { key: "questions", label: t("stageQuestions") },
+    { key: "impact", label: t("stageImpact") },
+    { key: "desk", label: t("stageEstimate") },
+    { key: "boe", label: t("stageBoe") },
   ];
   const order: StageKey[] = ["reading", "questions", "impact", "desk", "boe"];
   const reached: StageKey = summary.has_boe
@@ -274,7 +270,7 @@ export default function EstimateWorkspace({
     <section className="scr">
       <div className="page-h">
         <Link href="/" className="lbl">
-          ← {t(locale, "estimates")}
+          ← {t("estimates")}
         </Link>
         <IconEstimates size={18} />
         <h2>{summary.brd_ref}</h2>
@@ -287,11 +283,11 @@ export default function EstimateWorkspace({
           subtitle={
             <Lbl>
               {stage === "desk" && !summary.has_boe
-                ? t(locale, "stateNoDraft")
+                ? t("stateNoDraft")
                 : stage === "desk"
                   ? allRevealed
-                    ? t(locale, "stateDraftRevealed")
-                    : t(locale, "stateDraftClosed")
+                    ? t("stateDraftRevealed")
+                    : t("stateDraftClosed")
                   : summary.title.slice(0, 70)}
             </Lbl>
           }
@@ -307,11 +303,11 @@ export default function EstimateWorkspace({
             <>
               {summary.blocked > 0 && (
                 <StatusChip status="crit">
-                  {summary.blocked} {t(locale, "blocked")}
+                  {summary.blocked} {t("blocked")}
                 </StatusChip>
               )}
               <Chip>
-                {t(locale, "reviewer")}: {estimator || "—"}
+                {t("reviewer")}: {estimator || "—"}
               </Chip>
             </>
           }
@@ -335,7 +331,6 @@ export default function EstimateWorkspace({
         {/* ---------- 2 · Reading Room ---------- */}
         {stage === "reading" && (
           <ReadingRoom
-            locale={locale}
             requirements={state.requirements}
             blockedIds={blocked}
             blocks={sourceBlocks}
@@ -350,7 +345,6 @@ export default function EstimateWorkspace({
         {/* ---------- 3 · Question Board ---------- */}
         {stage === "questions" && (
           <QuestionBoard
-            locale={locale}
             id={id}
             questions={state.questions}
             requirements={state.requirements}
@@ -373,7 +367,7 @@ export default function EstimateWorkspace({
 
         {/* ---------- 4 · Impact Map ---------- */}
         {stage === "impact" && (
-          <ImpactMap locale={locale} id={id} workItems={state.work_items} />
+          <ImpactMap id={id} workItems={state.work_items} />
         )}
 
         {/* ---------- 5 · Estimate Desk ---------- */}
@@ -394,7 +388,7 @@ export default function EstimateWorkspace({
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "var(--acc)" }}
                 >
-                  {t(locale, "independentHeadline")}
+                  {t("independentHeadline")}
                 </div>
                 <div
                   style={{
@@ -404,7 +398,7 @@ export default function EstimateWorkspace({
                     textWrap: "pretty",
                   }}
                 >
-                  {t(locale, "independentBody")}
+                  {t("independentBody")}
                 </div>
               </div>
               <div
@@ -416,10 +410,10 @@ export default function EstimateWorkspace({
                 }}
               >
                 <Mn style={{ color: "var(--ink2)" }}>
-                  {entered} / {deskItems.length} {t(locale, "entered")}
+                  {entered} / {deskItems.length} {t("entered")}
                 </Mn>
                 <input
-                  placeholder={t(locale, "estimatorName")}
+                  placeholder={t("estimatorName")}
                   value={estimator}
                   onChange={(event) => setEstimator(event.target.value)}
                   style={{ width: 150 }}
@@ -430,7 +424,7 @@ export default function EstimateWorkspace({
                   disabled={!estimator || busy}
                   onClick={() => run(loadDesk)}
                 >
-                  {t(locale, "openDesk")}
+                  {t("openDesk")}
                 </button>
                 {!summary.has_boe && (
                   <button
@@ -446,7 +440,7 @@ export default function EstimateWorkspace({
                       })
                     }
                   >
-                    {t(locale, "buildBoe")}
+                    {t("buildBoe")}
                   </button>
                 )}
               </div>
@@ -461,18 +455,18 @@ export default function EstimateWorkspace({
                 <thead>
                   <tr>
                     <th style={{ width: 20, paddingLeft: 14 }} />
-                    <th style={{ width: 240 }}>{t(locale, "lineItem")}</th>
-                    <th style={{ width: 78 }}>{t(locale, "reqHeader")}</th>
-                    <th style={{ width: 110 }}>{t(locale, "impactShort")}</th>
+                    <th style={{ width: 240 }}>{t("lineItem")}</th>
+                    <th style={{ width: 78 }}>{t("reqHeader")}</th>
+                    <th style={{ width: 110 }}>{t("impactShort")}</th>
                     <th style={{ width: 106 }}>
-                      {t(locale, "confidenceHeader")}
+                      {t("confidenceHeader")}
                     </th>
-                    <th style={{ width: 250 }}>{t(locale, "yourRange")}</th>
-                    <th style={{ width: 200 }}>{t(locale, "draft")}</th>
-                    <th style={{ width: 148 }}>{t(locale, "delta")}</th>
-                    <th style={{ width: 60 }}>{t(locale, "arHeader")}</th>
-                    <th style={{ width: 108 }}>{t(locale, "statusHeader")}</th>
-                    <th>{t(locale, "evidence")}</th>
+                    <th style={{ width: 250 }}>{t("yourRange")}</th>
+                    <th style={{ width: 200 }}>{t("draft")}</th>
+                    <th style={{ width: 148 }}>{t("delta")}</th>
+                    <th style={{ width: 60 }}>{t("arHeader")}</th>
+                    <th style={{ width: 108 }}>{t("statusHeader")}</th>
+                    <th>{t("evidence")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -482,14 +476,13 @@ export default function EstimateWorkspace({
                         colSpan={11}
                         style={{ color: "var(--mut)", fontSize: 12.5 }}
                       >
-                        {t(locale, "deskClosedHint")}
+                        {t("deskClosedHint")}
                       </td>
                     </tr>
                   )}
                   {deskItems.map((item) => (
                     <DeskRow
                       key={item.work_item.id}
-                      locale={locale}
                       item={item}
                       maxBand={maxBand}
                       busy={busy}
@@ -539,7 +532,7 @@ export default function EstimateWorkspace({
                           "closed" under Evidence and swallow Status. */}
                       <td>
                         <StatusChip status="crit">
-                          {t(locale, "statusBlocked")}
+                          {t("statusBlocked")}
                         </StatusChip>
                       </td>
                       <td>
@@ -552,12 +545,12 @@ export default function EstimateWorkspace({
                           textWrap: "pretty",
                         }}
                       >
-                        {t(locale, "noEvidenceNoLine")}{" "}
-                        {t(locale, "heldHeadline")}
+                        {t("noEvidenceNoLine")}{" "}
+                        {t("heldHeadline")}
                       </td>
                       <td>
                         <Chip style={{ color: "var(--mut)" }}>
-                          {t(locale, "closed")}
+                          {t("closed")}
                         </Chip>
                       </td>
                       <td colSpan={4} />
@@ -595,11 +588,11 @@ export default function EstimateWorkspace({
                       // a plural; English needs the singular, Turkish never does.
                       const noun =
                         count === 1
-                          ? t(locale, "itemOne")
-                          : t(locale, "items").toLowerCase();
+                          ? t("itemOne")
+                          : t("items").toLowerCase();
                       const label = allRevealed
-                        ? t(locale, "total")
-                        : t(locale, "subtotal");
+                        ? t("total")
+                        : t("subtotal");
                       return `${label} · ${count} ${noun}`;
                     })()}
                   </Lbl>
@@ -607,7 +600,7 @@ export default function EstimateWorkspace({
                     {deskTotal.optimistic} — {deskTotal.pessimistic} pd
                   </Num>
                   <Chip>
-                    {t(locale, "likelyShort")} {deskTotal.likely} pd
+                    {t("likelyShort")} {deskTotal.likely} pd
                   </Chip>
                 </div>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -617,11 +610,9 @@ export default function EstimateWorkspace({
                         color: "var(--crit)",
                         borderColor: "var(--crit)",
                       }}
-                      title={t(locale, "coneNarrows")}
+                      title={t("coneNarrows")}
                     >
-                      {t(
-                        locale,
-                        coneStage === "detailed"
+                      {t(coneStage === "detailed"
                           ? "coneDetailed"
                           : coneStage === "approved_scope"
                             ? "coneApproved"
@@ -631,7 +622,7 @@ export default function EstimateWorkspace({
                     </Chip>
                   )}
                   <Mn style={{ color: "var(--mut)" }}>
-                    {t(locale, "signatures")} {signedCount} / {deskItems.length}
+                    {t("signatures")} {signedCount} / {deskItems.length}
                   </Mn>
                   <div
                     aria-hidden
@@ -661,7 +652,6 @@ export default function EstimateWorkspace({
         {/* ---------- 6 · BoE Preview & Signature ---------- */}
         {stage === "boe" && (
           <BoePreview
-            locale={locale}
             id={id}
             summary={summary}
             fullySigned={fullySigned}
@@ -707,11 +697,9 @@ function ringPosition(index: number, total: number): { x: number; y: number } {
 }
 
 function ImpactMap({
-  locale,
   id,
   workItems,
 }: {
-  locale: Locale;
   id: string;
   workItems: WorkItemShape[];
 }) {
@@ -752,9 +740,7 @@ function ImpactMap({
   const tone = (confidence: string | null) =>
     confidence === "high" ? "ok" : confidence === "medium" ? "warn" : "crit";
   const confidenceLabel = (confidence: string | null) =>
-    t(
-      locale,
-      confidence === "high" ? "confHigh" : confidence === "medium" ? "confMedium" : "confLow",
+    t(confidence === "high" ? "confHigh" : confidence === "medium" ? "confMedium" : "confLow",
     );
 
   if (error) {
@@ -770,7 +756,7 @@ function ImpactMap({
   if (workItems.length === 0) {
     return (
       <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
-        {t(locale, "impactSubtitle")}
+        {t("impactSubtitle")}
       </div>
     );
   }
@@ -788,9 +774,9 @@ function ImpactMap({
         }}
       >
         <Lbl>
-          {t(locale, "impactSubtitle")}
+          {t("impactSubtitle")}
           {modules.length > 0 && modules[0].confidence === null
-            ? ` · ${t(locale, "coverageHidden")}`
+            ? ` · ${t("coverageHidden")}`
             : ""}
         </Lbl>
         <div style={{ display: "flex" }}>
@@ -799,14 +785,14 @@ function ImpactMap({
             className={`stg ${view === "graph" ? "on" : ""}`.trim()}
             onClick={() => setView("graph")}
           >
-            {t(locale, "viewGraph")}
+            {t("viewGraph")}
           </button>
           <button
             type="button"
             className={`stg ${view === "heat" ? "on" : ""}`.trim()}
             onClick={() => setView("heat")}
           >
-            {t(locale, "viewHeat")}
+            {t("viewHeat")}
           </button>
         </div>
       </div>
@@ -883,7 +869,7 @@ function ImpactMap({
                   >
                     <div style={{ fontSize: 13, fontWeight: 500 }}>
                       {entry.module === "(unmapped)"
-                        ? t(locale, "unmappedModule")
+                        ? t("unmappedModule")
                         : entry.module}
                     </div>
                     {entry.module === "(unmapped)" && (
@@ -896,7 +882,7 @@ function ImpactMap({
                           textWrap: "pretty",
                         }}
                       >
-                        {t(locale, "unmappedHint")}
+                        {t("unmappedHint")}
                       </div>
                     )}
                     <div
@@ -914,7 +900,7 @@ function ImpactMap({
                           </StatusChip>
                           {entry.confidence === "low" && (
                             <StatusChip status="crit">
-                              {t(locale, "discoverySuggested")}
+                              {t("discoverySuggested")}
                             </StatusChip>
                           )}
                         </>
@@ -937,17 +923,17 @@ function ImpactMap({
                   textWrap: "pretty",
                 }}
               >
-                {t(locale, "impactFootnote")}
+                {t("impactFootnote")}
               </div>
             </>
           ) : (
             <table className="dt">
               <thead>
                 <tr>
-                  <th>{t(locale, "modules")}</th>
-                  <th style={{ width: 90 }}>{t(locale, "workItems")}</th>
-                  <th style={{ width: 150 }}>{t(locale, "confidenceHeader")}</th>
-                  <th style={{ width: 160 }}>{t(locale, "evidence")}</th>
+                  <th>{t("modules")}</th>
+                  <th style={{ width: 90 }}>{t("workItems")}</th>
+                  <th style={{ width: 150 }}>{t("confidenceHeader")}</th>
+                  <th style={{ width: 160 }}>{t("evidence")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1002,14 +988,14 @@ function ImpactMap({
         >
           {!data?.selected ? (
             <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
-              {t(locale, "selectModule")}
+              {t("selectModule")}
             </div>
           ) : (
             <>
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{data.selected.module}</div>
                 <Lbl>
-                  {t(locale, "evidenceFor")} · {data.selected.requirement_ids.join(", ") || "—"}
+                  {t("evidenceFor")} · {data.selected.requirement_ids.join(", ") || "—"}
                 </Lbl>
               </div>
 
@@ -1018,7 +1004,7 @@ function ImpactMap({
                   made the panel contradict itself on the same screen. */}
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
                 <Lbl style={{ color: "var(--ev-code)" }}>
-                  {t(locale, "codeSection")} · {codeEvidence.length}
+                  {t("codeSection")} · {codeEvidence.length}
                 </Lbl>
                 {codeEvidence.length === 0 ? (
                   <div
@@ -1029,7 +1015,7 @@ function ImpactMap({
                       textWrap: "pretty",
                     }}
                   >
-                    {t(locale, "noCodeGraph")}
+                    {t("noCodeGraph")}
                   </div>
                 ) : (
                   codeEvidence.map((page, index) => (
@@ -1058,11 +1044,11 @@ function ImpactMap({
 
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
                 <Lbl style={{ color: "var(--ev-wiki)" }}>
-                  {t(locale, "wikiSection")} · {wikiEvidence.length}
+                  {t("wikiSection")} · {wikiEvidence.length}
                 </Lbl>
                 {wikiEvidence.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--mut)", marginTop: 7 }}>
-                    {t(locale, "noEvidenceForModule")}
+                    {t("noEvidenceForModule")}
                   </div>
                 )}
                 {wikiEvidence.map((page, index) => (
@@ -1078,7 +1064,7 @@ function ImpactMap({
                     >
                       <span style={{ textWrap: "pretty" }}>{page.title}</span>
                       {page.stale ? (
-                        <StatusChip status="crit">{t(locale, "staleSource")}</StatusChip>
+                        <StatusChip status="crit">{t("staleSource")}</StatusChip>
                       ) : null}
                     </div>
                     {page.snippet && (
@@ -1102,7 +1088,7 @@ function ImpactMap({
 
               <div style={{ padding: "12px 16px" }}>
                 <Lbl style={{ color: "var(--ev-analog)" }}>
-                  {t(locale, "analogSection")} · {data.selected.analogs.length}
+                  {t("analogSection")} · {data.selected.analogs.length}
                 </Lbl>
                 {data.selected.analogs.map((analog) => (
                   <div
@@ -1145,7 +1131,7 @@ function ImpactMap({
                           }}
                         >
                           <span>
-                            {t(locale, "estimatedShort")} {analog.estimate.optimistic}–
+                            {t("estimatedShort")} {analog.estimate.optimistic}–
                             {analog.estimate.pessimistic} pd
                           </span>
                           {analog.actual_effort !== null && (
@@ -1154,12 +1140,10 @@ function ImpactMap({
                                 color: analog.scope_changed ? "var(--crit)" : undefined,
                               }}
                             >
-                              {t(locale, "actualWord")} {analog.actual_effort} pd
+                              {t("actualWord")} {analog.actual_effort} pd
                               {analog.scope_changed
-                                ? ` · ${t(locale, "scopeChanged")}`
-                                : ` · ${t(
-                                    locale,
-                                    analog.actual_effort > analog.estimate.pessimistic
+                                ? ` · ${t("scopeChanged")}`
+                                : ` · ${t(analog.actual_effort > analog.estimate.pessimistic
                                       ? "devAbove"
                                       : analog.actual_effort < analog.estimate.optimistic
                                         ? "devBelow"
@@ -1195,7 +1179,6 @@ const LANES = [
  * a question's status: dispatch was not recorded, so "sent" and "answered" could not
  * be distinguished from "open", and an answer could only be applied in bulk. */
 function QuestionBoard({
-  locale,
   id,
   questions,
   requirements,
@@ -1203,7 +1186,6 @@ function QuestionBoard({
   onChanged,
   onApply,
 }: {
-  locale: Locale;
   id: string;
   questions: Question[];
   requirements: Requirement[];
@@ -1232,7 +1214,7 @@ function QuestionBoard({
     // "Copy text" produced markdown bullets the customer never saw.
     let current = true;
     api
-      .questionLetter(id, selectedIds, locale)
+      .questionLetter(id, selectedIds, "tr")
       .then((compiled) => {
         // Two selections in quick succession resolve out of order; without this the
         // preview and the clipboard can hold a letter for a selection that is gone.
@@ -1245,7 +1227,7 @@ function QuestionBoard({
       current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, locale, selected]);
+  }, [id, selected]);
 
   const [working, setWorking] = useState(false);
   const inFlight = busy || working;
@@ -1312,12 +1294,12 @@ function QuestionBoard({
                     marginBottom: 10,
                   }}
                 >
-                  <Lbl>{t(locale, lane.label)}</Lbl>
+                  <Lbl>{t(lane.label)}</Lbl>
                   <Mn style={{ color: "var(--mut)" }}>{rows.length}</Mn>
                 </div>
                 {rows.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--mut)", textWrap: "pretty" }}>
-                    {t(locale, lane.empty)}
+                    {t(lane.empty)}
                   </div>
                 )}
                 {rows.map((question) => (
@@ -1389,7 +1371,7 @@ function QuestionBoard({
                     {lane.key === "sent" && (
                       <>
                         <Lbl style={{ textTransform: "none", letterSpacing: 0 }}>
-                          {t(locale, "waitingDays").replace(
+                          {t("waitingDays").replace(
                             "{n}",
                             String(waitedDays(question.sent_at) ?? 0),
                           )}
@@ -1398,7 +1380,7 @@ function QuestionBoard({
                         <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
                           <input
                             style={{ flex: 1, minWidth: 0 }}
-                            placeholder={t(locale, "answerFrom")}
+                            placeholder={t("answerFrom")}
                             value={answers[question.id] ?? ""}
                             onChange={(event) =>
                               setAnswers({ ...answers, [question.id]: event.target.value })
@@ -1421,7 +1403,7 @@ function QuestionBoard({
                             )
                           }
                         >
-                          {t(locale, "recordAnswer")}
+                          {t("recordAnswer")}
                         </button>
                       </>
                     )}
@@ -1444,7 +1426,7 @@ function QuestionBoard({
                         <Lbl style={{ textTransform: "none", letterSpacing: 0 }}>
                           {question.answered_by}
                           {question.answered_at
-                            ? ` · ${new Date(question.answered_at).toLocaleDateString(locale)}`
+                            ? ` · ${new Date(question.answered_at).toLocaleDateString(DATE_LOCALE)}`
                             : ""}
                         </Lbl>
                         <button
@@ -1456,7 +1438,7 @@ function QuestionBoard({
                             onApply({ [question.id]: question.answer ?? "" })
                           }
                         >
-                          {t(locale, "applyToLine")}
+                          {t("applyToLine")}
                         </button>
                       </>
                     )}
@@ -1464,7 +1446,7 @@ function QuestionBoard({
                     {lane.key === "applied" && (
                       <>
                         <div style={{ fontSize: 12, color: "var(--mut)" }}>
-                          {t(locale, "appliedTo")}{" "}
+                          {t("appliedTo")}{" "}
                           <Mn style={{ color: "var(--ink2)" }}>
                             {question.applied_to ?? "—"}
                           </Mn>
@@ -1493,7 +1475,7 @@ function QuestionBoard({
                               flex: "none",
                             }}
                           />
-                          {t(locale, "reEstimateSuggested")}
+                          {t("reEstimateSuggested")}
                         </div>
                       </>
                     )}
@@ -1515,9 +1497,9 @@ function QuestionBoard({
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Lbl>{t(locale, "customerSet")}</Lbl>
+            <Lbl>{t("customerSet")}</Lbl>
             <Chip>
-              {selected.size} {t(locale, "selectedShort")}
+              {selected.size} {t("selectedShort")}
             </Chip>
           </div>
           <div
@@ -1528,7 +1510,7 @@ function QuestionBoard({
               textWrap: "pretty",
             }}
           >
-            {t(locale, "letterHint")}
+            {t("letterHint")}
           </div>
 
           {letter ? (
@@ -1547,7 +1529,7 @@ function QuestionBoard({
             </div>
           ) : (
             <div className="ph" style={{ padding: "20px 14px" }}>
-              {t(locale, "selectToCompose")}
+              {t("selectToCompose")}
             </div>
           )}
 
@@ -1558,11 +1540,11 @@ function QuestionBoard({
               disabled={!letter}
               onClick={() => letter && navigator.clipboard.writeText(letter.text)}
             >
-              {t(locale, "copyText")}
+              {t("copyText")}
             </button>
             <input
               style={{ width: 130 }}
-              placeholder={t(locale, "recipientPlaceholder")}
+              placeholder={t("recipientPlaceholder")}
               value={recipient}
               onChange={(event) => setRecipient(event.target.value)}
             />
@@ -1577,12 +1559,12 @@ function QuestionBoard({
                 })
               }
             >
-              {t(locale, "sendSelected")}
+              {t("sendSelected")}
             </button>
           </div>
 
           <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-            <Lbl>{t(locale, "answeredBy")}</Lbl>
+            <Lbl>{t("answeredBy")}</Lbl>
             <input
               style={{ width: "100%", marginTop: 6 }}
               value={answeredBy}
@@ -1591,7 +1573,7 @@ function QuestionBoard({
           </div>
 
           <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-            <Lbl>{t(locale, "newQuestion")}</Lbl>
+            <Lbl>{t("newQuestion")}</Lbl>
             <select
               style={{ width: "100%", marginTop: 6 }}
               value={newFor}
@@ -1605,7 +1587,7 @@ function QuestionBoard({
             </select>
             <input
               style={{ width: "100%", marginTop: 6 }}
-              placeholder={t(locale, "questionPlaceholder")}
+              placeholder={t("questionPlaceholder")}
               value={newText}
               onChange={(event) => setNewText(event.target.value)}
             />
@@ -1624,7 +1606,7 @@ function QuestionBoard({
                 })
               }
             >
-              {t(locale, "newQuestion")}
+              {t("newQuestion")}
             </button>
           </div>
         </div>
@@ -1639,7 +1621,6 @@ function QuestionBoard({
  * the paragraph it came from; the two panes address each other through `source_ref`,
  * the same string the parser stamps on both. */
 function ReadingRoom({
-  locale,
   requirements,
   blockedIds,
   blocks,
@@ -1649,7 +1630,6 @@ function ReadingRoom({
   openQuestionCount,
   onGoToQuestions,
 }: {
-  locale: Locale;
   requirements: Requirement[];
   blockedIds: Set<string>;
   blocks: DocBlock[];
@@ -1726,14 +1706,14 @@ function ReadingRoom({
           }}
         >
           <Lbl>
-            {t(locale, "sourcePane")} · {blocks.length}
+            {t("sourcePane")} · {blocks.length}
           </Lbl>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {missingSource && (
-              <StatusChip status="warn">{t(locale, "sourceRowMissing")}</StatusChip>
+              <StatusChip status="warn">{t("sourceRowMissing")}</StatusChip>
             )}
             {sourceTruncated && (
-              <StatusChip status="warn">{t(locale, "sourceTruncated")}</StatusChip>
+              <StatusChip status="warn">{t("sourceTruncated")}</StatusChip>
             )}
           </div>
         </div>
@@ -1743,7 +1723,7 @@ function ReadingRoom({
         >
           {!sourceAvailable || blocks.length === 0 ? (
             <div className="ph" style={{ padding: "26px 20px", textWrap: "pretty" }}>
-              {sourceError ? t(locale, "sourceFailed") : t(locale, "sourceUnavailable")}
+              {sourceError ? t("sourceFailed") : t("sourceUnavailable")}
             </div>
           ) : (
             <div
@@ -1761,7 +1741,6 @@ function ReadingRoom({
               {blocks.map((block) => (
                 <SourceBlock
                   key={block.index}
-                  locale={locale}
                   block={block}
                   highlighted={block.source_ref === selectedRef}
                 />
@@ -1784,17 +1763,17 @@ function ReadingRoom({
           }}
         >
           <Lbl>
-            {t(locale, "requirementsCount").replace("{n}", String(requirements.length))}
+            {t("requirementsCount").replace("{n}", String(requirements.length))}
           </Lbl>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <StatusChip status="ok">
-              {t(locale, "ambClear")} {counts.ok}
+              {t("ambClear")} {counts.ok}
             </StatusChip>
             <StatusChip status="warn">
-              {t(locale, "ambPartial")} {counts.warn}
+              {t("ambPartial")} {counts.warn}
             </StatusChip>
             <StatusChip status="crit">
-              {t(locale, "ambAmbiguous")} {counts.crit}
+              {t("ambAmbiguous")} {counts.crit}
             </StatusChip>
           </div>
         </div>
@@ -1804,9 +1783,9 @@ function ReadingRoom({
             <thead>
               <tr>
                 <th style={{ width: 4, padding: 0 }} />
-                <th style={{ width: 88 }}>{t(locale, "idHeader")}</th>
-                <th>{t(locale, "textHeader")}</th>
-                <th style={{ width: 116 }}>{t(locale, "sourceWord")}</th>
+                <th style={{ width: 88 }}>{t("idHeader")}</th>
+                <th>{t("textHeader")}</th>
+                <th style={{ width: 116 }}>{t("sourceWord")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1868,12 +1847,12 @@ function ReadingRoom({
                             }}
                           />
                           <span style={{ color: "var(--ink2)", textWrap: "pretty" }}>
-                            {issueSentence(locale, issue)}
+                            {issueSentence(issue)}
                           </span>
                         </div>
                       ))}
                       {(requirement.anchors ?? []).map((anchor, index) => (
-                        <AnchorPill key={index} locale={locale} snippet={anchor.snippet} />
+                        <AnchorPill key={index} snippet={anchor.snippet} />
                       ))}
                     </td>
                     <td>
@@ -1900,11 +1879,11 @@ function ReadingRoom({
           }}
         >
           <span style={{ fontSize: 12.5, color: "var(--mut)", textWrap: "pretty" }}>
-            {t(locale, "selectRowHint")}
+            {t("selectRowHint")}
           </span>
           {openQuestionCount > 0 && (
             <button type="button" className="btn p" onClick={onGoToQuestions}>
-              {t(locale, "sendToBoard").replace("{n}", String(openQuestionCount))}
+              {t("sendToBoard").replace("{n}", String(openQuestionCount))}
             </button>
           )}
         </div>
@@ -1930,10 +1909,10 @@ function shortRef(sourceRef: string | null | undefined): string {
   return block ? `¶${block[1]}` : "—";
 }
 
-function AnchorPill({ locale, snippet }: { locale: Locale; snippet: string }) {
+function AnchorPill({ snippet }: { snippet: string }) {
   return (
     <span
-      title={t(locale, "anchorTooltip")}
+      title={t("anchorTooltip")}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -1951,17 +1930,15 @@ function AnchorPill({ locale, snippet }: { locale: Locale; snippet: string }) {
     >
       <span aria-hidden style={{ width: 8, height: 8, flex: "none", background: "var(--crit)" }} />
       {snippet}
-      <Mn style={{ color: "var(--crit)" }}>{t(locale, "quarantined")}</Mn>
+      <Mn style={{ color: "var(--crit)" }}>{t("quarantined")}</Mn>
     </span>
   );
 }
 
 function SourceBlock({
-  locale,
   block,
   highlighted,
 }: {
-  locale: Locale;
   block: DocBlock;
   highlighted: boolean;
 }) {
@@ -2002,7 +1979,7 @@ function SourceBlock({
             ))}
           </tbody>
         </table>
-        <BlockAnchors locale={locale} block={block} />
+        <BlockAnchors block={block} />
       </div>
     );
   }
@@ -2019,7 +1996,7 @@ function SourceBlock({
         }}
       >
         {block.text}
-        <BlockAnchors locale={locale} block={block} />
+        <BlockAnchors block={block} />
       </div>
     );
   }
@@ -2027,18 +2004,18 @@ function SourceBlock({
     <div id={id} style={{ margin: "0 0 10px", ...mark }}>
       {block.kind === "list_item" ? `• ${block.text}` : block.text}
       {block.text_truncated && <Mn style={{ color: "var(--mut)" }}> […]</Mn>}
-      <BlockAnchors locale={locale} block={block} />
+      <BlockAnchors block={block} />
     </div>
   );
 }
 
-function BlockAnchors({ locale, block }: { locale: Locale; block: DocBlock }) {
+function BlockAnchors({ block }: { block: DocBlock }) {
   if (block.anchors.length === 0) return null;
   return (
     <div>
       {block.anchors.map((anchor, index) => (
         <div key={index}>
-          <AnchorPill locale={locale} snippet={anchor.snippet} />
+          <AnchorPill snippet={anchor.snippet} />
         </div>
       ))}
     </div>
@@ -2048,14 +2025,12 @@ function BlockAnchors({ locale, block }: { locale: Locale; block: DocBlock }) {
 /* ---------------- Desk row ---------------- */
 
 function DeskRow({
-  locale,
   item,
   maxBand,
   busy,
   onRecord,
   onSign,
 }: {
-  locale: Locale;
   item: DeskItem;
   maxBand: number;
   busy: boolean;
@@ -2103,7 +2078,7 @@ function DeskRow({
               type="button"
               onClick={() => setExpanded(!expanded)}
               aria-expanded={expanded}
-              aria-label={`${t(locale, "assumptionsWord")} / ${t(locale, "risksWord")}`}
+              aria-label={`${t("assumptionsWord")} / ${t("risksWord")}`}
               style={{
                 border: "none",
                 background: "none",
@@ -2132,9 +2107,9 @@ function DeskRow({
             <div style={{ marginTop: 4 }}>
               <Chip
                 style={{ color: "var(--crit)", borderColor: "var(--crit)" }}
-                title={t(locale, "weakEvidenceBody")}
+                title={t("weakEvidenceBody")}
               >
-                {t(locale, "discoveryChip")} {item.discovery_pd} pd
+                {t("discoveryChip")} {item.discovery_pd} pd
               </Chip>
             </div>
           )}
@@ -2217,7 +2192,7 @@ function DeskRow({
                   });
                 }}
               >
-                {t(locale, "record")}
+                {t("record")}
               </button>
             </div>
           )}
@@ -2225,14 +2200,14 @@ function DeskRow({
             <>
               <input
                 style={{ width: "100%", marginTop: 5 }}
-                placeholder={t(locale, "rationalePlaceholder")}
+                placeholder={t("rationalePlaceholder")}
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
               />
               <div
                 style={{ fontSize: 11.5, color: "var(--mut)", marginTop: 4 }}
               >
-                {t(locale, "rationaleHint")}
+                {t("rationaleHint")}
               </div>
             </>
           )}
@@ -2242,13 +2217,13 @@ function DeskRow({
             <RangeBar band={item.ai.range} max={maxBand} />
           ) : (
             // Honest closed state — the design forbids a blurred reveal.
-            <Chip style={{ color: "var(--mut)" }}>{t(locale, "closed")}</Chip>
+            <Chip style={{ color: "var(--mut)" }}>{t("closed")}</Chip>
           )}
           {item.delphi.state === "below_threshold" && (
             // Says how far the panel is from opening WITHOUT any band-shaped number:
             // with two panelists a median plus your own band reconstructs the other's.
             <Chip style={{ color: "var(--mut)", marginLeft: 6 }}>
-              {t(locale, "delphiBelow")
+              {t("delphiBelow")
                 .replace("{have}", String(item.delphi.estimators))
                 .replace("{need}", String(item.delphi.threshold))}
             </Chip>
@@ -2263,11 +2238,11 @@ function DeskRow({
               {item.independent.optimistic <= item.ai.range.pessimistic &&
               item.ai.range.optimistic <= item.independent.pessimistic ? (
                 <StatusChip status="ok">
-                  {t(locale, "deltaIntersect")}
+                  {t("deltaIntersect")}
                 </StatusChip>
               ) : (
                 <StatusChip status="crit">
-                  {t(locale, "deltaDisjoint")}
+                  {t("deltaDisjoint")}
                 </StatusChip>
               )}
               <Num style={{ color: "var(--mut)" }}>
@@ -2290,14 +2265,14 @@ function DeskRow({
         </td>
         <td>
           {item.signed ? (
-            <StatusChip status="ok">{t(locale, "signed")}</StatusChip>
+            <StatusChip status="ok">{t("signed")}</StatusChip>
           ) : item.ai ? (
             <Chip style={{ color: "var(--ink2)" }}>
-              {t(locale, "statusReviewed")}
+              {t("statusReviewed")}
             </Chip>
           ) : (
             <Chip style={{ color: "var(--mut)" }}>
-              {t(locale, "statusDraft")}
+              {t("statusDraft")}
             </Chip>
           )}
         </td>
@@ -2320,7 +2295,7 @@ function DeskRow({
                 ))}
               </div>
               {item.signed ? (
-                <StatusChip status="ok">{t(locale, "signed")}</StatusChip>
+                <StatusChip status="ok">{t("signed")}</StatusChip>
               ) : (
                 <button
                   type="button"
@@ -2328,7 +2303,7 @@ function DeskRow({
                   disabled={busy}
                   onClick={onSign}
                 >
-                  {t(locale, "sign")}
+                  {t("sign")}
                 </button>
               )}
             </div>
@@ -2349,7 +2324,7 @@ function DeskRow({
             >
               <div>
                 <Lbl>
-                  {t(locale, "assumptionsWord")} · {item.ai.assumptions.length}
+                  {t("assumptionsWord")} · {item.ai.assumptions.length}
                 </Lbl>
                 <ul
                   style={{
@@ -2382,7 +2357,7 @@ function DeskRow({
               </div>
               <div>
                 <Lbl>
-                  {t(locale, "risksWord")} · {item.ai.risks.length}
+                  {t("risksWord")} · {item.ai.risks.length}
                 </Lbl>
                 <ul
                   style={{
@@ -2421,7 +2396,7 @@ function DeskRow({
             </div>
             {item.rationale && (
               <div style={{ marginTop: 12, maxWidth: 420 }}>
-                <Lbl>{t(locale, "rationaleLabel")}</Lbl>
+                <Lbl>{t("rationaleLabel")}</Lbl>
                 <div
                   className="card"
                   style={{
@@ -2445,7 +2420,7 @@ function DeskRow({
                   alignItems: "center",
                 }}
               >
-                <Lbl>{t(locale, "reqHeader")}</Lbl>
+                <Lbl>{t("reqHeader")}</Lbl>
                 {item.work_item.requirement_ids.map((req) => (
                   <Mn key={req} style={{ color: "var(--acc)" }}>
                     {req}
@@ -2465,8 +2440,8 @@ function DeskRow({
               bands={item.delphi.bands}
               consensus={item.delphi.consensus}
               max={maxBand}
-              label={t(locale, "delphiLabel")}
-              caption={t(locale, "delphiCaption")}
+              label={t("delphiLabel")}
+              caption={t("delphiCaption")}
             />
             <div
               style={{
@@ -2483,22 +2458,20 @@ function DeskRow({
                     borderColor: "var(--acc-line)",
                   }}
                 >
-                  {t(locale, "delphiConsensus")}{" "}
+                  {t("delphiConsensus")}{" "}
                   {item.delphi.consensus.optimistic}–
                   {item.delphi.consensus.pessimistic}
                 </Chip>
               )}
               <Chip>
-                {t(locale, "delphiSpread")} {item.delphi.spread_likely}
+                {t("delphiSpread")} {item.delphi.spread_likely}
               </Chip>
               {/* Shape carries the state, not colour alone: intersecting ranges are a
                   circle, a disjoint panel is a diamond that wants a conversation. */}
               <StatusChip
                 status={item.delphi.overlap === "intersect" ? "ok" : "warn"}
               >
-                {t(
-                  locale,
-                  item.delphi.overlap === "intersect"
+                {t(item.delphi.overlap === "intersect"
                     ? "delphiIntersect"
                     : "delphiDisjoint",
                 )}
@@ -2513,17 +2486,16 @@ function DeskRow({
 
 /** A stored note is a stable key; a locale that has no string for it falls back to
  * the key rather than showing nothing. */
-function versionNote(locale: Locale, note: string | null): string {
+function versionNote(note: string | null): string {
   if (!note) return "—";
   const key = `note-${note}` as MessageKey;
-  const translated = t(locale, key);
+  const translated = t(key);
   return translated === undefined ? note : translated;
 }
 
 /* ---------------- BoE preview & signature ---------------- */
 
 function BoePreview({
-  locale,
   id,
   summary,
   fullySigned,
@@ -2536,7 +2508,6 @@ function BoePreview({
   onRecordActual,
   onSigned,
 }: {
-  locale: Locale;
   id: string;
   summary: EstimateSummary;
   fullySigned: boolean;
@@ -2580,7 +2551,7 @@ function BoePreview({
   if (!summary.has_boe) {
     return (
       <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
-        {t(locale, "noDraftYet")}
+        {t("noDraftYet")}
       </div>
     );
   }
@@ -2631,7 +2602,7 @@ function BoePreview({
           padding: "14px 12px",
         }}
       >
-        <Lbl>{t(locale, "contentsRail")}</Lbl>
+        <Lbl>{t("contentsRail")}</Lbl>
         <div
           style={{
             display: "flex",
@@ -2654,11 +2625,11 @@ function BoePreview({
                 section.present
                   ? undefined
                   : section.key === "scope"
-                    ? t(locale, "scopeSectionMissing")
-                    : t(locale, "sectionAbsent")
+                    ? t("scopeSectionMissing")
+                    : t("sectionAbsent")
               }
             >
-              {t(locale, section.label)}
+              {t(section.label)}
             </a>
           ))}
         </div>
@@ -2670,12 +2641,10 @@ function BoePreview({
               paddingTop: 12,
             }}
           >
-            <Lbl>{t(locale, "coneStage")}</Lbl>
+            <Lbl>{t("coneStage")}</Lbl>
             <div style={{ marginTop: 7 }}>
               <Chip style={{ color: "var(--crit)", borderColor: "var(--crit)" }}>
-                {t(
-                  locale,
-                  boeDoc.cone_stage === "detailed"
+                {t(boeDoc.cone_stage === "detailed"
                     ? "coneDetailed"
                     : boeDoc.cone_stage === "approved_scope"
                       ? "coneApproved"
@@ -2692,7 +2661,7 @@ function BoePreview({
                 textWrap: "pretty",
               }}
             >
-              {t(locale, "coneNarrows")}
+              {t("coneNarrows")}
             </div>
           </div>
         )}
@@ -2711,15 +2680,15 @@ function BoePreview({
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>
-            {t(locale, "boeTitle")} — {summary.brd_ref}
+            {t("boeTitle")} — {summary.brd_ref}
           </span>
           {!fullySigned && (
             <>
               <Chip style={{ color: "var(--warn)" }}>
-                {t(locale, "draftWord")}
+                {t("draftWord")}
               </Chip>
               <StatusChip status="warn">
-                {t(locale, "pendingSignature")}
+                {t("pendingSignature")}
               </StatusChip>
             </>
           )}
@@ -2740,18 +2709,18 @@ function BoePreview({
               textWrap: "pretty",
             }}
           >
-            {t(locale, "signAllFirst")}
+            {t("signAllFirst")}
           </p>
         ) : (
           <>
             <table id="boe-lines" className="dt" style={{ marginTop: 14 }}>
               <thead>
                 <tr>
-                  <th>{t(locale, "lineItem")}</th>
+                  <th>{t("lineItem")}</th>
                   <th style={{ width: 62, textAlign: "right" }}>O</th>
                   <th style={{ width: 62, textAlign: "right" }}>L</th>
                   <th style={{ width: 62, textAlign: "right" }}>P</th>
-                  <th style={{ width: 160 }}>{t(locale, "actualEffort")}</th>
+                  <th style={{ width: 160 }}>{t("actualEffort")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2780,11 +2749,11 @@ function BoePreview({
                             {(line.disciplines ?? []).map((part) => (
                               <Chip key={part.discipline}>
                                 {part.discipline === "frontend"
-                                  ? t(locale, "frontendWord")
-                                  : t(locale, "backendWord")}{" "}
+                                  ? t("frontendWord")
+                                  : t("backendWord")}{" "}
                                 {part.range.likely} pd
                                 {!part.calibrated &&
-                                  ` · ${t(locale, "modelProposedBadge")}`}
+                                  ` · ${t("modelProposedBadge")}`}
                               </Chip>
                             ))}
                           </div>
@@ -2807,7 +2776,7 @@ function BoePreview({
                             <Num>{recorded.actual_effort} pd</Num>
                             {recorded.scope_changed ? (
                               <StatusChip status="crit">
-                                {t(locale, "scopeChanged")}
+                                {t("scopeChanged")}
                               </StatusChip>
                             ) : recorded.deviation !== null ? (
                               <Chip
@@ -2837,7 +2806,7 @@ function BoePreview({
                             />
                             <input
                               style={{ width: 110 }}
-                              placeholder={t(locale, "teamPlaceholder")}
+                              placeholder={t("teamPlaceholder")}
                               value={team[line.work_item_id] ?? ""}
                               onChange={(event) =>
                                 setTeam({
@@ -2847,7 +2816,7 @@ function BoePreview({
                               }
                             />
                             <select
-                              aria-label={t(locale, "disciplineWord")}
+                              aria-label={t("disciplineWord")}
                               value={discipline[line.work_item_id] ?? ""}
                               onChange={(event) =>
                                 setDisciplineFor({
@@ -2857,13 +2826,13 @@ function BoePreview({
                               }
                             >
                               <option value="">
-                                {t(locale, "disciplineWord")}
+                                {t("disciplineWord")}
                               </option>
                               <option value="frontend">
-                                {t(locale, "frontendWord")}
+                                {t("frontendWord")}
                               </option>
                               <option value="backend">
-                                {t(locale, "backendWord")}
+                                {t("backendWord")}
                               </option>
                             </select>
                             <button
@@ -2898,7 +2867,7 @@ function BoePreview({
                                 });
                               }}
                             >
-                              {t(locale, "save")}
+                              {t("save")}
                             </button>
                           </div>
                         )}
@@ -2917,12 +2886,12 @@ function BoePreview({
                 fontFamily: "var(--font-sans)",
               }}
             >
-              <Lbl>{t(locale, "total")}</Lbl>
+              <Lbl>{t("total")}</Lbl>
               <Num style={{ fontSize: 17, fontWeight: 600 }}>
                 {total.optimistic} — {total.pessimistic} pd
               </Num>
               <Chip>
-                {t(locale, "likelyShort")} {total.likely} pd
+                {t("likelyShort")} {total.likely} pd
               </Chip>
               {(() => {
                 const buckets: Record<string, number> = {};
@@ -2940,18 +2909,18 @@ function BoePreview({
                   <Chip
                     title={
                       uncalibrated
-                        ? t(locale, "modelProposedBadge")
+                        ? t("modelProposedBadge")
                         : undefined
                     }
                   >
-                    {t(locale, "disciplineSplit")}:{" "}
+                    {t("disciplineSplit")}:{" "}
                     {names
                       .map(
                         (name) =>
                           `${
                             name === "frontend"
-                              ? t(locale, "frontendWord")
-                              : t(locale, "backendWord")
+                              ? t("frontendWord")
+                              : t("backendWord")
                           } ${Math.round(buckets[name] * 10) / 10} pd`,
                       )
                       .join(" · ")}
@@ -2967,7 +2936,7 @@ function BoePreview({
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}
                 >
-                  {t(locale, "assumptionRegister")}
+                  {t("assumptionRegister")}
                 </div>
                 <ul
                   style={{
@@ -3004,7 +2973,7 @@ function BoePreview({
                 <div
                   style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}
                 >
-                  {t(locale, "risksContingency")}
+                  {t("risksContingency")}
                 </div>
                 <ul
                   style={{
@@ -3034,7 +3003,7 @@ function BoePreview({
                         entry.contingency_pd > 0 && (
                           <Chip style={{ color: "var(--warn)", flex: "none" }}>
                             +{entry.contingency_pd} pd ·{" "}
-                            {t(locale, "contingencyNote")}
+                            {t("contingencyNote")}
                           </Chip>
                         )}
                     </li>
@@ -3049,7 +3018,7 @@ function BoePreview({
             {boeLines.length > 0 && (
               <div id="boe-provenance" style={{ marginTop: 18 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
-                  {t(locale, "secProvenance")}
+                  {t("secProvenance")}
                 </div>
                 <div
                   style={{
@@ -3059,7 +3028,7 @@ function BoePreview({
                     textWrap: "pretty",
                   }}
                 >
-                  {t(locale, "provenanceIntro")}
+                  {t("provenanceIntro")}
                 </div>
                 <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none" }}>
                   {boeLines.map((line) => (
@@ -3114,18 +3083,18 @@ function BoePreview({
                 }}
               >
                 <div>
-                  <Lbl>{t(locale, "reviewer")}</Lbl>
+                  <Lbl>{t("reviewer")}</Lbl>
                   <div style={{ fontSize: 13, marginTop: 5 }}>
                     {versions?.reviewers.length
                       ? versions.reviewers.join(", ")
-                      : t(locale, "signed")}
+                      : t("signed")}
                   </div>
                   <Mn style={{ color: "var(--mut)" }}>
-                    {boeLines.length} {t(locale, "items").toLowerCase()}
+                    {boeLines.length} {t("items").toLowerCase()}
                   </Mn>
                 </div>
                 <div>
-                  <Lbl>{t(locale, "roleSigning")}</Lbl>
+                  <Lbl>{t("roleSigning")}</Lbl>
                   <div
                     style={{
                       fontSize: 13,
@@ -3135,11 +3104,11 @@ function BoePreview({
                   >
                     {versions?.authority
                       ? versions.authority.name
-                      : t(locale, "pendingAuthority")}
+                      : t("pendingAuthority")}
                   </div>
                   {versions?.authority && (
                     <Mn style={{ color: "var(--mut)" }}>
-                      {new Date(versions.authority.signed_at).toLocaleDateString(locale)}
+                      {new Date(versions.authority.signed_at).toLocaleDateString(DATE_LOCALE)}
                     </Mn>
                   )}
                 </div>
@@ -3162,7 +3131,7 @@ function BoePreview({
             reviewed on the desk; the authority signs the scope once, and only after
             every row carries a reviewer's name, so they endorse a document that was
             actually read line by line. */}
-        <Lbl>{t(locale, "signatureFlow")}</Lbl>
+        <Lbl>{t("signatureFlow")}</Lbl>
         <div
           style={{
             display: "flex",
@@ -3173,11 +3142,11 @@ function BoePreview({
           }}
         >
           <StatusChip status={fullySigned ? "ok" : "warn"}>
-            {t(locale, "reviewer")}
+            {t("reviewer")}
           </StatusChip>
           <span style={{ color: "var(--mut)" }}>&rarr;</span>
           <StatusChip status={authoritySigned ? "ok" : "warn"}>
-            {t(locale, "roleSigning")}
+            {t("roleSigning")}
           </StatusChip>
         </div>
 
@@ -3185,7 +3154,7 @@ function BoePreview({
           <div style={{ marginTop: 11 }}>
             <input
               style={{ width: "100%" }}
-              placeholder={t(locale, "estimatorName")}
+              placeholder={t("estimatorName")}
               value={authority}
               onChange={(event) => setAuthority(event.target.value)}
             />
@@ -3208,7 +3177,7 @@ function BoePreview({
                 }
               }}
             >
-              {t(locale, "authoritySigns")}
+              {t("authoritySigns")}
             </button>
             <div
               style={{
@@ -3218,7 +3187,7 @@ function BoePreview({
                 textWrap: "pretty",
               }}
             >
-              {t(locale, "signScopeHint")}
+              {t("signScopeHint")}
             </div>
           </div>
         )}
@@ -3230,20 +3199,20 @@ function BoePreview({
         {authoritySigned && versions && (
           <div style={{ marginTop: 11 }}>
             <StatusChip status="ok">
-              {t(locale, "signedConfirmation").replace("{n}", String(versions.current))}
+              {t("signedConfirmation").replace("{n}", String(versions.current))}
             </StatusChip>
           </div>
         )}
 
         <div style={{ marginTop: 18 }}>
-          <Lbl>{t(locale, "exportSection")}</Lbl>
+          <Lbl>{t("exportSection")}</Lbl>
           <div style={{ marginTop: 10 }}>
             {fullySigned ? (
               <a className="btn p" href={downloadUrl}>
-                {t(locale, "downloadDocx")}
+                {t("downloadDocx")}
               </a>
             ) : (
-              <StatusChip status="warn">{t(locale, "notSignedYet")}</StatusChip>
+              <StatusChip status="warn">{t("notSignedYet")}</StatusChip>
             )}
           </div>
         </div>
@@ -3253,7 +3222,7 @@ function BoePreview({
             numbers would be a reveal with extra steps. */}
         {versions && versions.versions.length > 0 && (
           <div style={{ marginTop: 18 }}>
-            <Lbl>{t(locale, "versionHistory")}</Lbl>
+            <Lbl>{t("versionHistory")}</Lbl>
             <div
               style={{
                 marginTop: 8,
@@ -3277,12 +3246,12 @@ function BoePreview({
                     v{entry.version}
                   </span>{" "}
                   <span style={{ color: "var(--mut)" }}>
-                    {versionNote(locale, entry.note)} · {entry.lines}{" "}
-                    {t(locale, "items").toLowerCase()}
+                    {versionNote(entry.note)} · {entry.lines}{" "}
+                    {t("items").toLowerCase()}
                   </span>
                   {entry.authority_signed && (
                     <StatusChip status="ok" style={{ marginLeft: 6 }}>
-                      {t(locale, "signed")}
+                      {t("signed")}
                     </StatusChip>
                   )}
                 </div>
@@ -3291,15 +3260,15 @@ function BoePreview({
             {versions.diffs.map((diff) => {
               const parts: string[] = [];
               if (diff.added.length)
-                parts.push(`${t(locale, "diffAdded")} ${diff.added.length}`);
+                parts.push(`${t("diffAdded")} ${diff.added.length}`);
               if (diff.removed.length)
-                parts.push(`${t(locale, "diffRemoved")} ${diff.removed.length}`);
+                parts.push(`${t("diffRemoved")} ${diff.removed.length}`);
               if (diff.widened.length)
-                parts.push(`${t(locale, "diffWidened")} ${diff.widened.length}`);
+                parts.push(`${t("diffWidened")} ${diff.widened.length}`);
               if (diff.narrowed.length)
-                parts.push(`${t(locale, "diffNarrowed")} ${diff.narrowed.length}`);
+                parts.push(`${t("diffNarrowed")} ${diff.narrowed.length}`);
               if (diff.shifted.length)
-                parts.push(`${t(locale, "diffShifted")} ${diff.shifted.length}`);
+                parts.push(`${t("diffShifted")} ${diff.shifted.length}`);
               return (
                 <div
                   key={`${diff.from}-${diff.to}`}
@@ -3313,7 +3282,7 @@ function BoePreview({
                   <Mn style={{ color: "var(--mut)" }}>
                     v{diff.from} &rarr; v{diff.to}
                   </Mn>{" "}
-                  {parts.length ? parts.join(" · ") : t(locale, "noChange")}
+                  {parts.length ? parts.join(" · ") : t("noChange")}
                 </div>
               );
             })}
@@ -3326,7 +3295,7 @@ function BoePreview({
                   textWrap: "pretty",
                 }}
               >
-                {t(locale, "diffsWithheld").replace(
+                {t("diffsWithheld").replace(
                   "{n}",
                   String(versions.diffs_withheld),
                 )}
@@ -3340,14 +3309,14 @@ function BoePreview({
                 textWrap: "pretty",
               }}
             >
-              {t(locale, "afterSigningBody")}
+              {t("afterSigningBody")}
             </div>
           </div>
         )}
 
         {critic.length > 0 && (
           <div style={{ marginTop: 18 }}>
-            <Lbl>{t(locale, "critic")}</Lbl>
+            <Lbl>{t("critic")}</Lbl>
             <div
               style={{
                 display: "flex",

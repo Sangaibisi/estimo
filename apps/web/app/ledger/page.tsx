@@ -18,7 +18,7 @@ import {
   type LedgerEntry,
   type LedgerPage,
 } from "@/lib/api";
-import { detectLocale, t, type Locale } from "@/lib/i18n";
+import { DATE_LOCALE, t } from "@/lib/i18n";
 import {
   BandHeader,
   Chip,
@@ -43,17 +43,15 @@ function bandOf(entry: LedgerEntry): Band | null {
  * inside the band is a kept promise even when it misses "likely". */
 function DeviationBadge({
   entry,
-  locale,
 }: {
   entry: LedgerEntry;
-  locale: Locale;
 }) {
   const band = bandOf(entry);
   if (entry.actual_effort === null || !band) return null;
   if (entry.actual_effort > band.pessimistic) {
     return (
       <StatusChip status="crit">
-        {t(locale, "devAbove")}
+        {t("devAbove")}
         {band.pessimistic > 0 &&
           ` · +${Math.round(
             ((entry.actual_effort - band.pessimistic) / band.pessimistic) * 100,
@@ -62,25 +60,24 @@ function DeviationBadge({
     );
   }
   if (entry.actual_effort < band.optimistic) {
-    return <StatusChip status="warn">{t(locale, "devBelow")}</StatusChip>;
+    return <StatusChip status="warn">{t("devBelow")}</StatusChip>;
   }
-  return <StatusChip status="ok">{t(locale, "devWithin")}</StatusChip>;
+  return <StatusChip status="ok">{t("devWithin")}</StatusChip>;
 }
 
 /** Month + year, in the reader's locale — a full date implies a precision the
  * ledger does not have about when work landed. */
-function delivered(iso: string | null, locale: Locale): string {
+function delivered(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB", {
+  return date.toLocaleDateString(DATE_LOCALE, {
     month: "short",
     year: "numeric",
   });
 }
 
 export default function LedgerPage() {
-  const [locale, setLocale] = useState<Locale>("en");
   const [query, setQuery] = useState("");
   const [team, setTeam] = useState("");
   const [domain, setDomain] = useState("");
@@ -121,7 +118,6 @@ export default function LedgerPage() {
   );
 
   useEffect(() => {
-    setLocale(detectLocale());
     load("", { team: "", domain: "", discipline: "" });
   }, [load]);
 
@@ -156,8 +152,8 @@ export default function LedgerPage() {
     <section className="scr">
       <div className="page-h">
         <IconLedger size={18} />
-        <h2>{t(locale, "ledger")}</h2>
-        <span className="sub">{t(locale, "ledgerSubtitle")}</span>
+        <h2>{t("ledger")}</h2>
+        <span className="sub">{t("ledgerSubtitle")}</span>
       </div>
 
       {/* While the wizard is open the page makes room for it rather than letting the
@@ -171,15 +167,15 @@ export default function LedgerPage() {
       >
         <div className="card" style={{ overflow: "hidden" }}>
           <BandHeader
-            title={t(locale, "ledger")}
-            subtitle={`${page?.total ?? 0} ${t(locale, "entriesWord")} · ${
+            title={t("ledger")}
+            subtitle={`${page?.total ?? 0} ${t("entriesWord")} · ${
               page?.with_actuals ?? 0
-            } ${t(locale, "withActuals")}`}
+            } ${t("withActuals")}`}
             right={
               <>
                 <input
                   style={{ width: 220 }}
-                  placeholder={t(locale, "analogSearchPlaceholder")}
+                  placeholder={t("analogSearchPlaceholder")}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
@@ -188,11 +184,11 @@ export default function LedgerPage() {
                   }}
                 />
                 <select
-                  aria-label={t(locale, "teamWord")}
+                  aria-label={t("teamWord")}
                   value={team}
                   onChange={(event) => applySlice({ team: event.target.value })}
                 >
-                  <option value="">{t(locale, "allTeams")}</option>
+                  <option value="">{t("allTeams")}</option>
                   {facets.teams.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -200,13 +196,13 @@ export default function LedgerPage() {
                   ))}
                 </select>
                 <select
-                  aria-label={t(locale, "domainWord")}
+                  aria-label={t("domainWord")}
                   value={domain}
                   onChange={(event) =>
                     applySlice({ domain: event.target.value })
                   }
                 >
-                  <option value="">{t(locale, "allDomains")}</option>
+                  <option value="">{t("allDomains")}</option>
                   {facets.domains.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -214,19 +210,19 @@ export default function LedgerPage() {
                   ))}
                 </select>
                 <select
-                  aria-label={t(locale, "disciplineWord")}
+                  aria-label={t("disciplineWord")}
                   value={discipline}
                   onChange={(event) =>
                     applySlice({ discipline: event.target.value })
                   }
                 >
-                  <option value="">{t(locale, "allDisciplines")}</option>
+                  <option value="">{t("allDisciplines")}</option>
                   {facets.disciplines.map((name) => (
                     <option key={name} value={name}>
                       {name === "frontend"
-                        ? t(locale, "frontendWord")
+                        ? t("frontendWord")
                         : name === "backend"
-                          ? t(locale, "backendWord")
+                          ? t("backendWord")
                           : name}
                     </option>
                   ))}
@@ -236,7 +232,7 @@ export default function LedgerPage() {
                   className="btn p"
                   onClick={() => load(query, { team, domain, discipline })}
                 >
-                  {t(locale, "search")}
+                  {t("search")}
                 </button>
                 {(searched || team || domain) && (
                   <button
@@ -249,7 +245,7 @@ export default function LedgerPage() {
                       load("", { team: "", domain: "", discipline: "" });
                     }}
                   >
-                    {t(locale, "clearSearch")}
+                    {t("clearSearch")}
                   </button>
                 )}
                 <button
@@ -261,7 +257,7 @@ export default function LedgerPage() {
                     size={14}
                     style={{ marginRight: 5, verticalAlign: -2 }}
                   />
-                  {t(locale, "importSeedSet")}
+                  {t("importSeedSet")}
                 </button>
               </>
             }
@@ -277,13 +273,13 @@ export default function LedgerPage() {
                 color: "var(--ink2)",
               }}
             >
-              {t(locale, "analogRankHint")}
+              {t("analogRankHint")}
               {/* Said whenever NO percentage could be shown — the dense leg being
                   off is only one of the two reasons; unembedded rows are the other,
                   and a reader owed an explanation does not care which. */}
               {entries.length > 0 &&
                 entries.every((entry) => entry.similarity === null) &&
-                ` · ${t(locale, "lexicalOnlyHint")}`}
+                ` · ${t("lexicalOnlyHint")}`}
             </div>
           )}
 
@@ -300,8 +296,8 @@ export default function LedgerPage() {
                   slice — including the estimate-only rows connectors and seed
                   imports write — so using it here would call open work closed. */}
               <Lbl>
-                {t(locale, "analogMatches")} · {Math.min(entries.length, 4)} /{" "}
-                {page?.with_actuals ?? 0} {t(locale, "closedJobsSuffix")}
+                {t("analogMatches")} · {Math.min(entries.length, 4)} /{" "}
+                {page?.with_actuals ?? 0} {t("closedJobsSuffix")}
               </Lbl>
               <div
                 style={{
@@ -338,7 +334,7 @@ export default function LedgerPage() {
                             title={entry.brd_ref}
                           >
                             {Math.round(entry.similarity * 100)}%{" "}
-                            {t(locale, "similarityWord")}
+                            {t("similarityWord")}
                           </Chip>
                         ) : (
                           <Mn style={{ color: "var(--mut)", flex: "none" }}>
@@ -370,12 +366,12 @@ export default function LedgerPage() {
                       >
                         <span className="mn">
                           {band
-                            ? `${band.optimistic}–${band.pessimistic} pd ${t(locale, "estimatedWord")}`
+                            ? `${band.optimistic}–${band.pessimistic} pd ${t("estimatedWord")}`
                             : "—"}
                           {entry.actual_effort !== null &&
-                            ` · ${entry.actual_effort} pd ${t(locale, "actualWord")}`}
+                            ` · ${entry.actual_effort} pd ${t("actualWord")}`}
                         </span>
-                        <DeviationBadge entry={entry} locale={locale} />
+                        <DeviationBadge entry={entry} />
                       </div>
                     </div>
                   );
@@ -410,8 +406,8 @@ export default function LedgerPage() {
                   operator with 200 rows that theirs is empty sends them to import
                   data they already have. */}
               {searched || page?.sliced
-                ? t(locale, "noMatchHere")
-                : t(locale, "ledgerEmpty")}
+                ? t("noMatchHere")
+                : t("ledgerEmpty")}
             </div>
           ) : (
             /* The table's column widths are fixed; when the import drawer narrows the
@@ -421,15 +417,15 @@ export default function LedgerPage() {
                 <thead>
                   <tr>
                     {searched && <th style={{ width: 40 }}>#</th>}
-                    <th style={{ width: 260 }}>{t(locale, "lineItem")}</th>
-                    <th style={{ width: 90 }}>{t(locale, "deliveredWord")}</th>
-                    <th style={{ width: 190 }}>{t(locale, "rangeThatDay")}</th>
-                    <th style={{ width: 90 }}>{t(locale, "actualEffort")}</th>
+                    <th style={{ width: 260 }}>{t("lineItem")}</th>
+                    <th style={{ width: 90 }}>{t("deliveredWord")}</th>
+                    <th style={{ width: 190 }}>{t("rangeThatDay")}</th>
+                    <th style={{ width: 90 }}>{t("actualEffort")}</th>
                     <th style={{ width: 120 }}>
-                      {t(locale, "deviationLabel")}
+                      {t("deviationLabel")}
                     </th>
-                    <th style={{ width: 110 }}>{t(locale, "teamWord")}</th>
-                    <th style={{ width: 90 }}>{t(locale, "boeRowColumn")}</th>
+                    <th style={{ width: 110 }}>{t("teamWord")}</th>
+                    <th style={{ width: 90 }}>{t("boeRowColumn")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -461,15 +457,15 @@ export default function LedgerPage() {
                             {entry.discipline && (
                               <Chip>
                                 {entry.discipline === "frontend"
-                                  ? t(locale, "frontendWord")
-                                  : t(locale, "backendWord")}
+                                  ? t("frontendWord")
+                                  : t("backendWord")}
                               </Chip>
                             )}
                           </div>
                         </td>
                         <td>
                           <Mn style={{ color: "var(--ink2)" }}>
-                            {delivered(entry.completed_at, locale)}
+                            {delivered(entry.completed_at)}
                           </Mn>
                         </td>
                         <td>
@@ -491,10 +487,10 @@ export default function LedgerPage() {
                         <td>
                           {entry.scope_changed ? (
                             <StatusChip status="crit">
-                              {t(locale, "scopeChanged")}
+                              {t("scopeChanged")}
                             </StatusChip>
                           ) : entry.actual_effort !== null && band ? (
-                            <DeviationBadge entry={entry} locale={locale} />
+                            <DeviationBadge entry={entry} />
                           ) : entry.deviation !== null ? (
                             <Chip
                               tone={
@@ -524,7 +520,7 @@ export default function LedgerPage() {
                               href={`/estimates/${entry.boe_link.estimate_id}`}
                               style={{ color: "var(--acc)" }}
                             >
-                              {t(locale, "openWord")} →
+                              {t("openWord")} →
                             </a>
                           ) : (
                             <Chip>{entry.actual_source ?? entry.origin}</Chip>
@@ -541,7 +537,6 @@ export default function LedgerPage() {
 
         {importing && (
           <ImportWizard
-            locale={locale}
             onClose={() => setImporting(false)}
             onImported={() => load(query, { team, domain, discipline })}
           />
@@ -549,7 +544,7 @@ export default function LedgerPage() {
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <Lbl>{t(locale, "ledgerFootnote")}</Lbl>
+        <Lbl>{t("ledgerFootnote")}</Lbl>
       </div>
     </section>
   );
@@ -563,11 +558,9 @@ export default function LedgerPage() {
  * no alias fallback underneath it) and the checklist is enforced server-side, so
  * neither step is decoration. */
 function ImportWizard({
-  locale,
   onClose,
   onImported,
 }: {
-  locale: Locale;
   onClose: () => void;
   onImported: () => void;
 }) {
@@ -644,9 +637,9 @@ function ImportWizard({
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {t(locale, "seedImportTitle")}
+          {t("seedImportTitle")}
         </div>
-        <Lbl>{t(locale, "stepOf").replace("{n}", String(step))}</Lbl>
+        <Lbl>{t("stepOf").replace("{n}", String(step))}</Lbl>
       </div>
       <div style={{ display: "flex", gap: 3, marginTop: 9 }}>
         {[1, 2, 3, 4].map((n) => (
@@ -680,7 +673,7 @@ function ImportWizard({
 
       {step === 1 && (
         <div style={{ marginTop: 11 }}>
-          <Lbl>{t(locale, "chooseFile")}</Lbl>
+          <Lbl>{t("chooseFile")}</Lbl>
           <input
             type="file"
             accept=".csv,.xlsx,.xlsm"
@@ -696,7 +689,7 @@ function ImportWizard({
 
       {step === 2 && preview && (
         <div style={{ marginTop: 11 }}>
-          <Lbl>{t(locale, "mapTheColumns")}</Lbl>
+          <Lbl>{t("mapTheColumns")}</Lbl>
           <div style={{ marginTop: 8, maxHeight: 300, overflowY: "auto" }}>
             {preview.columns.map((column) => (
               <div
@@ -732,7 +725,7 @@ function ImportWizard({
                   }
                   style={{ maxWidth: 150 }}
                 >
-                  <option value="">{t(locale, "doNotImport")}</option>
+                  <option value="">{t("doNotImport")}</option>
                   {preview.fields.map((field) => (
                     <option key={field} value={field}>
                       {field}
@@ -744,7 +737,7 @@ function ImportWizard({
           </div>
           {missing.length > 0 && (
             <div style={{ marginTop: 9, fontSize: 12, color: "var(--crit)" }}>
-              {t(locale, "missingRequired").replace(
+              {t("missingRequired").replace(
                 "{fields}",
                 missing.join(", "),
               )}
@@ -752,7 +745,7 @@ function ImportWizard({
           )}
           <div style={{ display: "flex", gap: 6, marginTop: 11 }}>
             <button type="button" className="btn" onClick={() => setStep(1)}>
-              {t(locale, "backWord")}
+              {t("backWord")}
             </button>
             <button
               type="button"
@@ -760,7 +753,7 @@ function ImportWizard({
               disabled={missing.length > 0}
               onClick={() => setStep(3)}
             >
-              {t(locale, "nextWord")}
+              {t("nextWord")}
             </button>
           </div>
         </div>
@@ -768,7 +761,7 @@ function ImportWizard({
 
       {step === 3 && (
         <div style={{ marginTop: 11 }}>
-          <Lbl>{t(locale, "beforeAnythingEnters")}</Lbl>
+          <Lbl>{t("beforeAnythingEnters")}</Lbl>
           <div
             style={{
               display: "flex",
@@ -792,7 +785,7 @@ function ImportWizard({
                   setChecks((c) => ({ ...c, personal: event.target.checked }))
                 }
               />
-              {t(locale, "checkNoPersonalData")}
+              {t("checkNoPersonalData")}
             </label>
             <label
               style={{
@@ -809,15 +802,15 @@ function ImportWizard({
                   setChecks((c) => ({ ...c, anonymised: event.target.checked }))
                 }
               />
-              {t(locale, "checkCustomersAnonymised")}
+              {t("checkCustomersAnonymised")}
             </label>
           </div>
           <div style={{ marginTop: 9, fontSize: 11.5, color: "var(--mut)" }}>
-            {t(locale, "checklistBlocks")}
+            {t("checklistBlocks")}
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 11 }}>
             <button type="button" className="btn" onClick={() => setStep(2)}>
-              {t(locale, "backWord")}
+              {t("backWord")}
             </button>
             <button
               type="button"
@@ -825,7 +818,7 @@ function ImportWizard({
               disabled={busy || !checks.personal || !checks.anonymised}
               onClick={() => void run()}
             >
-              {busy ? t(locale, "importingWord") : t(locale, "startImport")}
+              {busy ? t("importingWord") : t("startImport")}
             </button>
           </div>
         </div>
@@ -834,7 +827,7 @@ function ImportWizard({
       {step === 4 && report && (
         <div style={{ marginTop: 11, fontSize: 12.5 }}>
           <div>
-            {t(locale, "importDone")
+            {t("importDone")
               .replace("{imported}", String(report.imported))
               .replace("{total}", String(report.total_rows))}
           </div>
@@ -849,7 +842,7 @@ function ImportWizard({
               }}
             >
               <div style={{ color: "var(--ink)" }}>
-                {t(locale, "failedRowsQueue").replace(
+                {t("failedRowsQueue").replace(
                   "{n}",
                   String(report.rejected.length),
                 )}
@@ -860,7 +853,7 @@ function ImportWizard({
                 style={{ marginTop: 8 }}
                 onClick={() => setShowFailed((open) => !open)}
               >
-                {t(locale, "reviewFailedRows")}
+                {t("reviewFailedRows")}
               </button>
               {showFailed && (
                 <div
@@ -872,7 +865,7 @@ function ImportWizard({
                       style={{ padding: "5px 0", fontSize: 11.5 }}
                     >
                       <span className="mn" style={{ color: "var(--mut)" }}>
-                        {t(locale, "rowWord")} {row.row}
+                        {t("rowWord")} {row.row}
                       </span>
                       <div>{row.error}</div>
                     </div>
@@ -883,7 +876,7 @@ function ImportWizard({
           )}
           {report.duplicates.length > 0 && (
             <div style={{ marginTop: 10, color: "var(--ink2)" }}>
-              {t(locale, "duplicatesNote").replace(
+              {t("duplicatesNote").replace(
                 "{n}",
                 String(report.duplicates.length),
               )}
@@ -895,7 +888,7 @@ function ImportWizard({
               its actual as a row that never had one. */}
           {report.warnings.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <Lbl>{t(locale, "parseWarnings")}</Lbl>
+              <Lbl>{t("parseWarnings")}</Lbl>
               <div style={{ marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
                 {report.warnings.map((row) => (
                   <div
@@ -903,7 +896,7 @@ function ImportWizard({
                     style={{ padding: "4px 0", fontSize: 11.5 }}
                   >
                     <span className="mn" style={{ color: "var(--mut)" }}>
-                      {t(locale, "rowWord")} {row.row}
+                      {t("rowWord")} {row.row}
                     </span>
                     <div>{row.warning}</div>
                   </div>
@@ -913,7 +906,7 @@ function ImportWizard({
           )}
           {report.without_actuals > 0 && (
             <div style={{ marginTop: 10, color: "var(--ink2)" }}>
-              {t(locale, "noActualsNote").replace(
+              {t("noActualsNote").replace(
                 "{n}",
                 String(report.without_actuals),
               )}
@@ -921,7 +914,7 @@ function ImportWizard({
           )}
           {Object.keys(report.unknown_modules).length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <Lbl>{t(locale, "reviewQueueModules")}</Lbl>
+              <Lbl>{t("reviewQueueModules")}</Lbl>
               <div
                 style={{
                   display: "flex",
@@ -952,10 +945,10 @@ function ImportWizard({
                 setChecks({ personal: false, anonymised: false });
               }}
             >
-              {t(locale, "startOver")}
+              {t("startOver")}
             </button>
             <button type="button" className="btn" onClick={onClose}>
-              {t(locale, "cancelWord")}
+              {t("cancelWord")}
             </button>
           </div>
         </div>
@@ -968,7 +961,7 @@ function ImportWizard({
           style={{ marginTop: 11 }}
           onClick={onClose}
         >
-          {t(locale, "cancelWord")}
+          {t("cancelWord")}
         </button>
       )}
     </div>

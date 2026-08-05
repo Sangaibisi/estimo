@@ -8,12 +8,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type MetricsOverview } from "@/lib/api";
-import { detectLocale, t, type Locale } from "@/lib/i18n";
+import { DATE_LOCALE, t } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, Num, StatusChip } from "@/components/ui";
 import { IconCalibration } from "@/components/icons";
 
 export default function CalibrationPage() {
-  const [locale, setLocale] = useState<Locale>("en");
   const [data, setData] = useState<MetricsOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [team, setTeam] = useState("");
@@ -49,7 +48,6 @@ export default function CalibrationPage() {
   );
 
   useEffect(() => {
-    setLocale(detectLocale());
     load({ team: "", domain: "", discipline: "", months: null });
   }, [load]);
 
@@ -86,23 +84,23 @@ export default function CalibrationPage() {
     <section className="scr">
       <div className="page-h">
         <IconCalibration size={18} />
-        <h2>{t(locale, "calibration")}</h2>
-        <span className="sub">{t(locale, "calibrationSubtitle")}</span>
+        <h2>{t("calibration")}</h2>
+        <span className="sub">{t("calibrationSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <BandHeader
-          title={t(locale, "howHonest")}
+          title={t("howHonest")}
           subtitle={
             product_accuracy.samples === 0
-              ? t(locale, "noData")
-              : `${product_accuracy.samples} ${t(locale, "completedItems")}`
+              ? t("noData")
+              : `${product_accuracy.samples} ${t("completedItems")}`
           }
           right={
             <>
               {product_accuracy.coverage !== null ? (
                 <StatusChip status={coverageOnTarget ? "ok" : "warn"}>
-                  {t(locale, "coverageVsTarget")
+                  {t("coverageVsTarget")
                     .replace("{actual}", pct(product_accuracy.coverage))
                     .replace("{target}", pct(product_accuracy.nominal))}
                 </StatusChip>
@@ -110,22 +108,22 @@ export default function CalibrationPage() {
                 // Withheld, not missing. "No completed items yet" next to a subtitle
                 // reading "2 completed items" is the screen contradicting itself.
                 <Chip>
-                  {t(locale, "sliceWithheld")
+                  {t("sliceWithheld")
                     .replace("{n}", String(product_accuracy.samples))
                     .replace("{need}", String(product_accuracy.min_samples))}
                 </Chip>
               ) : (
-                <Chip>{t(locale, "noCoverageYet")}</Chip>
+                <Chip>{t("noCoverageYet")}</Chip>
               )}
               <select
-                aria-label={t(locale, "teamWord")}
+                aria-label={t("teamWord")}
                 value={team}
                 onChange={(event) => {
                   setTeam(event.target.value);
                   load({ team: event.target.value, domain, discipline, months });
                 }}
               >
-                <option value="">{t(locale, "allTeams")}</option>
+                <option value="">{t("allTeams")}</option>
                 {slices.teams.map((slice) => (
                   <option key={slice.key} value={slice.key}>
                     {slice.key}
@@ -133,14 +131,14 @@ export default function CalibrationPage() {
                 ))}
               </select>
               <select
-                aria-label={t(locale, "domainWord")}
+                aria-label={t("domainWord")}
                 value={domain}
                 onChange={(event) => {
                   setDomain(event.target.value);
                   load({ team, domain: event.target.value, discipline, months });
                 }}
               >
-                <option value="">{t(locale, "allDomains")}</option>
+                <option value="">{t("allDomains")}</option>
                 {slices.domains.map((slice) => (
                   <option key={slice.key} value={slice.key}>
                     {slice.key}
@@ -148,26 +146,26 @@ export default function CalibrationPage() {
                 ))}
               </select>
               <select
-                aria-label={t(locale, "disciplineWord")}
+                aria-label={t("disciplineWord")}
                 value={discipline}
                 onChange={(event) => {
                   setDiscipline(event.target.value);
                   load({ team, domain, discipline: event.target.value, months });
                 }}
               >
-                <option value="">{t(locale, "allDisciplines")}</option>
+                <option value="">{t("allDisciplines")}</option>
                 {(slices.disciplines ?? []).map((slice) => (
                   <option key={slice.key} value={slice.key}>
                     {slice.key === "frontend"
-                      ? t(locale, "frontendWord")
+                      ? t("frontendWord")
                       : slice.key === "backend"
-                        ? t(locale, "backendWord")
+                        ? t("backendWord")
                         : slice.key}
                   </option>
                 ))}
               </select>
               <select
-                aria-label={t(locale, "windowAll")}
+                aria-label={t("windowAll")}
                 value={months ?? ""}
                 onChange={(event) => {
                   const next = event.target.value
@@ -177,10 +175,10 @@ export default function CalibrationPage() {
                   load({ team, domain, discipline, months: next });
                 }}
               >
-                <option value="">{t(locale, "windowAll")}</option>
+                <option value="">{t("windowAll")}</option>
                 {[12, 24].map((n) => (
                   <option key={n} value={n}>
-                    {t(locale, "windowMonths").replace("{n}", String(n))}
+                    {t("windowMonths").replace("{n}", String(n))}
                   </option>
                 ))}
               </select>
@@ -189,7 +187,7 @@ export default function CalibrationPage() {
                 className="btn"
                 onClick={() => exportFigures(data)}
               >
-                {t(locale, "exportFigures")}
+                {t("exportFigures")}
               </button>
             </>
           }
@@ -204,7 +202,7 @@ export default function CalibrationPage() {
               borderRight: "1px solid var(--line)",
             }}
           >
-            <Lbl>{t(locale, "coverageChartTitle")}</Lbl>
+            <Lbl>{t("coverageChartTitle")}</Lbl>
             <div
               style={{
                 fontSize: 12,
@@ -212,9 +210,9 @@ export default function CalibrationPage() {
                 margin: "4px 0 10px",
               }}
             >
-              {t(locale, "coverageChartHint")}
+              {t("coverageChartHint")}
             </div>
-            <CoverageChart locale={locale} series={calibration.series} />
+            <CoverageChart series={calibration.series} />
             {calibration.current.samples < 100 && (
               <div
                 style={{
@@ -224,13 +222,13 @@ export default function CalibrationPage() {
                   textWrap: "pretty",
                 }}
               >
-                {t(locale, "lowSampleNote")}
+                {t("lowSampleNote")}
               </div>
             )}
           </div>
 
           <div style={{ width: 420, flex: "none", padding: "14px 18px" }}>
-            <Lbl>{t(locale, "maeChartTitle")}</Lbl>
+            <Lbl>{t("maeChartTitle")}</Lbl>
             <div
               style={{
                 fontSize: 12,
@@ -238,22 +236,21 @@ export default function CalibrationPage() {
                 margin: "4px 0 10px",
               }}
             >
-              {t(locale, "maeChartHint")}
+              {t("maeChartHint")}
             </div>
             <MaeBars
-              locale={locale}
               product={product_accuracy.mae_product}
               naive={product_accuracy.mae_naive_median}
             />
 
             {product_accuracy.mape_product !== null && (
               <div style={{ marginTop: 12 }}>
-                <Lbl>{t(locale, "mapeTitle")}</Lbl>
+                <Lbl>{t("mapeTitle")}</Lbl>
                 <div style={{ fontSize: 12.5, marginTop: 4 }}>
                   {pct(product_accuracy.mape_product)}{" "}
                   <span style={{ color: "var(--mut)" }}>
                     · {pct(product_accuracy.mape_naive_median)}{" "}
-                    {t(locale, "naiveMedian")}
+                    {t("naiveMedian")}
                   </span>
                 </div>
                 {product_accuracy.mape_excluded > 0 && (
@@ -264,7 +261,7 @@ export default function CalibrationPage() {
                       marginTop: 4,
                     }}
                   >
-                    {t(locale, "mapeExcluded").replace(
+                    {t("mapeExcluded").replace(
                       "{n}",
                       String(product_accuracy.mape_excluded),
                     )}
@@ -283,18 +280,18 @@ export default function CalibrationPage() {
                 textWrap: "pretty",
               }}
             >
-              {verdictSentence(locale, product_accuracy.comparison)}
+              {verdictSentence(product_accuracy.comparison)}
             </div>
 
             <div style={{ marginTop: 18 }}>
-              <Lbl>{t(locale, "transferQuantiles")}</Lbl>
+              <Lbl>{t("transferQuantiles")}</Lbl>
               <table className="dt" style={{ marginTop: 8 }}>
                 <thead>
                   <tr>
                     <th>q10</th>
                     <th>q50</th>
                     <th>q90</th>
-                    <th style={{ width: 60 }}>{t(locale, "samplesShort")}</th>
+                    <th style={{ width: 60 }}>{t("samplesShort")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -315,7 +312,7 @@ export default function CalibrationPage() {
               {calibration.current.prior_based && (
                 <div style={{ marginTop: 8 }}>
                   <StatusChip status="warn">
-                    {t(locale, "priorBased")}
+                    {t("priorBased")}
                   </StatusChip>
                 </div>
               )}
@@ -326,8 +323,8 @@ export default function CalibrationPage() {
 
       <div className="card" style={{ overflow: "hidden" }}>
         <BandHeader
-          title={t(locale, "anchoringSection")}
-          subtitle={t(locale, "anchoringSubtitle")}
+          title={t("anchoringSection")}
+          subtitle={t("anchoringSubtitle")}
         />
         <div
           style={{
@@ -337,23 +334,23 @@ export default function CalibrationPage() {
           }}
         >
           <Tile
-            label={t(locale, "entryBlind")}
+            label={t("entryBlind")}
             value={String(anchoring.entry.blind)}
           />
           <Tile
-            label={t(locale, "entryAfterReadable")}
+            label={t("entryAfterReadable")}
             value={String(anchoring.entry.after_readable)}
-            hint={t(locale, "entryHint")}
+            hint={t("entryHint")}
           />
           <Tile
-            label={t(locale, "entryUnknown")}
+            label={t("entryUnknown")}
             value={String(anchoring.entry.unknown)}
             last
           />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)" }}>
           <Tile
-            label={`${t(locale, "anchoringTile")} · ${t(locale, "samplesShort")}=${anchoring.samples}`}
+            label={`${t("anchoringTile")} · ${t("samplesShort")}=${anchoring.samples}`}
             value={
               anchoring.mean_abs_delta === null
                 ? "—"
@@ -361,25 +358,25 @@ export default function CalibrationPage() {
             }
           />
           <Tile
-            label={t(locale, "zeroDeltaTile")}
+            label={t("zeroDeltaTile")}
             value={pct(anchoring.zero_delta_share)}
-            hint={t(locale, "zeroDeltaHint")}
+            hint={t("zeroDeltaHint")}
           />
-          <Tile label={t(locale, "wipTile")} value={String(workflow.wip)} />
+          <Tile label={t("wipTile")} value={String(workflow.wip)} />
           <Tile
-            label={t(locale, "revisionTile")}
+            label={t("revisionTile")}
             value={pct(workflow.question_revision_rate)}
           />
           <Tile
-            label={t(locale, "rebuildTile")}
+            label={t("rebuildTile")}
             value={pct(workflow.rebuild_share)}
             last
           />
         </div>
       </div>
 
-      <SliceBars locale={locale} slices={slices} />
-      <QuestionImpact locale={locale} impact={question_impact} />
+      <SliceBars slices={slices} />
+      <QuestionImpact impact={question_impact} />
     </section>
   );
 }
@@ -391,10 +388,8 @@ export default function CalibrationPage() {
  * listed with its count and the reason, which is the same self-critical register the
  * coverage headline already uses. */
 function SliceBars({
-  locale,
   slices,
 }: {
-  locale: Locale;
   slices: MetricsOverview["slices"];
 }) {
   const all = [...slices.teams, ...slices.domains, ...(slices.disciplines ?? [])];
@@ -411,8 +406,8 @@ function SliceBars({
   return (
     <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
       <BandHeader
-        title={t(locale, "perSliceTitle")}
-        subtitle={t(locale, "perSliceHint")}
+        title={t("perSliceTitle")}
+        subtitle={t("perSliceHint")}
       />
       {all.length === 0 ? (
         <div
@@ -423,7 +418,7 @@ function SliceBars({
             textWrap: "pretty",
           }}
         >
-          {t(locale, "noSlicesYet")}
+          {t("noSlicesYet")}
         </div>
       ) : (
         <div style={{ padding: "14px 18px" }}>
@@ -440,9 +435,7 @@ function SliceBars({
               <span style={{ width: 170, fontSize: 12.5 }} className="mn">
                 {slice.key}{" "}
                 <span style={{ color: "var(--mut)" }}>
-                  {t(
-                    locale,
-                    slice.kind === "team"
+                  {t(slice.kind === "team"
                       ? "teamWord"
                       : slice.kind === "discipline"
                         ? "disciplineWord"
@@ -473,7 +466,7 @@ function SliceBars({
               <span style={{ width: 200, fontSize: 12, color: "var(--ink2)" }}>
                 {slice.coverage !== null
                   ? `${Math.round(slice.coverage * 100)}% · ${slice.samples}`
-                  : t(locale, "sliceWithheld")
+                  : t("sliceWithheld")
                       .replace("{n}", String(slice.samples))
                       .replace("{need}", String(slices.min_samples))}
               </span>
@@ -491,7 +484,7 @@ function SliceBars({
                 textWrap: "pretty",
               }}
             >
-              {t(locale, "worstSlice")
+              {t("worstSlice")
                 .replace("{key}", worst.key)
                 .replace(
                   "{value}",
@@ -512,10 +505,8 @@ function SliceBars({
  * before-image to diff. That is a fact about the product's own design, and saying it
  * is more useful than a rate computed from three rows. */
 function QuestionImpact({
-  locale,
   impact,
 }: {
-  locale: Locale;
   impact: MetricsOverview["question_impact"];
 }) {
   const pct = (value: number | null) =>
@@ -523,8 +514,8 @@ function QuestionImpact({
   return (
     <div className="card" style={{ overflow: "hidden" }}>
       <BandHeader
-        title={t(locale, "questionImpactTitle")}
-        subtitle={t(locale, "questionImpactHint")}
+        title={t("questionImpactTitle")}
+        subtitle={t("questionImpactHint")}
       />
       {impact.samples === 0 ? (
         <div
@@ -535,16 +526,16 @@ function QuestionImpact({
             textWrap: "pretty",
           }}
         >
-          {t(locale, "questionImpactEmpty")}
+          {t("questionImpactEmpty")}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)" }}>
           <Tile
-            label={`${t(locale, "changedShare")} · ${t(locale, "samplesShort")}=${impact.samples}`}
+            label={`${t("changedShare")} · ${t("samplesShort")}=${impact.samples}`}
             value={pct(impact.changed_share)}
           />
           <Tile
-            label={t(locale, "widthChange")}
+            label={t("widthChange")}
             value={
               impact.median_width_change === null
                 ? "—"
@@ -554,7 +545,7 @@ function QuestionImpact({
             }
             hint={
               impact.lines_created > 0
-                ? t(locale, "linesCreated").replace(
+                ? t("linesCreated").replace(
                     "{n}",
                     String(impact.lines_created),
                   )
@@ -568,7 +559,7 @@ function QuestionImpact({
         <div
           style={{ padding: "14px 18px", borderTop: "1px solid var(--line)" }}
         >
-          <Lbl>{t(locale, "reasonsTitle")}</Lbl>
+          <Lbl>{t("reasonsTitle")}</Lbl>
           <div
             style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}
           >
@@ -588,12 +579,11 @@ function QuestionImpact({
 
 /** The comparison verdict as a sentence, with the test's own numbers in it. */
 function verdictSentence(
-  locale: Locale,
   comparison: MetricsOverview["product_accuracy"]["comparison"],
 ): string {
   const decided = comparison.wins + comparison.losses;
-  const fill = (key: Parameters<typeof t>[1]) =>
-    t(locale, key)
+  const fill = (key: Parameters<typeof t>[0]) =>
+    t(key)
       .replace("{wins}", String(comparison.wins))
       .replace("{losses}", String(comparison.losses))
       .replace("{decided}", String(decided))
@@ -601,7 +591,7 @@ function verdictSentence(
         "{p}",
         comparison.p_value === null ? "—" : String(comparison.p_value),
       );
-  if (comparison.verdict === "no-signal") return t(locale, "verdictNoSignal");
+  if (comparison.verdict === "no-signal") return t("verdictNoSignal");
   if (comparison.verdict === "pipeline-better")
     return fill("verdictPipelineBetter");
   if (comparison.verdict === "baseline-better")
@@ -667,10 +657,8 @@ const H = 190;
 const PAD = { left: 38, right: 14, top: 10, bottom: 22 };
 
 function CoverageChart({
-  locale,
   series,
 }: {
-  locale: Locale;
   series: MetricsOverview["calibration"]["series"];
 }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -678,7 +666,7 @@ function CoverageChart({
   if (points.length === 0) {
     return (
       <div style={{ fontSize: 12.5, color: "var(--mut)" }}>
-        {t(locale, "noData")}
+        {t("noData")}
       </div>
     );
   }
@@ -703,7 +691,7 @@ function CoverageChart({
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: "100%", height: "auto" }}
         role="img"
-        aria-label={t(locale, "coverageChartTitle")}
+        aria-label={t("coverageChartTitle")}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
@@ -747,7 +735,7 @@ function CoverageChart({
           fontSize={10.5}
           textAnchor="end"
         >
-          {t(locale, "nominalWord")} {Math.round(nominal * 100)}%
+          {t("nominalWord")} {Math.round(nominal * 100)}%
         </text>
         <path d={path} fill="none" stroke="var(--acc)" strokeWidth={2} />
         {points.map((snap, index) => (
@@ -779,10 +767,10 @@ function CoverageChart({
               different population; pairing it with this rate rendered a 3-row 33%
               coverage as "33% · n=33". Snapshots written before migration 0016 carry
               no rolling count and show none. */}
-          {new Date(points[hover].at).toLocaleString(locale)} ·{" "}
+          {new Date(points[hover].at).toLocaleString(DATE_LOCALE)} ·{" "}
           {Math.round((points[hover].rolling_coverage as number) * 100)}%
           {points[hover].rolling_samples !== null &&
-            ` · ${t(locale, "samplesShort")}=${points[hover].rolling_samples}`}
+            ` · ${t("samplesShort")}=${points[hover].rolling_samples}`}
         </Mn>
       )}
     </>
@@ -790,25 +778,23 @@ function CoverageChart({
 }
 
 function MaeBars({
-  locale,
   product,
   naive,
 }: {
-  locale: Locale;
   product: number | null;
   naive: number | null;
 }) {
   if (product === null && naive === null) {
     return (
       <div style={{ fontSize: 12.5, color: "var(--mut)" }}>
-        {t(locale, "noData")}
+        {t("noData")}
       </div>
     );
   }
   const max = Math.max(product ?? 0, naive ?? 0, 0.1);
   const rows: [string, number | null, string][] = [
     ["Estimo", product, "var(--acc)"],
-    [t(locale, "naiveMedian"), naive, "var(--line2)"],
+    [t("naiveMedian"), naive, "var(--line2)"],
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

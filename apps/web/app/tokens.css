@@ -1,79 +1,61 @@
-/* Estimo design system — faithful port of docs/design/estimo-ui.dc.html
-   (Foundations + component layer). The design file is the source of truth; when
-   this file and the design disagree, the design wins (docs/design/README.md). */
+/* Estimo design system — port of docs/design/repository-map.dc.html (the
+   Integration Map design language). The design file is the source of truth; when
+   this file and the design disagree, the design wins (docs/design/README.md).
 
-:root,
-[data-theme="light"] {
-  --bg: #f4f4f1;
-  --surf: #ffffff;
-  --surf2: #fafaf7;
-  --surf3: #efefea;
-  --ink: #15181c;
-  --ink2: #3d434b;
-  --mut: #6b717a;
-  --line: #e2e2dc;
-  --line2: #cfcfc7;
-  --acc: #1f4b8e;
-  --acc-ink: #ffffff;
-  --acc-bg: #eaf0f9;
-  --acc-line: #b9cce6;
-  --ok: #2c6a4b;
-  --ok-bg: #e9f2ec;
-  --warn: #93651a;
-  --warn-bg: #f8f1e2;
-  --crit: #9c3a26;
-  --crit-bg: #f8ebe7;
-  --ev-code: #463f8f;
-  --ev-wiki: #1a6570;
-  --ev-analog: #7a4076;
-  --ev-ans: #3a6428;
-  --sh: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
-  --sh2: 0 8px 24px rgba(20, 24, 28, 0.1);
-  /* Brand identity: the tone-on-tone navy gradient behind chrome accents (top
-     strip, active-rail edge). Chrome only — never inside data graphics — and
-     deliberately monochrome-blue: a second hue would collide with the reserved
-     evidence colors (--ev-wiki teal came uncomfortably close). The logo tile
-     itself uses a FIXED pair in the SVGs (favicon parity), not these tokens. */
-  --brand-a: var(--acc);
-  --brand-b: #16355e;
+   One theme only: the product is a dark workstation UI. The old light/dark pair
+   and its toggle were removed with the 2026-08 redesign — a single palette means
+   every glow, gradient and chart color is tuned once, against one surface. */
+
+:root {
+  /* Surfaces — violet-tinted near-blacks (hue 295 throughout the neutrals). */
+  --bg: oklch(0.155 0.012 295);
+  --surf: oklch(0.205 0.014 295);
+  --surf2: oklch(0.182 0.014 295);
+  --surf3: oklch(0.25 0.02 295);
+  /* Ink ramp. */
+  --ink: oklch(0.93 0.01 295);
+  --ink2: oklch(0.76 0.015 295);
+  --mut: oklch(0.56 0.02 295);
+  /* Lines. */
+  --line: oklch(0.26 0.02 295);
+  --line2: oklch(0.31 0.02 295);
+  /* Accent — the design's violet, with its glow. */
+  --acc: oklch(0.72 0.16 300);
+  --acc-ink: oklch(0.18 0.04 300);
+  --acc-bg: oklch(0.235 0.03 300);
+  --acc-line: oklch(0.38 0.07 300);
+  /* Second brand hue — the data-flow cyan (edges, secondary emphasis). */
+  --flow: oklch(0.74 0.13 200);
+  --flow-line: oklch(0.4 0.07 200);
+  /* Status. */
+  --ok: oklch(0.74 0.13 150);
+  --ok-bg: oklch(0.235 0.045 150);
+  --warn: oklch(0.79 0.12 75);
+  --warn-bg: oklch(0.24 0.045 75);
+  --crit: oklch(0.68 0.15 25);
+  --crit-bg: oklch(0.235 0.05 25);
+  /* Evidence type — the third color role, never blended with the two above. */
+  --ev-code: oklch(0.74 0.12 265);
+  --ev-wiki: oklch(0.74 0.12 200);
+  --ev-analog: oklch(0.74 0.12 330);
+  --ev-ans: oklch(0.74 0.12 150);
+  /* Shadows: deep drop + the design's inset top highlight on raised surfaces. */
+  --sh: 0 10px 26px -14px rgba(0, 0, 0, 0.85), inset 0 1px 0 oklch(0.29 0.02 295);
+  --sh2: 0 22px 44px -14px rgba(0, 0, 0, 0.9);
+  --glow-acc: 0 0 22px -6px oklch(0.66 0.18 300);
+  --glow-flow: 0 0 22px -6px oklch(0.66 0.14 200);
+  /* Brand gradient (chrome accents only, never inside data graphics). */
+  --brand-a: oklch(0.72 0.16 300);
+  --brand-b: oklch(0.55 0.17 290);
   --grad-brand: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-  --r: 6px;
-  --r2: 10px;
-  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --r: 8px;
+  --r2: 11px;
+  --font-sans: Helvetica, "Helvetica Neue", Arial, ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jbmono), "JetBrains Mono", ui-monospace, monospace;
   --font-serif: var(--font-plex-serif), Georgia, serif;
 }
 
-[data-theme="dark"] {
-  --bg: #0e1013;
-  --surf: #16191e;
-  --surf2: #1b1f25;
-  --surf3: #232830;
-  --ink: #e9eaec;
-  --ink2: #c2c7ce;
-  --mut: #8d949d;
-  --line: #272c34;
-  --line2: #39404a;
-  --acc: #7ba5e8;
-  --acc-ink: #0e1013;
-  --acc-bg: #17253a;
-  --acc-line: #31435f;
-  --ok: #63b189;
-  --ok-bg: #14251d;
-  --warn: #d2a557;
-  --warn-bg: #2a2214;
-  --crit: #de8069;
-  --crit-bg: #2c1a15;
-  --ev-code: #9e97e8;
-  --ev-wiki: #5cb6c2;
-  --ev-analog: #c48abf;
-  --ev-ans: #8fbf72;
-  --sh: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sh2: 0 10px 28px rgba(0, 0, 0, 0.55);
-  --brand-b: #4a7fd4;
-}
-
-/* Row density (the design ships two modes; comfortable is the default). */
+/* Row density (the design ships two modes; dense is pinned in the root layout). */
 :root,
 [data-density="comfortable"] {
   --rp: 12px 12px;
@@ -90,16 +72,7 @@
 
 body {
   margin: 0;
-  /* A whisper of brand tint at the top of the document; settles to --bg by ~340px
-     and scrolls away with the page. Plain --bg first: the gradient needs
-     color-mix(), which the oldest supported Firefox lacks — without the fallback
-     those browsers would drop the whole declaration and paint white. */
   background: var(--bg);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--acc) 3%, var(--bg)),
-    var(--bg) 340px
-  );
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -110,7 +83,65 @@ a {
   text-decoration: none;
 }
 a:hover {
-  text-decoration: underline;
+  color: oklch(0.84 0.13 300);
+}
+
+/* The design's slim violet scrollbars. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.3 0.02 295);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.4 0.05 300);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Motion vocabulary ---- */
+@keyframes om-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Dashed edges flow when hot (selection/hover); -26 = two dash periods (7+6). */
+@keyframes om-flow {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+/* Ambient backdrop orbs — barely-there, very slow. */
+@keyframes om-drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6vw, 8vh) scale(1.15);
+  }
+}
+@keyframes om-drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.1);
+  }
+  50% {
+    transform: translate(-7vw, -6vh) scale(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .om-anim,
+  .om-anim * {
+    animation: none !important;
+  }
 }
 
 /* ---- Data table ---- */
@@ -120,9 +151,10 @@ a:hover {
   font-size: 13px;
 }
 .dt th {
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--mut);
   text-align: left;
@@ -154,19 +186,21 @@ a:hover {
   font-variant-numeric: tabular-nums;
   font-size: 11.5px;
 }
+/* Micro label — the design's monospaced, tracked-out section marker. */
 .lbl {
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--mut);
 }
 
 /* ---- Surfaces ---- */
 .card {
-  background: var(--surf);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
+  background: linear-gradient(180deg, oklch(0.225 0.016 295), var(--surf));
+  border: 1px solid var(--line2);
+  border-radius: var(--r2);
   box-shadow: var(--sh);
 }
 
@@ -175,11 +209,11 @@ a:hover {
   align-items: center;
   gap: 5px;
   border: 1px solid var(--line2);
-  border-radius: 4px;
-  padding: 2px 7px;
-  font-size: 11.5px;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 11px;
   color: var(--ink2);
-  background: var(--surf);
+  background: oklch(0.21 0.015 295);
   white-space: nowrap;
   line-height: 1.5;
 }
@@ -188,20 +222,25 @@ a:hover {
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   border: 1px solid var(--line2);
-  border-radius: 5px;
-  padding: 6px 11px;
-  font-size: 12.5px;
+  border-radius: var(--r);
+  padding: 7px 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 500;
-  color: var(--ink);
-  background: var(--surf);
+  color: var(--ink2);
+  background: oklch(0.21 0.015 295);
   cursor: pointer;
   white-space: nowrap;
-  font-family: inherit;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
 }
 .btn:hover {
-  background: var(--surf3);
+  border-color: oklch(0.46 0.03 295);
+  color: var(--ink);
 }
 .btn:focus-visible,
 .stg:focus-visible {
@@ -212,38 +251,34 @@ a:hover {
   background: var(--acc);
   border-color: var(--acc);
   color: var(--acc-ink);
+  font-weight: 700;
+  box-shadow: 0 0 24px -8px oklch(0.7 0.18 300);
 }
 .btn.p:hover {
   filter: brightness(1.08);
+  color: var(--acc-ink);
+}
+/* Accent-outline hover — the design's "Link" affordance. */
+.btn.glow:hover {
+  border-color: oklch(0.6 0.14 300);
+  color: var(--ink);
+  box-shadow: var(--glow-acc);
 }
 .btn[disabled] {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* ---- Top bar brand strip ---- */
-.topbar {
-  position: relative;
-}
-.topbar::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--grad-brand);
-}
-
-/* ---- Left rail navigation ---- */
+/* ---- Left sidebar navigation ---- */
 .rail-i {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 9px;
-  border-radius: 5px;
-  font-size: 13px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--ink2);
   cursor: pointer;
   border: 1px solid transparent;
@@ -254,26 +289,15 @@ a:hover {
 }
 .rail-i:hover {
   background: var(--surf3);
-  text-decoration: none;
+  color: var(--ink);
 }
 .rail-i.on {
-  background: var(--acc-bg);
-  border-color: var(--acc-line);
-  color: var(--acc);
-  font-weight: 500;
+  background: oklch(0.235 0.03 300);
+  border-color: oklch(0.38 0.07 300);
+  color: var(--ink);
 }
 .rail-i.on svg {
   color: var(--acc);
-}
-.rail-i.on::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--grad-brand);
 }
 
 /* ---- Page heading with its section icon ---- */
@@ -281,20 +305,21 @@ a:hover {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .page-h svg {
   color: var(--acc);
   align-self: center;
+  filter: drop-shadow(0 0 8px oklch(0.6 0.16 300 / 0.55));
 }
 .page-h h2 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 .page-h .sub {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--mut);
 }
 
@@ -304,43 +329,37 @@ a:hover {
   align-items: center;
   gap: 7px;
   padding: 6px 13px;
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--mut);
-  background: var(--surf);
+  background: oklch(0.21 0.015 295);
   border: 1px solid var(--line2);
   border-right: none;
   cursor: pointer;
-  font-family: inherit;
 }
 .stg:first-child {
-  border-radius: 5px 0 0 5px;
+  border-radius: var(--r) 0 0 var(--r);
 }
 .stg:last-child {
   border-right: 1px solid var(--line2);
-  border-radius: 0 5px 5px 0;
+  border-radius: 0 var(--r) var(--r) 0;
 }
 .stg.done {
   color: var(--ink2);
-  background: var(--surf2);
+  background: var(--surf3);
 }
 .stg.on {
   background: var(--acc);
   border-color: var(--acc);
   color: var(--acc-ink);
-  font-weight: 500;
+  font-weight: 700;
 }
 
 /* ---- Placeholder / drop target ---- */
 .ph {
-  /* color-mix fallback first, as on body. */
-  background: var(--surf2);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--acc) 3%, var(--surf2)),
-    var(--surf2)
-  );
-  border: 1px dashed var(--line2);
-  border-radius: var(--r);
+  background: oklch(0.19 0.02 300);
+  border: 1px dashed oklch(0.32 0.03 300);
+  border-radius: var(--r2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -349,25 +368,26 @@ a:hover {
   text-align: center;
 }
 
-/* ---- Form controls (design-consistent, not in the spec sheet) ---- */
+/* ---- Form controls ---- */
 input,
 select,
 textarea {
-  font: inherit;
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   border: 1px solid var(--line2);
-  border-radius: 5px;
-  padding: 6px 9px;
-  background: var(--surf);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  background: oklch(0.15 0.012 295);
   color: var(--ink);
 }
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--acc);
-  outline-offset: 1px;
+  outline: none;
+  border-color: oklch(0.6 0.14 300);
 }
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--mut);
 }
 
@@ -375,9 +395,9 @@ input::placeholder {
   color: var(--mut);
 }
 
-/* Anchor offset under the sticky top bar (design: .scr). */
+/* Anchor offset for in-page jumps. */
 .scr {
-  scroll-margin-top: 70px;
+  scroll-margin-top: 16px;
 }
 
 /* Document context — the BoE reads in Plex Serif so the exported artefact and the
@@ -386,8 +406,20 @@ input::placeholder {
   font-family: var(--font-serif);
 }
 
+/* ---- Map canvas backdrop: the 64px grid over a violet radial. ---- */
+.canvas-grid {
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .rv {
-    transition: opacity 0.28s ease, transform 0.28s ease;
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s ease;
   }
 }

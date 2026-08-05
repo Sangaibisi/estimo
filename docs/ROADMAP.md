@@ -554,6 +554,78 @@ remains, behind its own trigger conditions.
 
 ---
 
+## S14 — Repository-first redesign · `Status: 🟡 In progress (2026-08-06)`
+
+The maintainer's directive: the product's cornerstone is **adding and relating the
+company's repositories**, and the UI leads — visual/interaction decisions lock first,
+the backend follows them. The 2026-08-06 UI wave shipped (see CHANGELOG): the OKLCH
+dark design language (docs/design/repository-map.dc.html) across every screen, the
+Repository Map surface at `/map`, English-only UI, light theme removed, and Settings
+reduced to what an operator configures (connections + model gateway) pinned to the
+bottom of the nav as its own category. Same tracking rule as S12/S13: a line is
+deleted when it ships; the story goes to CHANGELOG.
+
+- [ ] **S14-1 Map persistence.** Projects, hand-drawn repository nodes, typed
+  API-call/data-flow relations, positions and type/project assignments move from
+  localStorage to the API (tenant-scoped tables + RLS per the 0009 pattern, CRUD
+  routes, optimistic UI). Include a one-shot import of the browser-local state so
+  early maps are not lost.
+- [ ] **S14-2 The map feeds the estimator.** The human-curated relation graph joins
+  the impact worker's inputs: impacted repo → its consumers along api/data edges
+  (blast radius), repo `type` → discipline priors (fe/mobile → frontend,
+  be/middleware → backend) beside the S13-3 historical ratios. Measured before/after
+  on the golden set per PRINCIPLES #7 — the graph earns its influence or stays
+  advisory.
+- [ ] **S14-3 Knowledge lane (decide).** Whether wiki/Jira connections join the map
+  as a second lane (sources feeding modules) or stay Settings-only. Decision note in
+  this file; no silent scope growth.
+- [ ] **S14-4 Rendering-stack checkpoint.** The map is deliberately hand-rolled
+  (SVG + DOM, zero new dependencies). If it outgrows that — hundreds of nodes,
+  minimap, edge routing — evaluate @xyflow/react against the ADR-0005 reliability
+  bar in an ADR before adopting anything. No other stack change is on the table:
+  Next.js + inline styles carried the redesign without friction.
+
+### S14-R — 2026-08-05 consolidated S13 review, carried forward
+
+The end-of-sprint multi-role review confirmed 9 findings before its verifier wave hit
+session limits (23 finder findings remain unverified; titles live in the workflow
+journal). Backend fixes deliberately follow the UI-first directive — none of this is
+live beyond the maintainer's own machine. Each fix lands with a mutation-verified
+regression test.
+
+- [ ] **BLOCKER · pin scoping is an ACL bypass** (`packages/connectors/…/pins.py`).
+  A Confluence pin fetches any page ID with no check that the page's space is in the
+  connection's `space_keys`, then stamps it with the connection's ACL keys —
+  space-permission-protected pages have no page-level restrictions, so private
+  content can surface under e.g. `public`. Jira pins likewise bypass the operator's
+  JQL scope. Fix: enforce space membership in the pin path (page's space vs
+  `space_keys`) and JQL membership for issue pins, refusing out-of-scope refs.
+- [ ] **MAJOR · `estimo-boe` CLI is cross-tenant** (`packages/estimate/…/cli.py`).
+  No `--tenant` flag, no GUC pinning: an app-role URL silently returns zero rows, an
+  owner URL bypasses RLS and can leak another tenant's repo structure into the BoE.
+  Copy the embed CLI's tenant-pinning pattern.
+- [ ] **MAJOR · builder-ACL wiki content is stored tenant-wide**
+  (`packages/estimate/…/impact_worker.py`). Wiki claims retrieved under the
+  BUILDER's audiences are baked into `boe.impact` with no audience recorded, then
+  served to any tenant reader once the estimate is signed. Record the audience on
+  stored analyses (or restrict what the worker may quote).
+- [ ] **MAJOR · per-discipline actuals collide** (`packages/estimate/…/loop.py`).
+  Two actuals for the same line with different disciplines overwrite each other and
+  are graded against the full-line band. Thread discipline into the origin ref /
+  dedupe key and grade against the discipline sub-range.
+- [ ] **MINOR · uncapped discovery risks** (`estimator.py`): injected wiki text can
+  mint unlimited 30%-contingency risk rows; cap per item.
+- [ ] **MINOR · cadence PATCH omitted-field semantics** (`routers/connections.py`):
+  omitting `sync_cadence_minutes` silently disables scheduling; distinguish
+  omitted from explicit null.
+- [ ] **MINOR · ledger "clear search" ignores the discipline slice**
+  (`apps/web/app/ledger/page.tsx`).
+- [ ] **Retriage the 23 unverified finder findings** (scheduler starvation, stuck
+  `running` rows, pin-version pruning, per-request CodeGraph reassembly, worker
+  call budget, …) — verify inline and fix the real ones.
+
+---
+
 ## Continuous tracks (apply to every sprint)
 
 - **E — Evals:** Every PR that changes estimation behavior carries a golden-set report;

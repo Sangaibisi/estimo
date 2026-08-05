@@ -1,154 +1,180 @@
 "use client";
 
-/** App chrome: the sticky top bar and the 184px left rail from the design.
+/** App chrome — the design's left sidebar (docs/design/repository-map.dc.html).
  *
- * The design is explicit that this is a desktop workstation UI (min-width 1280px,
- * no mobile breakpoint) and that theme is a root data attribute (density is pinned
- * to "dense" in the root layout — the toggle was dropped as operator noise). The
- * identity layer (docs/design/README.md) replaced the original CSS-primitive rail
- * squares with the drawn SVG icon set — still no glyph font, no emoji. */
+ * One dark theme, English-only UI, no top bar: the sidebar is the whole chrome.
+ * Two nav groups: WORKSPACE (the estimation surfaces) and, pinned to the bottom
+ * as its own category, ADMIN (deployment settings only). Behind everything sits
+ * the ambient layer — the design's violet radial plus two very slow drifting
+ * orbs (`om-drift-*`, disabled under prefers-reduced-motion). */
 
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { detectLocale, setLocale, t, type Locale } from "@/lib/i18n";
 import {
   IconAdmin,
   IconCalibration,
   IconEstimates,
   IconKnowledge,
   IconLedger,
-  IconMoon,
-  IconSun,
+  IconMap,
   LogoMark,
 } from "@/components/icons";
 
-type Theme = "light" | "dark";
-
-const RAIL: {
+const WORKSPACE: {
   href: string;
-  key: "estimates" | "ledger" | "calibration" | "knowledge" | "admin";
+  label: string;
   icon: (props: { size?: number }) => ReactNode;
 }[] = [
-  { href: "/", key: "estimates", icon: IconEstimates },
-  { href: "/ledger", key: "ledger", icon: IconLedger },
-  { href: "/calibration", key: "calibration", icon: IconCalibration },
-  { href: "/knowledge", key: "knowledge", icon: IconKnowledge },
-  { href: "/admin", key: "admin", icon: IconAdmin },
+  { href: "/", label: "Estimates", icon: IconEstimates },
+  { href: "/map", label: "Repository map", icon: IconMap },
+  { href: "/ledger", label: "Ledger", icon: IconLedger },
+  { href: "/calibration", label: "Calibration", icon: IconCalibration },
+  { href: "/knowledge", label: "Knowledge", icon: IconKnowledge },
 ];
+
+const groupLabel: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: 9.5,
+  letterSpacing: "0.18em",
+  color: "var(--mut)",
+  padding: "0 12px",
+  marginBottom: 6,
+};
+
+function orb(color: string, size: number, pos: CSSProperties, anim: string): CSSProperties {
+  return {
+    position: "absolute",
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    background: `radial-gradient(circle, ${color}, transparent 70%)`,
+    filter: "blur(70px)",
+    opacity: 0.55,
+    animation: `${anim} linear infinite`,
+    ...pos,
+  };
+}
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [locale, setLocaleState] = useState<Locale>("en");
-  const [theme, setTheme] = useState<Theme>("light");
-
-  useEffect(() => {
-    setLocaleState(detectLocale());
-    const storedTheme = window.localStorage.getItem("estimo-theme");
-    const initialTheme: Theme =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    setTheme(initialTheme);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("estimo-theme", theme);
-  }, [theme]);
-
-  useEffect(() => {
-    // CSS text-transform cases by the CONTENT language: Turkish uppercases i → İ
-    // only when the tree is marked tr, otherwise every uppercased label ships the
-    // wrong glyph ("PROFILI" for "PROFİLİ").
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  const switchLocale = useCallback((next: Locale) => {
-    setLocale(next);
-    setLocaleState(next);
-  }, []);
 
   const active = (href: string) =>
     href === "/" ? pathname === "/" || pathname.startsWith("/estimates") : pathname.startsWith(href);
 
+  const item = (entry: (typeof WORKSPACE)[number]) => (
+    <Link
+      key={entry.href}
+      href={entry.href}
+      className={`rail-i ${active(entry.href) ? "on" : ""}`.trim()}
+    >
+      <entry.icon size={16} />
+      {entry.label}
+    </Link>
+  );
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <header
-        className="topbar"
+    <div style={{ height: "100vh", display: "flex", overflow: "hidden" }}>
+      {/* Ambient layer: the design's violet radial + two slow orbs. */}
+      <div
+        aria-hidden
+        className="om-anim"
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          padding: "10px 22px",
-          background: "var(--surf)",
-          borderBottom: "1px solid var(--line2)",
-          boxShadow: "var(--sh)",
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(120% 90% at 30% 0%, oklch(0.2 0.03 300) 0%, var(--bg) 62%)",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <LogoMark size={24} />
-          <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em" }}>
-            Estimo
-          </span>
-          <span className="lbl" style={{ alignSelf: "center", paddingTop: 1 }}>
-            {t(locale, "tagline")}
-          </span>
-        </div>
-        <div style={{ flex: 1 }} />
-        <select
-          aria-label="Language"
-          value={locale}
-          onChange={(event) => switchLocale(event.target.value as Locale)}
-          style={{ fontSize: 12.5 }}
-        >
-          <option value="en">EN</option>
-          <option value="tr">TR</option>
-        </select>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-        >
-          {theme === "light" ? <IconMoon size={14} /> : <IconSun size={14} />}
-          {theme === "light" ? t(locale, "themeDark") : t(locale, "themeLight")}
-        </button>
-      </header>
+        <div
+          style={orb(
+            "oklch(0.4 0.13 300 / 0.5)",
+            560,
+            { top: "-12%", left: "8%" },
+            "om-drift-a 52s",
+          )}
+        />
+        <div
+          style={orb(
+            "oklch(0.4 0.1 200 / 0.35)",
+            480,
+            { bottom: "-18%", right: "-6%" },
+            "om-drift-b 67s",
+          )}
+        />
+      </div>
 
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <nav
+      <nav
+        style={{
+          width: 224,
+          flex: "none",
+          zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          borderRight: "1px solid var(--line)",
+          background: "linear-gradient(180deg, oklch(0.185 0.016 295), oklch(0.165 0.012 295))",
+          overflowY: "auto",
+        }}
+      >
+        <Link
+          href="/"
           style={{
-            width: 184,
-            flex: "none",
-            borderRight: "1px solid var(--line)",
-            background: "var(--surf2)",
-            padding: "12px 10px",
             display: "flex",
-            flexDirection: "column",
-            gap: 3,
+            alignItems: "center",
+            gap: 11,
+            padding: "16px 16px",
+            borderBottom: "1px solid var(--line)",
+            color: "var(--ink)",
           }}
         >
-          {RAIL.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`rail-i ${active(item.href) ? "on" : ""}`.trim()}
+          <LogoMark size={26} />
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
+              Estimo
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 8.5,
+                color: "var(--mut)",
+                letterSpacing: "0.16em",
+              }}
             >
-              <item.icon size={16} />
-              {t(locale, item.key)}
-            </Link>
-          ))}
-          <div style={{ flex: 1, minHeight: 36 }} />
-        </nav>
+              BASIS OF ESTIMATE
+            </span>
+          </span>
+        </Link>
 
-        <main style={{ flex: 1, minWidth: 0, padding: "18px 22px 60px" }}>{children}</main>
-      </div>
+        <div style={{ padding: "16px 8px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={groupLabel}>WORKSPACE</div>
+          {WORKSPACE.map(item)}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 24 }} />
+
+        {/* Admin lives at the bottom, as its own category — deployment settings
+            only (connections + model gateway), away from the daily surfaces. */}
+        <div style={{ padding: "10px 8px 14px", display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 6px 10px" }} />
+          <div style={groupLabel}>ADMIN</div>
+          {item({ href: "/admin", label: "Settings", icon: IconAdmin })}
+        </div>
+      </nav>
+
+      <main
+        style={{
+          flex: 1,
+          minWidth: 0,
+          zIndex: 1,
+          overflow: "auto",
+          padding: "18px 22px 60px",
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 }

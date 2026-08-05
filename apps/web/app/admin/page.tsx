@@ -1,12 +1,14 @@
 "use client";
 
-/** 10 · Admin — "Boring but transparent: sync status, error queues, roles."
+/** Settings — deployment configuration only: connections + the model gateway.
  *
- * Connection tiles carry the design's canonical error shape: what failed, the code,
- * and the exact remedial path. Credentials entered here are sealed before storage
- * (ADR-0008 — encrypted when ESTIMO_SECRET_KEY is set) and never serialized back;
- * the env-var-name lane remains available. The Model gateway card EDITS runtime
- * config: what it saves overrides the environment immediately. */
+ * The 2026-08 redesign cut this surface down to what an operator actually
+ * configures (the admin JSON: gateway + connections). Runtime/auth facts became
+ * a one-line system strip — reported, never edited (env-only) — and the static
+ * roles explainer left entirely. Credentials entered here are sealed before
+ * storage (ADR-0008) and never serialized back; the env-var-name lane remains.
+ * The Model gateway card EDITS runtime config: saving overrides the environment
+ * immediately. */
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -15,36 +17,43 @@ import {
   type GatewayCheckResult,
   type SystemInfo,
 } from "@/lib/api";
-import { detectLocale, t, type Locale } from "@/lib/i18n";
+import { DATE_LOCALE, t } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
-import {
-  CONNECTOR_LABELS,
-  ConnectorMark,
-  IconAdmin,
-} from "@/components/icons";
+import { CONNECTOR_LABELS, ConnectorMark, IconAdmin } from "@/components/icons";
 
 const KINDS = ["confluence", "bitbucket", "github", "gitlab", "git", "jira"];
 
-const ROLE_ROWS: {
-  role: "roleAnalyst" | "roleReviewer" | "roleSigning" | "roleAdmin";
-  sign: "maySignNothing" | "maySignLines" | "maySignFull";
-}[] = [
-  { role: "roleAnalyst", sign: "maySignNothing" },
-  { role: "roleReviewer", sign: "maySignNothing" },
-  { role: "roleSigning", sign: "maySignLines" },
-  { role: "roleAdmin", sign: "maySignFull" },
-];
+/** Per-kind hint for the free-form config JSON — the shapes the connectors read. */
+const CONFIG_HINTS: Record<string, string> = {
+  confluence: '{"space_keys": ["AUR"], "email": "…"}',
+  bitbucket: '{"auth": "bearer", "username": "…", "branch": "main"}',
+  github: '{"branch": "main"}',
+  gitlab: '{"branch": "main"}',
+  git: '{"branch": "main"}',
+  jira: '{"email": "…", "jql": "project = AUR", "points_to_pd": 1}',
+};
+
+function statsLine(stats: Record<string, unknown> | null): string {
+  if (!stats) return "";
+  const graph = stats.graph as Record<string, unknown> | undefined;
+  if (graph && typeof graph === "object") {
+    const n = (v: unknown) => (typeof v === "number" ? v.toLocaleString(DATE_LOCALE) : "—");
+    return `${n(graph.files)} files · ${n(graph.modules)} modules · ${n(graph.symbols)} symbols`;
+  }
+  return Object.entries(stats)
+    .filter(([, value]) => typeof value === "number" || typeof value === "string")
+    .slice(0, 4)
+    .map(([key, value]) => `${value} ${key}`)
+    .join(" · ");
+}
 
 export default function AdminPage() {
-  const [locale, setLocale] = useState<Locale>("en");
   const [connections, setConnections] = useState<ConnectionEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [system, setSystem] = useState<SystemInfo | null>(null);
-  const [gatewayResult, setGatewayResult] = useState<GatewayCheckResult | null>(
-    null,
-  );
+  const [gatewayResult, setGatewayResult] = useState<GatewayCheckResult | null>(null);
   const [checking, setChecking] = useState(false);
 
   const [kind, setKind] = useState("bitbucket");
@@ -64,9 +73,7 @@ export default function AdminPage() {
   const [gwTimeout, setGwTimeout] = useState("");
   const [gwConnectTimeout, setGwConnectTimeout] = useState("");
   const [gwRetries, setGwRetries] = useState("");
-  const [gwProfiles, setGwProfiles] = useState<
-    { stage: string; profile: string }[]
-  >([]);
+  const [gwProfiles, setGwProfiles] = useState<{ stage: string; profile: string }[]>([]);
   const [gwSaved, setGwSaved] = useState(false);
 
   const loadSystem = useCallback(() => {
@@ -79,25 +86,16 @@ export default function AdminPage() {
         // for the first time, not correcting ours.
         setGwBaseUrl(info.gateway.base_url ?? "");
         setGwTimeout(
-          info.gateway.timeout_seconds === null
-            ? ""
-            : String(info.gateway.timeout_seconds),
+          info.gateway.timeout_seconds === null ? "" : String(info.gateway.timeout_seconds),
         );
         setGwConnectTimeout(
           info.gateway.connect_timeout_seconds === null
             ? ""
             : String(info.gateway.connect_timeout_seconds),
         );
-        setGwRetries(
-          info.gateway.max_retries === null
-            ? ""
-            : String(info.gateway.max_retries),
-        );
+        setGwRetries(info.gateway.max_retries === null ? "" : String(info.gateway.max_retries));
         setGwProfiles(
-          Object.entries(info.gateway.profiles).map(([stage, profile]) => ({
-            stage,
-            profile,
-          })),
+          Object.entries(info.gateway.profiles).map(([stage, profile]) => ({ stage, profile })),
         );
         setGwApiKey("");
       })
@@ -112,7 +110,6 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    setLocale(detectLocale());
     refresh();
     loadSystem();
   }, [refresh, loadSystem]);
@@ -134,8 +131,7 @@ export default function AdminPage() {
   function numeric(raw: string, label: string): number | null {
     if (!raw.trim()) return null;
     const value = Number(raw.trim().replace(",", "."));
-    if (!Number.isFinite(value))
-      throw new Error(`${label}: not a number — "${raw}"`);
+    if (!Number.isFinite(value)) throw new Error(`${label}: not a number — "${raw}"`);
     return value;
   }
 
@@ -161,17 +157,13 @@ export default function AdminPage() {
         }
         const filled = rows.filter((row) => row.stage && row.profile);
         const duplicate = filled.find(
-          (row, index) =>
-            filled.findIndex((other) => other.stage === row.stage) !== index,
+          (row, index) => filled.findIndex((other) => other.stage === row.stage) !== index,
         );
         if (duplicate) throw new Error(`duplicate stage: "${duplicate.stage}"`);
 
-        const timeout = numeric(gwTimeout, t(locale, "timeoutShort"));
-        const connectTimeout = numeric(
-          gwConnectTimeout,
-          t(locale, "timeoutShort"),
-        );
-        const retries = numeric(gwRetries, t(locale, "retriesShort"));
+        const timeout = numeric(gwTimeout, t("timeoutShort"));
+        const connectTimeout = numeric(gwConnectTimeout, t("timeoutShort"));
+        const retries = numeric(gwRetries, t("retriesShort"));
 
         await api.putGateway({
           // Only send the URL when the operator actually changed it: the value in
@@ -181,13 +173,9 @@ export default function AdminPage() {
             ? { base_url: gwBaseUrl.trim() }
             : {}),
           ...(gwApiKey ? { api_key: gwApiKey } : {}),
-          profiles: Object.fromEntries(
-            filled.map((row) => [row.stage, row.profile]),
-          ),
+          profiles: Object.fromEntries(filled.map((row) => [row.stage, row.profile])),
           ...(timeout !== null ? { timeout_seconds: timeout } : {}),
-          ...(connectTimeout !== null
-            ? { connect_timeout_seconds: connectTimeout }
-            : {}),
+          ...(connectTimeout !== null ? { connect_timeout_seconds: connectTimeout } : {}),
           ...(retries !== null ? { max_retries: retries } : {}),
         });
       }
@@ -221,86 +209,81 @@ export default function AdminPage() {
   }
 
   return (
-    <section className="scr">
+    <section className="scr" style={{ maxWidth: 1120 }}>
       <div className="page-h">
         <IconAdmin size={18} />
-        <h2>{t(locale, "admin")}</h2>
-        <span className="sub">{t(locale, "adminSubtitle")}</span>
+        <h2>Settings</h2>
+        <span className="sub">Deployment configuration — connections and the model gateway.</span>
       </div>
 
+      {error && (
+        <div
+          role="alert"
+          style={{
+            padding: "10px 16px",
+            marginBottom: 14,
+            border: "1px solid var(--crit)",
+            borderRadius: "var(--r)",
+            background: "var(--crit-bg)",
+            color: "var(--crit)",
+            fontSize: 12.5,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* ---- Connections ---- */}
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <BandHeader
-          title={t(locale, "connections")}
+          title={t("connections")}
+          subtitle="Synced sources — they appear on the repository map and feed retrieval."
           right={
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setShowForm(!showForm)}
-            >
-              {t(locale, "addConnection")}
+            <button type="button" className="btn glow" onClick={() => setShowForm(!showForm)}>
+              {showForm ? "Close" : `+ ${t("addConnection")}`}
             </button>
           }
         />
 
-        {error && (
-          <div
-            role="alert"
-            style={{
-              padding: "10px 18px",
-              borderBottom: "1px solid var(--line)",
-              background: "var(--crit-bg)",
-              color: "var(--crit)",
-              fontSize: 12.5,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
         {showForm && (
           <div
             style={{
-              padding: "14px 18px",
+              padding: "16px 18px",
               borderBottom: "1px solid var(--line)",
-              background: "var(--surf2)",
+              background: "oklch(0.19 0.016 300)",
             }}
           >
             <div
               style={{
-                fontSize: 12.5,
+                fontSize: 12,
                 color: "var(--ink2)",
-                marginBottom: 10,
+                marginBottom: 12,
                 textWrap: "pretty",
               }}
             >
-              {t(locale, "secretEnvHint")}
+              {t("secretEnvHint")}
             </div>
             <div
               style={{
-                display: "flex",
+                display: "grid",
+                gridTemplateColumns: "150px 1fr 1fr",
                 gap: 8,
-                flexWrap: "wrap",
                 alignItems: "center",
               }}
             >
-              <select
-                aria-label="kind"
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-              >
+              <select aria-label="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
                 {KINDS.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {CONNECTOR_LABELS[option] ?? option}
                   </option>
                 ))}
               </select>
               <input
-                placeholder={t(locale, "connectionName")}
+                placeholder={t("connectionName")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
               <input
-                style={{ minWidth: 280 }}
                 placeholder="https://… (base URL / clone URL)"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
@@ -308,33 +291,33 @@ export default function AdminPage() {
               <input
                 type="password"
                 autoComplete="off"
-                style={{ minWidth: 230 }}
-                placeholder={t(locale, "secretValuePlaceholder")}
+                placeholder={t("secretValuePlaceholder")}
                 value={secretValue}
                 onChange={(e) => setSecretValue(e.target.value)}
               />
               <input
-                placeholder={`${t(locale, "orEnvVar")} — ESTIMO_SECRET_…`}
+                placeholder={`${t("orEnvVar")} — ESTIMO_SECRET_…`}
                 value={secretEnv}
                 onChange={(e) => setSecretEnv(e.target.value)}
               />
               <input
-                placeholder={t(locale, "aclKeysPlaceholder")}
+                placeholder={t("aclKeysPlaceholder")}
                 value={aclKeys}
                 onChange={(e) => setAclKeys(e.target.value)}
               />
               <input
                 style={{
-                  minWidth: 220,
+                  gridColumn: "1 / span 2",
                   borderColor: configValid ? undefined : "var(--crit)",
                 }}
-                placeholder='config JSON — {"space_keys": ["AUR"]}'
+                placeholder={`config JSON — ${CONFIG_HINTS[kind] ?? "{}"}`}
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
               />
               <button
                 type="button"
                 className="btn p"
+                style={{ justifyContent: "center" }}
                 disabled={busy || !name || !baseUrl || !configValid}
                 onClick={() =>
                   run(async () => {
@@ -362,23 +345,22 @@ export default function AdminPage() {
                   })
                 }
               >
-                {t(locale, "save")}
+                {t("save")}
               </button>
             </div>
           </div>
         )}
 
         {connections.length === 0 ? (
-          <div
-            style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}
-          >
-            —
+          <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
+            No connections yet — add the wiki, issue tracker and repositories this deployment
+            estimates against.
           </div>
         ) : (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))",
               gap: 14,
               padding: "16px 18px",
             }}
@@ -387,13 +369,17 @@ export default function AdminPage() {
               const run_ = connection.last_run;
               const failed = run_?.status === "failed";
               const running = run_?.status === "running";
+              const stats = statsLine(run_?.stats ?? null);
               return (
                 <div
                   key={connection.id}
                   className="card"
                   style={{
-                    padding: "13px 15px",
+                    padding: "14px 15px",
                     borderColor: failed ? "var(--crit)" : undefined,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
                   }}
                 >
                   <div
@@ -405,19 +391,15 @@ export default function AdminPage() {
                     }}
                   >
                     <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 9,
-                        minWidth: 0,
-                      }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}
                     >
-                      <ConnectorMark kind={connection.kind} />
+                      <ConnectorMark kind={connection.kind} size={30} />
                       <span style={{ minWidth: 0 }}>
                         <span
                           style={{
                             display: "block",
-                            fontSize: 14,
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 13,
                             fontWeight: 500,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -426,128 +408,90 @@ export default function AdminPage() {
                         >
                           {connection.name}
                         </span>
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: 11.5,
-                            color: "var(--mut)",
-                          }}
-                        >
+                        <span style={{ display: "block", fontSize: 11, color: "var(--mut)" }}>
                           {CONNECTOR_LABELS[connection.kind] ?? connection.kind}
                           {connection.sync_cadence_minutes
-                            ? ` · ${connection.sync_cadence_minutes} ${t(locale, "minShort")}`
-                            : ""}
+                            ? ` · every ${connection.sync_cadence_minutes} ${t("minShort")}`
+                            : " · manual sync"}
                         </span>
                       </span>
                     </span>
                     {failed ? (
-                      <StatusChip status="crit">
-                        {t(locale, "errorWord")}
-                      </StatusChip>
+                      <StatusChip status="crit">{t("errorWord")}</StatusChip>
                     ) : running ? (
-                      <StatusChip status="warn">
-                        {t(locale, "firstSync")}
-                      </StatusChip>
+                      <StatusChip status="warn">{t("firstSync")}</StatusChip>
                     ) : run_ ? (
-                      <StatusChip status="ok">
-                        {t(locale, "connected")}
-                      </StatusChip>
+                      <StatusChip status="ok">{t("connected")}</StatusChip>
                     ) : (
-                      <Chip>{t(locale, "neverSynced")}</Chip>
+                      <Chip>{t("neverSynced")}</Chip>
                     )}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      marginTop: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {connection.secret_env && !connection.secret_present && (
-                      <StatusChip status="crit">
-                        {t(locale, "secretMissing")}
-                      </StatusChip>
-                    )}
-                    {(connection.acl_keys ?? []).slice(0, 2).map((key) => (
-                      <Chip key={key}>{key}</Chip>
-                    ))}
                   </div>
 
                   {failed && run_?.error ? (
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        color: "var(--ink2)",
-                        marginTop: 9,
-                        textWrap: "pretty",
-                      }}
-                    >
+                    <div style={{ fontSize: 12, color: "var(--crit)", textWrap: "pretty" }}>
                       {run_.error.slice(0, 180)}
                     </div>
                   ) : running ? (
-                    <>
-                      <div
-                        style={{
-                          height: 6,
-                          borderRadius: 3,
-                          background: "var(--surf3)",
-                          marginTop: 11,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "38%",
-                            height: "100%",
-                            background: "var(--acc)",
-                          }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "var(--ink2)",
-                          marginTop: 8,
-                        }}
-                      >
-                        {t(locale, "firstSyncHint")}
-                      </div>
-                    </>
-                  ) : (
                     <div
                       style={{
-                        fontSize: 12,
-                        color: "var(--ink2)",
-                        marginTop: 9,
+                        height: 6,
+                        borderRadius: 3,
+                        background: "var(--surf3)",
+                        overflow: "hidden",
                       }}
                     >
-                      {run_
-                        ? `${t(locale, "lastSyncAgo")} ${new Date(run_.started_at).toLocaleString(locale)}${
-                            run_.stats
-                              ? ` · ${JSON.stringify(run_.stats).slice(1, 60)}`
-                              : ""
-                          }`
-                        : t(locale, "neverSynced")}
+                      <div
+                        style={{
+                          width: "38%",
+                          height: "100%",
+                          background: "var(--acc)",
+                          boxShadow: "0 0 12px var(--acc)",
+                          animation: "om-pulse 1.4s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mn" style={{ color: "var(--ink2)" }}>
+                      {run_ ? (
+                        <>
+                          {stats || "synced"}
+                          <span style={{ color: "var(--mut)" }}>
+                            {" "}
+                            · {new Date(run_.started_at).toLocaleString(DATE_LOCALE)}
+                          </span>
+                        </>
+                      ) : (
+                        t("neverSynced")
+                      )}
                     </div>
                   )}
+
+                  {(connection.secret_env && !connection.secret_present) ||
+                  (connection.acl_keys ?? []).length > 0 ? (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {connection.secret_env && !connection.secret_present && (
+                        <StatusChip status="crit">{t("secretMissing")}</StatusChip>
+                      )}
+                      {(connection.acl_keys ?? []).slice(0, 3).map((key) => (
+                        <Chip key={key}>{key}</Chip>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <div
                     style={{
                       display: "flex",
                       gap: 6,
-                      marginTop: 11,
                       alignItems: "center",
                       flexWrap: "wrap",
+                      borderTop: "1px solid var(--line)",
+                      paddingTop: 10,
                     }}
                   >
-                    <span style={{ fontSize: 11.5, color: "var(--mut)" }}>
-                      {t(locale, "cadenceLabel")}
-                    </span>
+                    <span style={{ fontSize: 11, color: "var(--mut)" }}>{t("cadenceLabel")}</span>
                     <input
-                      style={{ width: 64 }}
-                      placeholder={t(locale, "cadenceOff")}
+                      style={{ width: 62, padding: "5px 8px" }}
+                      placeholder={t("cadenceOff")}
                       value={
                         cadenceEdit[connection.id] ??
                         (connection.sync_cadence_minutes === null
@@ -555,15 +499,13 @@ export default function AdminPage() {
                           : String(connection.sync_cadence_minutes))
                       }
                       onChange={(event) =>
-                        setCadenceEdit({
-                          ...cadenceEdit,
-                          [connection.id]: event.target.value,
-                        })
+                        setCadenceEdit({ ...cadenceEdit, [connection.id]: event.target.value })
                       }
                     />
                     <button
                       type="button"
                       className="btn"
+                      style={{ padding: "5px 10px" }}
                       disabled={busy}
                       onClick={() => {
                         const raw = (cadenceEdit[connection.id] ?? "").trim();
@@ -572,34 +514,54 @@ export default function AdminPage() {
                         run(() => api.setCadence(connection.id, minutes));
                       }}
                     >
-                      {t(locale, "save")}
+                      {t("save")}
                     </button>
-                  </div>
-                  {(connection.kind === "confluence" ||
-                    connection.kind === "jira") && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 6,
-                        marginTop: 8,
-                        alignItems: "center",
-                        flexWrap: "wrap",
+                    <span style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      className="btn glow"
+                      style={{ padding: "5px 10px" }}
+                      disabled={busy || running}
+                      onClick={() => run(() => api.triggerSync(connection.id))}
+                    >
+                      {t("syncNow")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ padding: "5px 10px" }}
+                      aria-label="delete connection"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t("confirmDeleteConnection").replace("{name}", connection.name),
+                          )
+                        ) {
+                          run(() => api.deleteConnection(connection.id));
+                        }
                       }}
                     >
+                      ✕
+                    </button>
+                  </div>
+
+                  {(connection.kind === "confluence" || connection.kind === "jira") && (
+                    <div
+                      style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
+                    >
                       <input
-                        style={{ width: 150 }}
-                        placeholder={t(locale, "pinPlaceholder")}
+                        style={{ width: 150, padding: "5px 8px" }}
+                        placeholder={t("pinPlaceholder")}
                         value={pinRef[connection.id] ?? ""}
                         onChange={(event) =>
-                          setPinRef({
-                            ...pinRef,
-                            [connection.id]: event.target.value,
-                          })
+                          setPinRef({ ...pinRef, [connection.id]: event.target.value })
                         }
                       />
                       <button
                         type="button"
                         className="btn"
+                        style={{ padding: "5px 10px" }}
                         disabled={busy || !(pinRef[connection.id] ?? "").trim()}
                         onClick={() =>
                           run(async () => {
@@ -617,47 +579,15 @@ export default function AdminPage() {
                           })
                         }
                       >
-                        {t(locale, "pinNow")}
+                        {t("pinNow")}
                       </button>
                       {pinNote[connection.id] && (
-                        <span
-                          style={{ fontSize: 11.5, color: "var(--ink2)" }}
-                          className="mn"
-                        >
+                        <span className="mn" style={{ fontSize: 11, color: "var(--ink2)" }}>
                           {pinNote[connection.id]}
                         </span>
                       )}
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={busy || running}
-                      onClick={() => run(() => api.triggerSync(connection.id))}
-                    >
-                      {t(locale, "syncNow")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={busy}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            t(locale, "confirmDeleteConnection").replace(
-                              "{name}",
-                              connection.name,
-                            ),
-                          )
-                        ) {
-                          run(() => api.deleteConnection(connection.id));
-                        }
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
                 </div>
               );
             })}
@@ -665,32 +595,27 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Model gateway — the design's stage → profile table (ADR-0001 UI contract). */}
+      {/* ---- Model gateway — the stage → profile table (ADR-0001 UI contract). ---- */}
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <BandHeader
-          title={t(locale, "gatewaySection")}
+          title={t("gatewaySection")}
+          subtitle="One OpenAI-compatible endpoint; stages route to named model profiles."
           right={
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {gatewayResult &&
                 (gatewayResult.ok ? (
                   <StatusChip status="ok">
-                    {gatewayResult.model} · {gatewayResult.latency_ms} ms ·{" "}
-                    {t(locale, "gatewayOk")}
+                    {gatewayResult.model} · {gatewayResult.latency_ms} ms · {t("gatewayOk")}
                   </StatusChip>
                 ) : (
                   <StatusChip status="crit">
                     {gatewayResult.reason === "not-configured"
-                      ? t(locale, "gatewayUnset")
+                      ? t("gatewayUnset")
                       : (gatewayResult.error ?? "error").slice(0, 90)}
                   </StatusChip>
                 ))}
-              <button
-                type="button"
-                className="btn"
-                disabled={checking}
-                onClick={checkGateway}
-              >
-                {checking ? t(locale, "testing") : t(locale, "testGateway")}
+              <button type="button" className="btn" disabled={checking} onClick={checkGateway}>
+                {checking ? t("testing") : t("testGateway")}
               </button>
             </div>
           }
@@ -698,53 +623,32 @@ export default function AdminPage() {
         <div style={{ padding: "14px 18px" }}>
           {system ? (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 {system.gateway.source === "panel" ? (
-                  <StatusChip status="ok">
-                    {t(locale, "sourcePanel")}
-                  </StatusChip>
+                  <StatusChip status="ok">{t("sourcePanel")}</StatusChip>
                 ) : system.gateway.source === "unset" ? (
-                  <StatusChip status="warn">
-                    {t(locale, "gatewayUnset")}
-                  </StatusChip>
+                  <StatusChip status="warn">{t("gatewayUnset")}</StatusChip>
                 ) : (
-                  <Chip>{t(locale, "sourceEnv")}</Chip>
+                  <Chip>{t("sourceEnv")}</Chip>
                 )}
                 {/* "API key missing" is a PROBLEM only when a gateway exists without
                     one. On a fresh deployment it is just the second half of "nothing
                     is configured yet", and two red chips for one fact read as two
                     faults. */}
                 {system.gateway.api_key_present ? (
-                  <StatusChip status="ok">
-                    {t(locale, "keyConfigured")}
-                  </StatusChip>
+                  <StatusChip status="ok">{t("keyConfigured")}</StatusChip>
                 ) : (
                   system.gateway.configured && (
-                    <StatusChip status="crit">
-                      {t(locale, "keyMissing")}
-                    </StatusChip>
+                    <StatusChip status="crit">{t("keyMissing")}</StatusChip>
                   )
                 )}
                 {!system.gateway.secrets_encrypted && (
-                  <StatusChip status="warn">
-                    {t(locale, "unencryptedWarn")}
-                  </StatusChip>
+                  <StatusChip status="warn">{t("unencryptedWarn")}</StatusChip>
                 )}
                 {!system.gateway.stored_key_readable && (
-                  <StatusChip status="crit">
-                    {t(locale, "keyUnreadable")}
-                  </StatusChip>
+                  <StatusChip status="crit">{t("keyUnreadable")}</StatusChip>
                 )}
-                {gwSaved && (
-                  <StatusChip status="ok">{t(locale, "savedOk")}</StatusChip>
-                )}
+                {gwSaved && <StatusChip status="ok">{t("savedOk")}</StatusChip>}
               </div>
               {!system.gateway.configured && (
                 <div
@@ -755,7 +659,7 @@ export default function AdminPage() {
                     textWrap: "pretty",
                   }}
                 >
-                  {t(locale, "gatewayUnsetHint")}
+                  {t("gatewayUnsetHint")}
                 </div>
               )}
 
@@ -769,27 +673,27 @@ export default function AdminPage() {
                   marginTop: 12,
                 }}
               >
-                <Lbl>{t(locale, "baseUrlLabel")}</Lbl>
+                <Lbl>{t("baseUrlLabel")}</Lbl>
                 <input
-                  style={{ fontFamily: "var(--font-mono)", minWidth: 320 }}
+                  style={{ minWidth: 320 }}
                   value={gwBaseUrl}
                   onChange={(e) => setGwBaseUrl(e.target.value)}
                 />
-                <Lbl>{t(locale, "apiKeyLabel")}</Lbl>
+                <Lbl>{t("apiKeyLabel")}</Lbl>
                 <input
                   type="password"
                   autoComplete="off"
                   style={{ minWidth: 320 }}
                   placeholder={
                     system.gateway.api_key_present
-                      ? t(locale, "apiKeySavedPlaceholder")
-                      : t(locale, "apiKeyUnsetPlaceholder")
+                      ? t("apiKeySavedPlaceholder")
+                      : t("apiKeyUnsetPlaceholder")
                   }
                   value={gwApiKey}
                   onChange={(e) => setGwApiKey(e.target.value)}
                 />
                 <Lbl>
-                  {t(locale, "timeoutShort")} · {t(locale, "retriesShort")}
+                  {t("timeoutShort")} · {t("retriesShort")}
                 </Lbl>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
@@ -816,8 +720,8 @@ export default function AdminPage() {
               <table className="dt" style={{ marginTop: 12 }}>
                 <thead>
                   <tr>
-                    <th>{t(locale, "stageHeader")}</th>
-                    <th>{t(locale, "profileHeader")}</th>
+                    <th>{t("stageHeader")}</th>
+                    <th>{t("profileHeader")}</th>
                     <th style={{ width: 40 }} />
                   </tr>
                 </thead>
@@ -830,9 +734,7 @@ export default function AdminPage() {
                           onChange={(e) =>
                             setGwProfiles(
                               gwProfiles.map((r, i) =>
-                                i === index
-                                  ? { ...r, stage: e.target.value }
-                                  : r,
+                                i === index ? { ...r, stage: e.target.value } : r,
                               ),
                             )
                           }
@@ -840,14 +742,11 @@ export default function AdminPage() {
                       </td>
                       <td>
                         <input
-                          style={{ fontFamily: "var(--font-mono)" }}
                           value={row.profile}
                           onChange={(e) =>
                             setGwProfiles(
                               gwProfiles.map((r, i) =>
-                                i === index
-                                  ? { ...r, profile: e.target.value }
-                                  : r,
+                                i === index ? { ...r, profile: e.target.value } : r,
                               ),
                             )
                           }
@@ -859,9 +758,7 @@ export default function AdminPage() {
                           className="btn"
                           aria-label="remove profile"
                           onClick={() =>
-                            setGwProfiles(
-                              gwProfiles.filter((_, i) => i !== index),
-                            )
+                            setGwProfiles(gwProfiles.filter((_, i) => i !== index))
                           }
                         >
                           ✕
@@ -877,31 +774,20 @@ export default function AdminPage() {
               {gwProfiles.length === 0 && (
                 <div style={{ marginTop: 10 }}>
                   {system.gateway.configured ? (
-                    <StatusChip status="crit">
-                      {t(locale, "noProfiles")}
-                    </StatusChip>
+                    <StatusChip status="crit">{t("noProfiles")}</StatusChip>
                   ) : (
-                    <Lbl>{t(locale, "noProfilesYet")}</Lbl>
+                    <Lbl>{t("noProfilesYet")}</Lbl>
                   )}
                 </div>
               )}
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginTop: 12,
-                  alignItems: "center",
-                }}
-              >
+              <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
                 <button
                   type="button"
                   className="btn"
-                  onClick={() =>
-                    setGwProfiles([...gwProfiles, { stage: "", profile: "" }])
-                  }
+                  onClick={() => setGwProfiles([...gwProfiles, { stage: "", profile: "" }])}
                 >
-                  {t(locale, "addProfile")}
+                  {t("addProfile")}
                 </button>
                 <div style={{ flex: 1 }} />
                 {/* Two different acts wearing one label. With an environment
@@ -917,16 +803,14 @@ export default function AdminPage() {
                     onClick={() => {
                       if (
                         !system.gateway.env_present &&
-                        !window.confirm(t(locale, "clearGatewayConfirm"))
+                        !window.confirm(t("clearGatewayConfirm"))
                       ) {
                         return;
                       }
                       void saveGateway(true);
                     }}
                   >
-                    {system.gateway.env_present
-                      ? t(locale, "revertEnv")
-                      : t(locale, "clearGateway")}
+                    {system.gateway.env_present ? t("revertEnv") : t("clearGateway")}
                   </button>
                 )}
                 <button
@@ -935,12 +819,12 @@ export default function AdminPage() {
                   disabled={busy || !gwBaseUrl.trim()}
                   onClick={() => saveGateway(false)}
                 >
-                  {t(locale, "saveGateway")}
+                  {t("saveGateway")}
                 </button>
               </div>
 
               <div style={{ marginTop: 10, textWrap: "pretty" }}>
-                <Lbl>{t(locale, "gatewayHint")}</Lbl>
+                <Lbl>{t("gatewayHint")}</Lbl>
               </div>
             </>
           ) : (
@@ -949,113 +833,35 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Runtime & authentication — reported, never edited (env-only config). */}
-      <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
-        <BandHeader title={t(locale, "runtimeSection")} />
-        <div style={{ padding: "14px 18px" }}>
-          {system ? (
-            <>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "170px 1fr",
-                  rowGap: 9,
-                  columnGap: 14,
-                  alignItems: "baseline",
-                  fontSize: 13,
-                }}
-              >
-                <Lbl>{t(locale, "authModeLabel")}</Lbl>
-                <span
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  {system.auth.mode === "oidc" ? (
-                    <>
-                      <StatusChip status="ok">
-                        {t(locale, "authModeOidc")}
-                      </StatusChip>
-                      <Mn>{system.auth.issuer}</Mn>
-                      {system.auth.audience && (
-                        <Chip>aud {system.auth.audience}</Chip>
-                      )}
-                      <Chip>roles ← {system.auth.role_claim}</Chip>
-                      <Chip>tenant ← {system.auth.tenant_claim}</Chip>
-                      {system.auth.acl_claim ? (
-                        <Chip>acl ← {system.auth.acl_claim}</Chip>
-                      ) : (
-                        <StatusChip status="warn">
-                          {t(locale, "aclClaimUnset")}
-                        </StatusChip>
-                      )}
-                    </>
-                  ) : (
-                    <StatusChip status="warn">
-                      {t(locale, "authModeOpen")}
-                    </StatusChip>
-                  )}
-                </span>
-                <Lbl>{t(locale, "apiVersionLabel")}</Lbl>
-                <Mn>{system.version}</Mn>
-                <Lbl>{t(locale, "databaseLabel")}</Lbl>
-                <Mn>
-                  {system.database.role}@{system.database.host}/
-                  {system.database.name}
-                </Mn>
-                <Lbl>{t(locale, "corsLabel")}</Lbl>
-                <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {system.cors_origins.map((origin) => (
-                    <Chip key={origin}>{origin}</Chip>
-                  ))}
-                </span>
-              </div>
-              <div style={{ marginTop: 12, textWrap: "pretty" }}>
-                <Lbl>{t(locale, "envOnlyHint")}</Lbl>
-              </div>
-            </>
+      {/* ---- System strip: reported, never edited (env-only config). ---- */}
+      {system && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            padding: "10px 14px",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r2)",
+            background: "oklch(0.18 0.014 295)",
+          }}
+        >
+          <Lbl>System</Lbl>
+          {system.auth.mode === "oidc" ? (
+            <StatusChip status="ok">{t("authModeOidc")}</StatusChip>
           ) : (
-            <div style={{ color: "var(--mut)", fontSize: 13 }}>—</div>
+            <StatusChip status="warn">{t("authModeOpen")}</StatusChip>
           )}
+          {system.auth.mode === "oidc" && <Mn>{system.auth.issuer}</Mn>}
+          <Mn>v{system.version}</Mn>
+          <Mn>
+            {system.database.role}@{system.database.host}/{system.database.name}
+          </Mn>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: "var(--mut)" }}>{t("envOnlyHint")}</span>
         </div>
-      </div>
-
-      {/* Roles */}
-      <div className="card" style={{ overflow: "hidden" }}>
-        <BandHeader title={t(locale, "rolesSection")} />
-        <div style={{ padding: "14px 18px" }}>
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>{t(locale, "rolesSection")}</th>
-                <th style={{ width: 180 }}>{t(locale, "maySign")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROLE_ROWS.map((row) => (
-                <tr key={row.role}>
-                  <td style={{ color: "var(--ink2)" }}>
-                    {t(locale, row.role)}
-                  </td>
-                  <td>
-                    {row.sign === "maySignNothing" ? (
-                      <Mn style={{ color: "var(--mut)" }}>—</Mn>
-                    ) : (
-                      t(locale, row.sign)
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: 10 }}>
-            <Lbl>{t(locale, "rolesFootnote")}</Lbl>
-          </div>
-        </div>
-      </div>
+      )}
     </section>
   );
 }

@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
+import { IBM_Plex_Serif, JetBrains_Mono } from "next/font/google";
 import "./tokens.css";
 import { Shell } from "@/components/Shell";
 
 // Self-hosted at build time — an air-gapped install must not reach out for fonts.
-const sans = IBM_Plex_Sans({
+// The design's type pair: JetBrains Mono for labels/numbers/controls, the system
+// Helvetica stack for prose (no download needed), Plex Serif for the BoE document
+// view only (Turkish casing correctness + docx parity).
+const mono = JetBrains_Mono({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-sans",
-});
-const mono = IBM_Plex_Mono({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500"],
-  variable: "--font-plex-mono",
+  weight: ["400", "500", "700"],
+  variable: "--font-jbmono",
 });
 const serif = IBM_Plex_Serif({
   subsets: ["latin", "latin-ext"],
@@ -33,15 +31,9 @@ export const dynamic = "force-dynamic";
 export default function RootLayout({ children }: { children: ReactNode }) {
   const apiUrl = process.env.ESTIMO_API_URL ?? "";
   return (
-    <html
-      lang="en"
-      // The design drives theme and row density from root data attributes. The theme
-      // toggle in the top bar rewrites data-theme; density is pinned dense (the
-      // toggle was dropped — a workstation UI does not need the choice).
-      data-theme="light"
-      data-density="dense"
-      className={`${sans.variable} ${mono.variable} ${serif.variable}`}
-    >
+    // Single dark theme — no data-theme switch (2026-08 redesign). Density stays a
+    // root attribute, pinned dense: a workstation UI does not need the choice.
+    <html lang="en" data-density="dense" className={`${mono.variable} ${serif.variable}`}>
       <body>
         {apiUrl && (
           <script

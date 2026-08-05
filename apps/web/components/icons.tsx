@@ -56,8 +56,8 @@ export function LogoMark({ size = 22, style }: IconProps) {
     >
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2b5fa8" />
-          <stop offset="1" stopColor="#16355e" />
+          <stop offset="0" stopColor="#a06ee8" />
+          <stop offset="1" stopColor="#5b2ea6" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="8" fill={`url(#${id})`} />
@@ -154,20 +154,14 @@ export function IconAdmin(props: IconProps) {
   );
 }
 
-/** Theme toggles. */
-export function IconSun(props: IconProps) {
+/** Repository map — three typed nodes and the edges that relate them. */
+export function IconMap(props: IconProps) {
   return (
     <Svg {...props}>
-      <circle cx="8" cy="8" r="3" />
-      <path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.13 1.13M11.47 11.47l1.13 1.13M12.6 3.4l-1.13 1.13M4.53 11.47 3.4 12.6" />
-    </Svg>
-  );
-}
-
-export function IconMoon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M13.25 9.6A5.75 5.75 0 1 1 6.4 2.75a4.6 4.6 0 0 0 6.85 6.85z" />
+      <rect x="1.75" y="2.5" width="5" height="3.5" rx="1" />
+      <rect x="9.25" y="6.25" width="5" height="3.5" rx="1" />
+      <rect x="1.75" y="10" width="5" height="3.5" rx="1" />
+      <path d="M6.75 4.5c2.5 0 2.5 3.25 2.5 3.25M6.75 11.5c2.5 0 2.5-3 2.5-3" />
     </Svg>
   );
 }

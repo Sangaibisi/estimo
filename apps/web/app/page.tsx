@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type EstimateSummary } from "@/lib/api";
-import { detectLocale, statusLabel, t, type Locale } from "@/lib/i18n";
+import { statusLabel, t } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
 import { IconEstimates } from "@/components/icons";
 
@@ -24,7 +24,7 @@ function stageOf(estimate: EstimateSummary): number {
 
 const STAGE_KEYS = ["stgRead", "stgQ", "stgImpact", "stgEst", "stgBoe"] as const;
 
-function RowStages({ at, locale }: { at: number; locale: Locale }) {
+function RowStages({ at }: { at: number }) {
   // The design's labeled .stg pill strip at scale(.86) — done/on states carried by
   // the shared stage classes, not bespoke tick bars.
   return (
@@ -37,7 +37,7 @@ function RowStages({ at, locale }: { at: number; locale: Locale }) {
           className={`stg ${index + 1 < at ? "done" : index + 1 === at ? "on" : ""}`.trim()}
           style={{ cursor: "default" }}
         >
-          {t(locale, key)}
+          {t(key)}
         </span>
       ))}
     </div>
@@ -45,14 +45,11 @@ function RowStages({ at, locale }: { at: number; locale: Locale }) {
 }
 
 export default function WorkspacePage() {
-  const [locale, setLocaleState] = useState<Locale>("en");
   const [estimates, setEstimates] = useState<EstimateSummary[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => setLocaleState(detectLocale()), []);
 
   const refresh = useCallback(() => {
     api.listEstimates().then(setEstimates).catch((err) => setError(String(err)));
@@ -81,14 +78,14 @@ export default function WorkspacePage() {
     <section className="scr">
       <div className="page-h">
         <IconEstimates size={18} />
-        <h2>{t(locale, "estimates")}</h2>
-        <span className="sub">{t(locale, "workspaceSubtitle")}</span>
+        <h2>{t("estimates")}</h2>
+        <span className="sub">{t("workspaceSubtitle")}</span>
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
         <BandHeader
-          title={t(locale, "estimates")}
-          subtitle={`${estimates.length} ${t(locale, "inFlight")} · ${waiting} ${t(locale, "waitingCustomer")}`}
+          title={t("estimates")}
+          subtitle={`${estimates.length} ${t("inFlight")} · ${waiting} ${t("waitingCustomer")}`}
           right={
             <button
               type="button"
@@ -96,7 +93,7 @@ export default function WorkspacePage() {
               disabled={uploading}
               onClick={() => fileInput.current?.click()}
             >
-              {t(locale, "newEstimate")}
+              {t("newEstimate")}
             </button>
           }
         />
@@ -127,8 +124,8 @@ export default function WorkspacePage() {
               if (file) void upload(file);
             }}
           >
-            <span style={{ color: "var(--ink2)", fontSize: 13 }}>{t(locale, "dropBrd")}</span>
-            <span>{t(locale, "orBrowse")}</span>
+            <span style={{ color: "var(--ink2)", fontSize: 13 }}>{t("dropBrd")}</span>
+            <span>{t("orBrowse")}</span>
             <input
               ref={fileInput}
               type="file"
@@ -151,7 +148,7 @@ export default function WorkspacePage() {
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
               >
                 <span style={{ fontSize: 13, fontWeight: 500 }}>
-                  {t(locale, "firstRead")} — {uploadName}
+                  {t("firstRead")} — {uploadName}
                 </span>
               </div>
               <div
@@ -182,7 +179,7 @@ export default function WorkspacePage() {
                 }}
               >
                 <span style={{ color: "var(--ink)", fontWeight: 500 }}>
-                  {t(locale, "uploading")}
+                  {t("uploading")}
                 </span>
               </div>
             </div>
@@ -206,18 +203,18 @@ export default function WorkspacePage() {
 
         {estimates.length === 0 ? (
           <div style={{ padding: "26px 18px", color: "var(--mut)", fontSize: 13 }}>
-            {t(locale, "noEstimates")}
+            {t("noEstimates")}
           </div>
         ) : (
           <table className="dt">
             <thead>
               <tr>
-                <th style={{ width: 300 }}>{t(locale, "file")}</th>
-                <th style={{ width: 240 }}>{t(locale, "stage")}</th>
-                <th style={{ width: 74 }}>{t(locale, "items")}</th>
-                <th style={{ width: 92 }}>{t(locale, "openQ")}</th>
-                <th style={{ width: 92 }}>{t(locale, "blocked")}</th>
-                <th>{t(locale, "waitingOn")}</th>
+                <th style={{ width: 300 }}>{t("file")}</th>
+                <th style={{ width: 240 }}>{t("stage")}</th>
+                <th style={{ width: 74 }}>{t("items")}</th>
+                <th style={{ width: 92 }}>{t("openQ")}</th>
+                <th style={{ width: 92 }}>{t("blocked")}</th>
+                <th>{t("waitingOn")}</th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +234,7 @@ export default function WorkspacePage() {
                       </div>
                     </td>
                     <td>
-                      <RowStages at={stage} locale={locale} />
+                      <RowStages at={stage} />
                     </td>
                     <td className="num">{estimate.work_items}</td>
                     <td>
@@ -260,10 +257,10 @@ export default function WorkspacePage() {
                     </td>
                     <td style={{ color: "var(--ink2)", fontSize: 12.5 }}>
                       {estimate.open_questions > 0 ? (
-                        t(locale, "waitingCustomer")
+                        t("waitingCustomer")
                       ) : (
                         <Chip tone={estimate.has_boe ? "acc" : "neutral"}>
-                          {statusLabel(locale, estimate.status)}
+                          {statusLabel(estimate.status)}
                         </Chip>
                       )}
                     </td>
@@ -276,7 +273,7 @@ export default function WorkspacePage() {
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <Lbl>{t(locale, "keyboardHint")}</Lbl>
+        <Lbl>{t("keyboardHint")}</Lbl>
       </div>
     </section>
   );

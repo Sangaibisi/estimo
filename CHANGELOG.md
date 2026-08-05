@@ -9,6 +9,32 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Changed
+- **The repository-first redesign (S14 wave 1) — a new design language and the
+  Repository Map.** The whole UI moved to the OKLCH dark system delivered as
+  `docs/design/repository-map.dc.html` (now the design source of truth):
+  violet-tinted near-black surfaces, one violet accent with real glows, data-flow
+  cyan, JetBrains Mono micro-typography, grid-paper canvases, and a restrained
+  motion vocabulary — pulsing live dots, streaming dashes on hot data-flow edges,
+  two very slow ambient orbs behind the chrome — all disabled under
+  `prefers-reduced-motion`. The light theme and its toggle were **removed** (one
+  palette, tuned once), and the UI became **English-only**: the locale toggle and
+  the `tr` dictionary left with it (Turkish stays a data language per ADR-0004 —
+  BRDs, fixtures and the exported BoE are untouched; dates render day-first). The
+  new centerpiece is **/map, the Repository Map**: the company's repositories as
+  typed nodes (frontend … infra) auto-laid-out by architectural layer, synced git
+  connections joining automatically as live nodes carrying their code-graph stats,
+  directed API-call / data-flow relations drawn by hand (click-to-link), draggable
+  cards, a per-node inspector (type, project, relations, graph stats), and an
+  optional synthetic sample map for empty deployments. Map state is deliberately
+  client-side for now — server persistence and feeding the relation graph to the
+  impact worker are S14's backend decisions (ROADMAP S14-1/2). Navigation became
+  the design's left sidebar with **Admin pinned to the bottom as its own
+  category**, and Admin itself was cut to what an operator configures — renamed
+  **Settings**: richer connection tiles (provider mark, stats line, cadence, pins,
+  sync) with per-kind config hints (including `"auth": "bearer"` for Bitbucket DC
+  PATs), the model-gateway editor, and a one-line read-only system strip replacing
+  the old Runtime and Roles sections. The brand mark kept its three range bars but
+  moved to the violet pair (favicon + LogoMark in sync).
 - **Admin → Connections got a professional identity layer.** Each connection tile
   now leads with a per-provider mark — hand-drawn simplified renditions of the
   GitHub / GitLab / Bitbucket / Confluence / Jira / plain-git marks on the icon
