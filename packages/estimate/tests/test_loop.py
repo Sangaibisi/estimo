@@ -179,6 +179,39 @@ class TestLoop:
         seeded.expire_all()
         assert list((await seeded.execute(select(AnalogFeedback))).scalars()) == []
 
+    async def test_discipline_is_normalized_and_stored(self, seeded: AsyncSession) -> None:
+        """S13-3: the actuals form may say "FE"; the ledger stores the slice key."""
+        estimate_id = uuid.uuid4()
+        analog_ids = await self._analog_ids(seeded)
+        item = _item("WI-REQ-T-09")
+        row = await record_actual(
+            seeded,
+            estimate_id=estimate_id,
+            brd_ref="AUR-BRD-2026-090",
+            brd_title="Disiplinli",
+            item=item,
+            line=_line(item.id, analog_ids),
+            actual_effort=5,
+            actual_source="timesheet",
+            discipline="FE",
+        )
+        assert row.discipline == "frontend"
+        # And an unrecognized value refuses loudly instead of minting a slice.
+        import pytest as _pytest
+
+        with _pytest.raises(ValueError, match="discipline"):
+            await record_actual(
+                seeded,
+                estimate_id=estimate_id,
+                brd_ref="AUR-BRD-2026-090",
+                brd_title="Disiplinli",
+                item=item,
+                line=_line(item.id, analog_ids),
+                actual_effort=5,
+                actual_source="timesheet",
+                discipline="fullstack",
+            )
+
     async def test_rebuilt_line_with_new_analogs_drops_stale_feedback(
         self, seeded: AsyncSession
     ) -> None:

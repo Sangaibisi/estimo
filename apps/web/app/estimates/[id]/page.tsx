@@ -87,12 +87,20 @@ interface RegisterEntry {
   contingency_pd?: number | null;
 }
 
+interface DisciplineRangeShape {
+  discipline: "frontend" | "backend";
+  range: { optimistic: number; likely: number; pessimistic: number };
+  basis: "model-proposed" | "historical-ratio";
+  calibrated: boolean;
+}
+
 interface BoeLineShape {
   work_item_id: string;
   range: { optimistic: number; likely: number; pessimistic: number };
   evidence?: { uri: string; kind: string; label?: string | null }[];
   assumptions?: RegisterEntry[];
   risks?: RegisterEntry[];
+  disciplines?: DisciplineRangeShape[];
 }
 
 interface BoeDocShape {
@@ -2544,11 +2552,13 @@ function BoePreview({
     actual_source: string;
     scope_changed: boolean;
     team?: string;
+    discipline?: "frontend" | "backend" | null;
   }) => void;
   onSigned: () => Promise<void>;
 }) {
   const [effort, setEffort] = useState<Record<string, string>>({});
   const [team, setTeam] = useState<Record<string, string>>({});
+  const [discipline, setDisciplineFor] = useState<Record<string, string>>({});
   const [versions, setVersions] = useState<BoeVersions | null>(null);
   const [authority, setAuthority] = useState("");
   const [signError, setSignError] = useState<string | null>(null);
@@ -2758,6 +2768,27 @@ function BoePreview({
                             {line.work_item_id}
                           </Mn>
                         </div>
+                        {(line.disciplines ?? []).length > 0 && (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 4,
+                              flexWrap: "wrap",
+                              marginTop: 4,
+                            }}
+                          >
+                            {(line.disciplines ?? []).map((part) => (
+                              <Chip key={part.discipline}>
+                                {part.discipline === "frontend"
+                                  ? t(locale, "frontendWord")
+                                  : t(locale, "backendWord")}{" "}
+                                {part.range.likely} pd
+                                {!part.calibrated &&
+                                  ` · ${t(locale, "modelProposedBadge")}`}
+                              </Chip>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="num">{line.range.optimistic}</td>
                       <td className="num" style={{ fontWeight: 600 }}>
@@ -2815,6 +2846,26 @@ function BoePreview({
                                 })
                               }
                             />
+                            <select
+                              aria-label={t(locale, "disciplineWord")}
+                              value={discipline[line.work_item_id] ?? ""}
+                              onChange={(event) =>
+                                setDisciplineFor({
+                                  ...discipline,
+                                  [line.work_item_id]: event.target.value,
+                                })
+                              }
+                            >
+                              <option value="">
+                                {t(locale, "disciplineWord")}
+                              </option>
+                              <option value="frontend">
+                                {t(locale, "frontendWord")}
+                              </option>
+                              <option value="backend">
+                                {t(locale, "backendWord")}
+                              </option>
+                            </select>
                             <button
                               type="button"
                               className="btn"
@@ -2828,6 +2879,7 @@ function BoePreview({
                                   effort[line.work_item_id] ?? "",
                                 );
                                 if (value === null) return;
+                                const chosen = discipline[line.work_item_id];
                                 onRecordActual({
                                   work_item_id: line.work_item_id,
                                   actual_effort: value,
@@ -2839,6 +2891,10 @@ function BoePreview({
                                   team:
                                     (team[line.work_item_id] ?? "").trim() ||
                                     undefined,
+                                  discipline:
+                                    chosen === "frontend" || chosen === "backend"
+                                      ? chosen
+                                      : undefined,
                                 });
                               }}
                             >
@@ -2868,6 +2924,41 @@ function BoePreview({
               <Chip>
                 {t(locale, "likelyShort")} {total.likely} pd
               </Chip>
+              {(() => {
+                const buckets: Record<string, number> = {};
+                let uncalibrated = false;
+                for (const line of boeLines) {
+                  for (const part of line.disciplines ?? []) {
+                    buckets[part.discipline] =
+                      (buckets[part.discipline] ?? 0) + part.range.likely;
+                    if (!part.calibrated) uncalibrated = true;
+                  }
+                }
+                const names = Object.keys(buckets).sort();
+                if (names.length === 0) return null;
+                return (
+                  <Chip
+                    title={
+                      uncalibrated
+                        ? t(locale, "modelProposedBadge")
+                        : undefined
+                    }
+                  >
+                    {t(locale, "disciplineSplit")}:{" "}
+                    {names
+                      .map(
+                        (name) =>
+                          `${
+                            name === "frontend"
+                              ? t(locale, "frontendWord")
+                              : t(locale, "backendWord")
+                          } ${Math.round(buckets[name] * 10) / 10} pd`,
+                      )
+                      .join(" · ")}
+                    {uncalibrated ? " *" : ""}
+                  </Chip>
+                );
+              })()}
             </div>
 
             {/* 3 · Assumption register — on screen, same content the .docx renders. */}

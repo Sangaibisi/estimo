@@ -143,3 +143,67 @@ async def error_distribution(session: AsyncSession) -> ErrorDistribution:
         samples=len(pairs),
         prior_based=False,
     )
+
+
+@dataclass(frozen=True)
+class DisciplineHistory:
+    """What the ledger knows about the FE/BE split (S13-3).
+
+    `rows` are the completed, scope-stable rows that CARRY a discipline —
+    (module_tags, discipline, effort) triples, effort preferring the actual. Loaded
+    once per estimate run; the per-module ratio is then pure arithmetic per item.
+    `counts` feed the calibrated/uncalibrated badge: a discipline slice below
+    MIN_SAMPLES renders as "model-proposed, uncalibrated" (S12-7 honest silence).
+    """
+
+    rows: tuple[tuple[frozenset[str], str, float], ...]
+    counts: dict[str, int]
+
+    def calibrated(self, discipline: str) -> bool:
+        return self.counts.get(discipline, 0) >= MIN_SAMPLES
+
+
+async def discipline_history(session: AsyncSession) -> DisciplineHistory:
+    result = await session.execute(
+        select(
+            LedgerEntryRow.module_tags,
+            LedgerEntryRow.discipline,
+            LedgerEntryRow.actual_effort,
+            LedgerEntryRow.est_likely,
+            LedgerEntryRow.estimate_single,
+        ).where(
+            LedgerEntryRow.discipline.is_not(None),
+            LedgerEntryRow.actual_effort.is_not(None),
+            LedgerEntryRow.scope_changed.is_(False),
+        )
+    )
+    rows: list[tuple[frozenset[str], str, float]] = []
+    counts: dict[str, int] = {}
+    for modules, discipline, actual, likely, single in result:
+        effort = float(actual if actual is not None else likely or single or 0)
+        if effort <= 0:
+            continue
+        rows.append((frozenset(modules or []), str(discipline), effort))
+        counts[str(discipline)] = counts.get(str(discipline), 0) + 1
+    return DisciplineHistory(rows=tuple(rows), counts=counts)
+
+
+def historical_ratio(
+    history: DisciplineHistory, module_tags: tuple[str, ...] | list[str]
+) -> dict[str, float] | None:
+    """The tenant's own FE/BE effort ratio, per module first, globally second.
+
+    None unless BOTH disciplines have measured effort in the chosen scope — a ratio
+    computed from one side would claim the other side is free, which is exactly the
+    kind of confident zero this product refuses to print (PRINCIPLES #6).
+    """
+    wanted = set(module_tags)
+    scoped = [row for row in history.rows if wanted and row[0] & wanted]
+    for pool in (scoped, list(history.rows)):
+        sums: dict[str, float] = {}
+        for _, discipline, effort in pool:
+            sums[discipline] = sums.get(discipline, 0.0) + effort
+        if len(sums) >= 2 and all(value > 0 for value in sums.values()):
+            total = sum(sums.values())
+            return {discipline: value / total for discipline, value in sums.items()}
+    return None

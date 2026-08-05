@@ -35,6 +35,7 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "modules": ("modules", "modül", "modul", "modüller", "moduller"),
     "domain": ("domain", "alan"),
     "team": ("team", "takım", "takim", "ekip"),
+    "discipline": ("discipline", "disiplin", "taraf", "katman"),
     "est_opt": ("est_opt", "iyimser"),
     "est_likely": ("est_likely", "olası", "olasi", "efor", "tahmin"),
     "est_pess": ("est_pess", "kötümser", "kotumser"),
@@ -49,6 +50,35 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
 
 _TRUTHY = {"1", "true", "evet", "yes", "x"}
 _FALSY = {"", "0", "false", "hayır", "hayir", "no"}
+
+# Accepted spellings of the two disciplines (S13-3). The canonical values are the
+# English slice keys the whole product compares on; Turkish and shorthand forms are
+# accepted at the boundary, everything else raises so a typo cannot mint a third
+# discipline the calibration slices would silently split over.
+_DISCIPLINES = {
+    "frontend": "frontend",
+    "fe": "frontend",
+    "ön yüz": "frontend",
+    "on yuz": "frontend",
+    "önyüz": "frontend",
+    "onyuz": "frontend",
+    "backend": "backend",
+    "be": "backend",
+    "arka uç": "backend",
+    "arka uc": "backend",
+}
+
+
+def normalize_discipline(raw: str | None) -> str | None:
+    """tr_lower + alias fold; ValueError on anything unrecognized."""
+    value = tr_lower((raw or "").strip())
+    if not value:
+        return None
+    if value not in _DISCIPLINES:
+        msg = f"discipline value not recognized: {raw!r} (use frontend/backend)"
+        raise ValueError(msg)
+    return _DISCIPLINES[value]
+
 
 _DATE_FIELDS = ("est_date", "completed_date")
 _FLOAT_FIELDS = ("est_opt", "est_likely", "est_pess", "est_single", "actual_effort")
@@ -257,6 +287,7 @@ def to_ledger_entry(row: dict[str, str]) -> LedgerEntry:
             tag for tag in (tr_lower(d.strip()) for d in row.get("domain", "").split(",")) if tag
         ),
         team=tr_lower((row.get("team") or "").strip()) or None,
+        discipline=normalize_discipline(row.get("discipline")),
         estimate=estimate,
         estimate_single=estimate_single,
         estimated_at=_parse_date(row["est_date"]) if row.get("est_date") else None,
@@ -278,6 +309,7 @@ def _to_row(entry: LedgerEntry, extras: dict[str, str]) -> LedgerEntryRow:
         module_tags=list(entry.module_tags),
         domain_tags=list(entry.domain_tags),
         team=entry.team,
+        discipline=entry.discipline,
         est_optimistic=entry.estimate.optimistic if entry.estimate else None,
         est_likely=entry.estimate.likely if entry.estimate else None,
         est_pessimistic=entry.estimate.pessimistic if entry.estimate else None,
@@ -300,6 +332,7 @@ def _dedupe_key(entry: LedgerEntry) -> tuple[Any, ...]:
         entry.brd_ref,
         entry.item_title,
         entry.team,
+        entry.discipline,
         entry.estimate.optimistic if entry.estimate else None,
         entry.estimate.likely if entry.estimate else None,
         entry.estimate.pessimistic if entry.estimate else None,
@@ -321,6 +354,7 @@ async def _existing_keys(session: AsyncSession) -> set[tuple[Any, ...]]:
             LedgerEntryRow.brd_ref,
             LedgerEntryRow.item_title,
             LedgerEntryRow.team,
+            LedgerEntryRow.discipline,
             LedgerEntryRow.est_optimistic,
             LedgerEntryRow.est_likely,
             LedgerEntryRow.est_pessimistic,
@@ -334,6 +368,7 @@ async def _existing_keys(session: AsyncSession) -> set[tuple[Any, ...]]:
             brd_ref,
             item_title,
             team,
+            discipline,
             _as_float(opt),
             _as_float(likely),
             _as_float(pess),
@@ -341,7 +376,18 @@ async def _existing_keys(session: AsyncSession) -> set[tuple[Any, ...]]:
             _as_float(actual),
             completed,
         )
-        for brd_ref, item_title, team, opt, likely, pess, single, actual, completed in result
+        for (
+            brd_ref,
+            item_title,
+            team,
+            discipline,
+            opt,
+            likely,
+            pess,
+            single,
+            actual,
+            completed,
+        ) in result
     }
 
 

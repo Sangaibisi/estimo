@@ -9,6 +9,25 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-3 — the FE/BE discipline dimension, end to end.** The sharpened product goal
+  is person-days *with a frontend/backend split*, so the split now exists at every
+  layer instead of nowhere: `discipline` on `ledger_entries` (migration 0018, fed by
+  the actuals form's new FE/BE select and a `discipline`/`disiplin`/`taraf` seed
+  column — aliases fold at the boundary, anything unrecognized is rejected so a typo
+  cannot mint a third slice), per-discipline sub-ranges on estimate lines, and
+  "X pd FE, Y pd BE" totals on the BoE (web chip + docx section). The split's basis
+  is explicit: the impact worker's cited composition first, the tenant's own
+  historical FE/BE effort ratio per module second (the naive baseline — refusing to
+  answer from one-sided history, because a ratio computed from backend rows alone
+  would claim frontend work is free), and NOTHING when neither has a basis. Until a
+  discipline's ledger slice clears MIN_SAMPLES the split renders with a
+  "model-proposed, uncalibrated" badge — the S12-7 honest-silence pattern applied to
+  a new dimension. Slicing rides the single shared predicate helper
+  (`ledger_slice_conditions`), so the ledger browse, analog retrieval, the metrics
+  headline and the per-slice calibration bars all agree on what "frontend" means;
+  the calibration screen gains discipline bars and filter, the ledger a discipline
+  facet. Per-discipline calibration data starts accruing NOW — which is the entire
+  point of shipping the column before the split is trustworthy.
 - **S13-2 — per-repo CodeGraphs persist, and scope reasoning became an agentic
   worker.** Sync built a CodeGraph on every git run, generated wiki pages from it,
   and threw it away — while the deployed estimate path never received a graph at

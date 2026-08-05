@@ -26,13 +26,20 @@ from estimo_core import (
     BoeDocument,
     ConeStage,
     Confidence,
+    DisciplineRange,
     EstimateLine,
     EvidenceRef,
     ImpactAnalysis,
     ThreePoint,
 )
 from estimo_estimate.bands import BandResult, band_from_analogs
-from estimo_estimate.calibration import ErrorDistribution, transfer_distribution
+from estimo_estimate.calibration import (
+    DisciplineHistory,
+    ErrorDistribution,
+    discipline_history,
+    historical_ratio,
+    transfer_distribution,
+)
 from estimo_estimate.impact_worker import analyze_impact
 from estimo_estimate.prompts import load_estimate_prompt
 from estimo_gateway import GatewayClient, GatewayError
@@ -104,6 +111,48 @@ async def _llm_adjust_likely(
     return band.range.likely, None
 
 
+def _scaled(range_: ThreePoint, share: float) -> ThreePoint:
+    return ThreePoint(
+        optimistic=round(range_.optimistic * share, 2),
+        likely=round(range_.likely * share, 2),
+        pessimistic=round(range_.pessimistic * share, 2),
+    )
+
+
+def _discipline_split(
+    final_range: ThreePoint,
+    analysis: ImpactAnalysis | None,
+    history: DisciplineHistory,
+    module_tags: tuple[str, ...],
+) -> tuple[DisciplineRange, ...]:
+    """FE/BE sub-ranges for one line (S13-3).
+
+    Precedence: the impact worker's cited proposal, then the tenant's own
+    historical ratio per module (the naive baseline), then NOTHING — an unsplit
+    line is the honest answer when neither the model nor the history has a basis.
+    Sub-ranges scale the line's final band; they never invent their own numbers.
+    """
+    shares: dict[str, float] | None = None
+    basis: str = "model-proposed"
+    if analysis is not None and analysis.composition:
+        shares = {part.discipline: part.share for part in analysis.composition}
+    else:
+        shares = historical_ratio(history, module_tags)
+        basis = "historical-ratio"
+    if not shares:
+        return ()
+    return tuple(
+        DisciplineRange(
+            discipline=discipline,
+            range=_scaled(final_range, share),
+            basis=basis,
+            calibrated=history.calibrated(discipline),
+        )
+        for discipline, share in sorted(shares.items())
+        if share > 0
+    )
+
+
 def _cone_stage(state: PipelineState) -> ConeStage:
     reqs = state.requirements
     if not reqs:
@@ -134,6 +183,7 @@ async def estimate_state(
 
     prompt = load_estimate_prompt()
     distribution: ErrorDistribution = await transfer_distribution(session)
+    history: DisciplineHistory = await discipline_history(session)
     answered = {q.requirement_id: q for q in state.questions if q.id in state.answers}
     # `graph` is the CLI's local --repo build; `graphs` are the persisted per-repo
     # graphs the deployed path loads. The worker sees them as one estate (S13-2).
@@ -175,6 +225,7 @@ async def estimate_state(
         ]
         assumptions: list[AssumptionRisk] = []
         risks: list[AssumptionRisk] = []
+        analysis: ImpactAnalysis | None = None
 
         if all_graphs or client is not None:
             # Scope reasoning is the model's job now (ADR-0009): a tool-using loop
@@ -232,6 +283,7 @@ async def estimate_state(
                 EstimateLine(
                     work_item_id=item.id,
                     range=prior_band,
+                    disciplines=_discipline_split(prior_band, analysis, history, item.module_tags),
                     confidence=Confidence.LOW,
                     evidence=tuple(evidence)
                     or (
@@ -269,6 +321,7 @@ async def estimate_state(
             EstimateLine(
                 work_item_id=item.id,
                 range=final_range,
+                disciplines=_discipline_split(final_range, analysis, history, item.module_tags),
                 confidence=band.confidence,
                 evidence=tuple(evidence),
                 assumptions=tuple(assumptions),

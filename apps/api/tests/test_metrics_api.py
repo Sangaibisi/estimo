@@ -117,9 +117,9 @@ def _boe_document(
             ),
         ),
     )
-    # `exclude={"total"}` mirrors what build_boe stores: `total` is a computed field,
+    # `storable()` mirrors what build_boe stores: `total` is a computed field,
     # and a dump that carries it cannot be re-validated (BoeDocument forbids extras).
-    return document.model_dump(mode="json", exclude={"total"})
+    return document.storable()
 
 
 async def test_a_connector_row_is_not_graded_as_a_pipeline_estimate(

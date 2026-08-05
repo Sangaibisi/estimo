@@ -193,7 +193,9 @@ def _lexical_stmt(
     )
 
 
-def ledger_slice_conditions(team: str | None, domain: str | None) -> list[Any]:
+def ledger_slice_conditions(
+    team: str | None, domain: str | None, discipline: str | None = None
+) -> list[Any]:
     """Slice predicates shared by BOTH retrieval legs.
 
     Filtering after retrieval would silently shrink the result set — a reader who
@@ -201,8 +203,9 @@ def ledger_slice_conditions(team: str | None, domain: str | None) -> list[Any]:
     the top-N was chosen before the filter was known. So the slice goes into the
     SQL of each leg and the top-N is the top-N *of the slice*.
 
-    Team and domain are stored normalized (`tr_lower` at the import boundary), so
-    the comparison normalizes too.
+    Team, domain and discipline are stored normalized (`tr_lower` at the import
+    boundary), so the comparison normalizes too. Any new slice key belongs HERE,
+    not at a call site — that is the invariant that keeps every leg agreeing.
     """
     conditions: list[Any] = []
     if team:
@@ -213,6 +216,8 @@ def ledger_slice_conditions(team: str | None, domain: str | None) -> list[Any]:
                 bindparam("domain_slice", [tr_lower(domain.strip())], type_=ARRAY(String(60)))
             )
         )
+    if discipline:
+        conditions.append(LedgerEntryRow.discipline == tr_lower(discipline.strip()))
     return conditions
 
 
@@ -376,6 +381,7 @@ async def hybrid_ledger_matches(
     limit: int = 10,
     team: str | None = None,
     domain: str | None = None,
+    discipline: str | None = None,
 ) -> list[tuple[uuid.UUID, float | None]]:
     """Lexical always; dense joins in when a gateway client is provided.
 
@@ -383,7 +389,7 @@ async def hybrid_ledger_matches(
     did not run (or the entry has no embedding of the right dimension) — the rank
     alone never becomes a number.
     """
-    conditions = ledger_slice_conditions(team, domain)
+    conditions = ledger_slice_conditions(team, domain, discipline)
     rankings = [await lexical_ledger_ids(session, query, limit=limit * 2, conditions=conditions)]
     similarity: dict[uuid.UUID, float] = {}
     if client is not None:
@@ -405,8 +411,15 @@ async def hybrid_ledger_ids(
     limit: int = 10,
     team: str | None = None,
     domain: str | None = None,
+    discipline: str | None = None,
 ) -> list[uuid.UUID]:
     matches = await hybrid_ledger_matches(
-        session, query, client=client, limit=limit, team=team, domain=domain
+        session,
+        query,
+        client=client,
+        limit=limit,
+        team=team,
+        domain=domain,
+        discipline=discipline,
     )
     return [item_id for item_id, _ in matches]

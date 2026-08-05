@@ -27,6 +27,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from estimo_knowledge.db import AnalogFeedback, CalibrationSnapshot, LedgerEntryRow
+from estimo_knowledge.importer import normalize_discipline
 from sqlalchemy import Date, cast, delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -90,6 +91,7 @@ async def record_actual(
     estimated_at: dt.date | None = None,
     team: str | None = None,
     domain_tags: list[str] | None = None,
+    discipline: str | None = None,
 ) -> LedgerEntryRow:
     """Upsert the ledger row for this line, then re-derive feedback + snapshot.
 
@@ -118,6 +120,9 @@ async def record_actual(
     # str.lower() maps "I" to "i", not "ı").
     row.domain_tags = _normalize_tags(domain_tags if domain_tags is not None else item.domain_tags)
     row.team = _normalize_tag(team if team is not None else item.team)
+    # S13-3 slice key. Same boundary rule as team/domain — normalized, aliases
+    # folded, anything unrecognized raises before it can mint a third discipline.
+    row.discipline = normalize_discipline(discipline)
     row.est_optimistic = line.range.optimistic
     row.est_likely = line.range.likely
     row.est_pessimistic = line.range.pessimistic

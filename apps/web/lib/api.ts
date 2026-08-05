@@ -233,6 +233,7 @@ export const api = {
       actual_source: string;
       scope_changed: boolean;
       team?: string;
+      discipline?: "frontend" | "backend" | null;
     },
   ) =>
     request<{ status: string; deviation: number | null }>(
@@ -247,21 +248,27 @@ export const api = {
   metrics: (view?: {
     team?: string;
     domain?: string;
+    discipline?: string;
     months?: number | null;
   }) => {
     const params = new URLSearchParams();
     if (view?.team) params.set("team", view.team);
     if (view?.domain) params.set("domain", view.domain);
+    if (view?.discipline) params.set("discipline", view.discipline);
     if (view?.months) params.set("months", String(view.months));
     const query = params.toString();
     return request<MetricsOverview>(
       `/v1/metrics/overview${query ? `?${query}` : ""}`,
     );
   },
-  ledger: (q: string, slice?: { team?: string; domain?: string }) => {
+  ledger: (
+    q: string,
+    slice?: { team?: string; domain?: string; discipline?: string },
+  ) => {
     const params = new URLSearchParams({ q });
     if (slice?.team) params.set("team", slice.team);
     if (slice?.domain) params.set("domain", slice.domain);
+    if (slice?.discipline) params.set("discipline", slice.discipline);
     return request<LedgerPage>(`/v1/ledger?${params.toString()}`);
   },
   previewImport: (file: File) => {
@@ -426,6 +433,7 @@ export interface ActualEntry {
   scope_changed: boolean;
   team: string | null;
   domain_tags: string[];
+  discipline: "frontend" | "backend" | null;
   recorded_band: {
     optimistic: number | null;
     likely: number | null;
@@ -447,7 +455,7 @@ export function parseEffort(raw: string): number | null {
 export interface CalibrationSlice {
   key: string;
   /** Which dimension — "billing" can be both a team and a domain. */
-  kind: "team" | "domain";
+  kind: "team" | "domain" | "discipline";
   coverage: number | null;
   samples: number;
   unbanded: number;
@@ -517,6 +525,7 @@ export interface MetricsOverview {
     min_samples: number;
     teams: CalibrationSlice[];
     domains: CalibrationSlice[];
+    disciplines: CalibrationSlice[];
   };
   anchoring: {
     samples: number;
@@ -542,7 +551,12 @@ export interface MetricsOverview {
     lines_created: number;
     reasons: { code: string; count: number; share: number | null }[];
   };
-  window: { months: number | null; team: string | null; domain: string | null };
+  window: {
+    months: number | null;
+    team: string | null;
+    domain: string | null;
+    discipline: string | null;
+  };
   workflow: {
     estimates: number;
     wip: number;
@@ -557,6 +571,7 @@ export interface LedgerEntry {
   item_title: string;
   module_tags: string[];
   team: string | null;
+  discipline: string | null;
   estimate: {
     optimistic: number | null;
     likely: number | null;
@@ -587,7 +602,7 @@ export interface LedgerPage {
   sliced: boolean;
   /** "hybrid" only when the dense leg ran; "lexical" explains absent percentages. */
   retrieval: "hybrid" | "lexical";
-  facets: { teams: string[]; domains: string[] };
+  facets: { teams: string[]; domains: string[]; disciplines: string[] };
 }
 
 /** Step 2 of the seed-set import wizard: what is in the file, and where each

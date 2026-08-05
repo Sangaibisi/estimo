@@ -71,6 +71,8 @@ class LedgerEntryRow(TenantScoped, Base):
     module_tags: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     domain_tags: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list)
     team: Mapped[str | None] = mapped_column(String(80), default=None)
+    # Slice key (S13-3): "frontend" | "backend" | NULL for whole-item rows.
+    discipline: Mapped[str | None] = mapped_column(String(20), default=None)
 
     est_optimistic: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)
     est_likely: Mapped[float | None] = mapped_column(Numeric(8, 2), default=None)

@@ -602,9 +602,10 @@ async def build_boe(
     finally:
         await _close(client)
     findings = review_boe(boe, state)
-    # Computed fields (total) serialize but are rejected on re-validation
-    # (extra="forbid") — persist the storable projection only.
-    document = boe.model_dump(mode="json", exclude={"total"})
+    # Computed fields serialize but are rejected on re-validation (extra="forbid")
+    # — persist the storable projection only, and let the MODEL name its computed
+    # fields (a storage site that hand-lists them goes stale the day one is added).
+    document = boe.storable()
     record.boe = document
     record.boe_version += 1
     record.critic = findings
@@ -1384,6 +1385,9 @@ class ActualIn(BaseModel):
     # against "actually used".
     team: str | None = Field(default=None, max_length=80)
     domain_tags: list[str] | None = None
+    # Which side of the FE/BE split this actual measures (S13-3). None = whole-item,
+    # the overwhelming majority until teams start reporting per-discipline effort.
+    discipline: Literal["frontend", "backend"] | None = None
 
 
 @router.post("/{estimate_id}/actuals", status_code=status.HTTP_201_CREATED)
@@ -1419,6 +1423,7 @@ async def record_actual_for_line(
             scope_changed=payload.scope_changed,
             team=payload.team,
             domain_tags=payload.domain_tags,
+            discipline=payload.discipline,
         )
     except IntegrityError as exc:
         # Concurrent duplicate lost the check-then-insert race on origin_ref.
@@ -1469,6 +1474,7 @@ async def list_actuals(estimate_id: uuid.UUID, session: SessionDep) -> list[dict
                 "scope_changed": row.scope_changed,
                 "team": row.team,
                 "domain_tags": list(row.domain_tags or ()),
+                "discipline": row.discipline,
                 # The band the actual was recorded AGAINST — after a rebuild the
                 # current draft's band may differ; mixing the two fakes the deviation.
                 "recorded_band": {

@@ -84,6 +84,7 @@ export default function LedgerPage() {
   const [query, setQuery] = useState("");
   const [team, setTeam] = useState("");
   const [domain, setDomain] = useState("");
+  const [discipline, setDiscipline] = useState("");
   const [page, setPage] = useState<LedgerPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -97,10 +98,14 @@ export default function LedgerPage() {
   const request = useRef(0);
 
   const load = useCallback(
-    (q: string, slice: { team: string; domain: string }) => {
+    (q: string, slice: { team: string; domain: string; discipline: string }) => {
       const ticket = ++request.current;
       api
-        .ledger(q, { team: slice.team, domain: slice.domain })
+        .ledger(q, {
+          team: slice.team,
+          domain: slice.domain,
+          discipline: slice.discipline,
+        })
         .then((result) => {
           if (ticket !== request.current) return;
           setPage(result);
@@ -117,12 +122,12 @@ export default function LedgerPage() {
 
   useEffect(() => {
     setLocale(detectLocale());
-    load("", { team: "", domain: "" });
+    load("", { team: "", domain: "", discipline: "" });
   }, [load]);
 
   const entries = page?.entries ?? [];
   const searched = page?.searched ?? false;
-  const facets = page?.facets ?? { teams: [], domains: [] };
+  const facets = page?.facets ?? { teams: [], domains: [], disciplines: [] };
   const max = Math.max(
     1,
     ...entries.flatMap((entry) => [
@@ -131,10 +136,19 @@ export default function LedgerPage() {
     ]),
   );
 
-  const applySlice = (next: { team?: string; domain?: string }) => {
-    const slice = { team: next.team ?? team, domain: next.domain ?? domain };
+  const applySlice = (next: {
+    team?: string;
+    domain?: string;
+    discipline?: string;
+  }) => {
+    const slice = {
+      team: next.team ?? team,
+      domain: next.domain ?? domain,
+      discipline: next.discipline ?? discipline,
+    };
     setTeam(slice.team);
     setDomain(slice.domain);
+    setDiscipline(slice.discipline);
     load(query, slice);
   };
 
@@ -169,7 +183,8 @@ export default function LedgerPage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") load(query, { team, domain });
+                    if (event.key === "Enter")
+                      load(query, { team, domain, discipline });
                   }}
                 />
                 <select
@@ -198,10 +213,28 @@ export default function LedgerPage() {
                     </option>
                   ))}
                 </select>
+                <select
+                  aria-label={t(locale, "disciplineWord")}
+                  value={discipline}
+                  onChange={(event) =>
+                    applySlice({ discipline: event.target.value })
+                  }
+                >
+                  <option value="">{t(locale, "allDisciplines")}</option>
+                  {facets.disciplines.map((name) => (
+                    <option key={name} value={name}>
+                      {name === "frontend"
+                        ? t(locale, "frontendWord")
+                        : name === "backend"
+                          ? t(locale, "backendWord")
+                          : name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   className="btn p"
-                  onClick={() => load(query, { team, domain })}
+                  onClick={() => load(query, { team, domain, discipline })}
                 >
                   {t(locale, "search")}
                 </button>
@@ -213,7 +246,7 @@ export default function LedgerPage() {
                       setQuery("");
                       setTeam("");
                       setDomain("");
-                      load("", { team: "", domain: "" });
+                      load("", { team: "", domain: "", discipline: "" });
                     }}
                   >
                     {t(locale, "clearSearch")}
@@ -425,6 +458,13 @@ export default function LedgerPage() {
                             {entry.module_tags.slice(0, 2).map((module) => (
                               <Chip key={module}>{module}</Chip>
                             ))}
+                            {entry.discipline && (
+                              <Chip>
+                                {entry.discipline === "frontend"
+                                  ? t(locale, "frontendWord")
+                                  : t(locale, "backendWord")}
+                              </Chip>
+                            )}
                           </div>
                         </td>
                         <td>
@@ -503,7 +543,7 @@ export default function LedgerPage() {
           <ImportWizard
             locale={locale}
             onClose={() => setImporting(false)}
-            onImported={() => load(query, { team, domain })}
+            onImported={() => load(query, { team, domain, discipline })}
           />
         )}
       </div>

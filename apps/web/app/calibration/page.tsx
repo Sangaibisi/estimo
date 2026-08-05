@@ -18,13 +18,19 @@ export default function CalibrationPage() {
   const [error, setError] = useState<string | null>(null);
   const [team, setTeam] = useState("");
   const [domain, setDomain] = useState("");
+  const [discipline, setDiscipline] = useState("");
   const [months, setMonths] = useState<number | null>(null);
   // Same sequencing rule as the ledger: a slow first response must not land on top of
   // a newer one and leave figures that describe a view nobody is looking at.
   const request = useRef(0);
 
   const load = useCallback(
-    (view: { team: string; domain: string; months: number | null }) => {
+    (view: {
+      team: string;
+      domain: string;
+      discipline: string;
+      months: number | null;
+    }) => {
       const ticket = ++request.current;
       api
         .metrics(view)
@@ -44,7 +50,7 @@ export default function CalibrationPage() {
 
   useEffect(() => {
     setLocale(detectLocale());
-    load({ team: "", domain: "", months: null });
+    load({ team: "", domain: "", discipline: "", months: null });
   }, [load]);
 
   if (error) {
@@ -116,7 +122,7 @@ export default function CalibrationPage() {
                 value={team}
                 onChange={(event) => {
                   setTeam(event.target.value);
-                  load({ team: event.target.value, domain, months });
+                  load({ team: event.target.value, domain, discipline, months });
                 }}
               >
                 <option value="">{t(locale, "allTeams")}</option>
@@ -131,13 +137,32 @@ export default function CalibrationPage() {
                 value={domain}
                 onChange={(event) => {
                   setDomain(event.target.value);
-                  load({ team, domain: event.target.value, months });
+                  load({ team, domain: event.target.value, discipline, months });
                 }}
               >
                 <option value="">{t(locale, "allDomains")}</option>
                 {slices.domains.map((slice) => (
                   <option key={slice.key} value={slice.key}>
                     {slice.key}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={t(locale, "disciplineWord")}
+                value={discipline}
+                onChange={(event) => {
+                  setDiscipline(event.target.value);
+                  load({ team, domain, discipline: event.target.value, months });
+                }}
+              >
+                <option value="">{t(locale, "allDisciplines")}</option>
+                {(slices.disciplines ?? []).map((slice) => (
+                  <option key={slice.key} value={slice.key}>
+                    {slice.key === "frontend"
+                      ? t(locale, "frontendWord")
+                      : slice.key === "backend"
+                        ? t(locale, "backendWord")
+                        : slice.key}
                   </option>
                 ))}
               </select>
@@ -149,7 +174,7 @@ export default function CalibrationPage() {
                     ? Number(event.target.value)
                     : null;
                   setMonths(next);
-                  load({ team, domain, months: next });
+                  load({ team, domain, discipline, months: next });
                 }}
               >
                 <option value="">{t(locale, "windowAll")}</option>
@@ -372,7 +397,7 @@ function SliceBars({
   locale: Locale;
   slices: MetricsOverview["slices"];
 }) {
-  const all = [...slices.teams, ...slices.domains];
+  const all = [...slices.teams, ...slices.domains, ...(slices.disciplines ?? [])];
   const drawable = all.filter((slice) => slice.coverage !== null);
   const worst = drawable.reduce<(typeof drawable)[number] | null>(
     (lowest, slice) =>
@@ -415,7 +440,14 @@ function SliceBars({
               <span style={{ width: 170, fontSize: 12.5 }} className="mn">
                 {slice.key}{" "}
                 <span style={{ color: "var(--mut)" }}>
-                  {t(locale, slice.kind === "team" ? "teamWord" : "domainWord")}
+                  {t(
+                    locale,
+                    slice.kind === "team"
+                      ? "teamWord"
+                      : slice.kind === "discipline"
+                        ? "disciplineWord"
+                        : "domainWord",
+                  )}
                 </span>
               </span>
               <div

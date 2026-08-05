@@ -46,6 +46,12 @@ _LABELS = {
             "Bu doküman Estimo tarafından üretilmiş bir TASLAKTIR; her satır insan "
             "onayı gerektirir."
         ),
+        "discipline_totals": "Disiplin Dağılımı",
+        "discipline_frontend": "Ön yüz (FE)",
+        "discipline_backend": "Arka uç (BE)",
+        "uncalibrated_note": (
+            "Model önerisidir; disiplin dilimi henüz kalibre edilmemiştir (örnek sayısı yetersiz)."
+        ),
     },
     "en": {
         "title": "Basis of Estimate (Draft)",
@@ -74,6 +80,12 @@ _LABELS = {
         "date": "Date / Signature",
         "unit": "pd",
         "draft_note": "This is an Estimo-generated DRAFT; every line requires human sign-off.",
+        "discipline_totals": "Discipline Split",
+        "discipline_frontend": "Frontend (FE)",
+        "discipline_backend": "Backend (BE)",
+        "uncalibrated_note": (
+            "Model-proposed; the discipline slice is not yet calibrated (insufficient samples)."
+        ),
     },
 }
 
@@ -127,6 +139,22 @@ def render_boe_docx(boe: BoeDocument, path: Path) -> None:
     total_cells[1].text = _fmt(boe.total.optimistic, locale)
     total_cells[2].text = _fmt(boe.total.likely, locale)
     total_cells[3].text = _fmt(boe.total.pessimistic, locale)
+
+    # S13-3: "X pd FE, Y pd BE" — rendered only when lines carry a split, with the
+    # uncalibrated badge whenever ANY contributing slice is below the sample floor.
+    discipline_totals = boe.discipline_totals
+    if discipline_totals:
+        doc.add_heading(labels["discipline_totals"], level=2)
+        for discipline, subtotal in sorted(discipline_totals.items()):
+            name = labels.get(f"discipline_{discipline}", discipline)
+            doc.add_paragraph(
+                f"{name}: {_fmt(subtotal.optimistic, locale)} / "
+                f"{_fmt(subtotal.likely, locale)} / "
+                f"{_fmt(subtotal.pessimistic, locale)} {labels['unit']}",
+                style="List Bullet",
+            )
+        if any(not part.calibrated for line in boe.lines for part in line.disciplines):
+            doc.add_paragraph(labels["uncalibrated_note"])
 
     doc.add_heading(labels["assumptions"], level=1)
     for assumption in boe.global_assumptions:

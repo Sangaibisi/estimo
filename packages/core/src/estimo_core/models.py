@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -203,6 +203,20 @@ class AssumptionRisk(EstimoModel):
         return self
 
 
+class DisciplineRange(EstimoModel):
+    """One discipline's slice of an estimate line (S13-3).
+
+    `basis` records where the SPLIT came from — the impact worker's proposal or the
+    tenant's historical FE/BE ratio. `calibrated` records whether this discipline's
+    ledger slice has cleared MIN_SAMPLES; until it does, consumers render the split
+    with a "model-proposed, uncalibrated" badge (S12-7 honest silence)."""
+
+    discipline: Literal["frontend", "backend"]
+    range: ThreePoint
+    basis: Literal["model-proposed", "historical-ratio"]
+    calibrated: bool = False
+
+
 class EstimateLine(EstimoModel):
     """One estimated work item. Structurally cannot exist without evidence."""
 
@@ -213,6 +227,10 @@ class EstimateLine(EstimoModel):
     assumptions: tuple[AssumptionRisk, ...] = ()
     risks: tuple[AssumptionRisk, ...] = ()
     basis_note: str | None = None
+    # Per-discipline sub-ranges (S13-3); () when nothing justified a split. Their
+    # sum tracks `range` by construction (shares sum to 1), but they are stored,
+    # not recomputed, so a historical document renders what was actually proposed.
+    disciplines: tuple[DisciplineRange, ...] = ()
 
     @model_validator(mode="after")
     def _registers_typed_correctly(self) -> Self:
@@ -314,6 +332,26 @@ class BoeDocument(EstimoModel):
             total = total + line.range
         return total
 
+    def storable(self) -> dict[str, Any]:
+        """The persistable projection — ONE place that knows which computed fields
+        exist. They serialize on dump but are rejected on re-validation
+        (`extra="forbid"`), so a storage site that forgets one writes documents
+        that can never be read back."""
+        return self.model_dump(mode="json", exclude={"total", "discipline_totals"})
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def discipline_totals(self) -> dict[str, ThreePoint]:
+        """Per-discipline roll-up ("X pd FE, Y pd BE"), only over lines that carry
+        a split — an unsplit line contributes to neither bucket, so the discipline
+        totals may sum to less than `total` and that is the honest reading."""
+        totals: dict[str, ThreePoint] = {}
+        for line in self.lines:
+            for part in line.disciplines:
+                current = totals.get(part.discipline)
+                totals[part.discipline] = part.range if current is None else current + part.range
+        return totals
+
 
 class LedgerEntry(EstimoModel):
     """One imported or recorded history row (docs/LEDGER-SCHEMA.md).
@@ -328,6 +366,9 @@ class LedgerEntry(EstimoModel):
     module_tags: tuple[str, ...] = ()
     domain_tags: tuple[str, ...] = ()
     team: str | None = None
+    # Slice key (S13-3): which side of the FE/BE split this row measures. None for
+    # whole-item rows — the overwhelming majority until per-discipline actuals accrue.
+    discipline: Literal["frontend", "backend"] | None = None
     estimate: ThreePoint | None = None
     estimate_single: float | None = Field(default=None, ge=0)
     estimated_at: dt.date | None = None

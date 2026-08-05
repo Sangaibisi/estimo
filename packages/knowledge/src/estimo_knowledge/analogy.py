@@ -83,9 +83,16 @@ async def find_analogs(
     limit: int = 5,
     team: str | None = None,
     domain: str | None = None,
+    discipline: str | None = None,
 ) -> list[AnalogyCard]:
     matches = await hybrid_ledger_matches(
-        session, text, client=client, limit=limit, team=team, domain=domain
+        session,
+        text,
+        client=client,
+        limit=limit,
+        team=team,
+        domain=domain,
+        discipline=discipline,
     )
     if not matches:
         return []

@@ -147,6 +147,7 @@ async def _accuracy_rows(
     *,
     team: str | None = None,
     domain: str | None = None,
+    discipline: str | None = None,
     months: int | None = None,
 ) -> list[tuple[Any, Any, Any, Any]]:
     """Product-estimated rows with actuals, optionally sliced and time-windowed."""
@@ -157,7 +158,7 @@ async def _accuracy_rows(
         LedgerEntryRow.origin_ref.like(PRODUCT_ORIGIN_PREFIX),
         LedgerEntryRow.actual_effort.is_not(None),
         LedgerEntryRow.scope_changed.is_(False),
-        *ledger_slice_conditions(team, domain),
+        *ledger_slice_conditions(team, domain, discipline),
     ]
     if months is not None:
         # completed_at is the date the WORK finished. A row without one falls out of a
@@ -232,6 +233,7 @@ async def _product_accuracy(
     *,
     team: str | None = None,
     domain: str | None = None,
+    discipline: str | None = None,
     months: int | None = None,
 ) -> dict[str, Any]:
     """Coverage + error over rows the PRODUCT estimated, against a naive baseline.
@@ -253,7 +255,9 @@ async def _product_accuracy(
     ]
     naive = statistics.median(completed) if completed else None
 
-    rows = await _accuracy_rows(session, team=team, domain=domain, months=months)
+    rows = await _accuracy_rows(
+        session, team=team, domain=domain, discipline=discipline, months=months
+    )
     product_errors: list[float] = []
     naive_errors: list[float] = []
     product_pct: list[float] = []
@@ -300,6 +304,7 @@ async def _slices(session: AsyncSession) -> dict[str, Any]:
             select(
                 LedgerEntryRow.team,
                 LedgerEntryRow.domain_tags,
+                LedgerEntryRow.discipline,
                 LedgerEntryRow.est_optimistic,
                 LedgerEntryRow.est_likely,
                 LedgerEntryRow.est_pessimistic,
@@ -313,12 +318,15 @@ async def _slices(session: AsyncSession) -> dict[str, Any]:
     ).all()
     by_team: dict[str, list[tuple[Any, Any, Any, Any]]] = {}
     by_domain: dict[str, list[tuple[Any, Any, Any, Any]]] = {}
-    for team, domains, opt, likely, pess, actual in rows:
+    by_discipline: dict[str, list[tuple[Any, Any, Any, Any]]] = {}
+    for team, domains, discipline, opt, likely, pess, actual in rows:
         measurement = (opt, likely, pess, actual)
         if team:
             by_team.setdefault(team, []).append(measurement)
         for domain in domains or ():
             by_domain.setdefault(domain, []).append(measurement)
+        if discipline:
+            by_discipline.setdefault(discipline, []).append(measurement)
 
     def graded(
         groups: dict[str, list[tuple[Any, Any, Any, Any]]], kind: str
@@ -347,6 +355,9 @@ async def _slices(session: AsyncSession) -> dict[str, Any]:
         "min_samples": MIN_SAMPLES,
         "teams": graded(by_team, "team"),
         "domains": graded(by_domain, "domain"),
+        # S13-3: the FE/BE dimension. Bars appear only once per-discipline actuals
+        # accrue — until then the BoE renders its split with the uncalibrated badge.
+        "disciplines": graded(by_discipline, "discipline"),
     }
 
 
@@ -624,7 +635,9 @@ async def _attribution(session: AsyncSession) -> dict[str, Any]:
     """
     rows = (
         await session.execute(
-            select(LedgerEntryRow.team, LedgerEntryRow.domain_tags).where(
+            select(
+                LedgerEntryRow.team, LedgerEntryRow.domain_tags, LedgerEntryRow.discipline
+            ).where(
                 # Rows Estimo itself wrote, which are the only ones a user could have
                 # attributed. `origin_ref IS NOT NULL` also matches `jira://…` rows the
                 # connector imports, and those inflate the denominator with rows nobody
@@ -635,12 +648,19 @@ async def _attribution(session: AsyncSession) -> dict[str, Any]:
         )
     ).all()
     if not rows:
-        return {"product_rows": 0, "with_team": 0, "with_domain": 0, "teams": []}
-    teams = sorted({team for team, _ in rows if team})
+        return {
+            "product_rows": 0,
+            "with_team": 0,
+            "with_domain": 0,
+            "with_discipline": 0,
+            "teams": [],
+        }
+    teams = sorted({team for team, _, _ in rows if team})
     return {
         "product_rows": len(rows),
-        "with_team": sum(1 for team, _ in rows if team),
-        "with_domain": sum(1 for _, domains in rows if domains),
+        "with_team": sum(1 for team, _, _ in rows if team),
+        "with_domain": sum(1 for _, domains, _ in rows if domains),
+        "with_discipline": sum(1 for _, _, discipline in rows if discipline),
         "teams": teams,
     }
 
@@ -650,6 +670,7 @@ async def overview(
     session: SessionDep,
     team: Annotated[str, Query(max_length=80)] = "",
     domain: Annotated[str, Query(max_length=60)] = "",
+    discipline: Annotated[str, Query(max_length=20)] = "",
     months: Annotated[int | None, Query(ge=1, le=240)] = None,
 ) -> dict[str, Any]:
     """Every number here is measured or absent (module docstring), and every rate
@@ -663,12 +684,21 @@ async def overview(
     return {
         "calibration": await _calibration(session),
         "product_accuracy": await _product_accuracy(
-            session, team=team or None, domain=domain or None, months=months
+            session,
+            team=team or None,
+            domain=domain or None,
+            discipline=discipline or None,
+            months=months,
         ),
         "slices": await _slices(session),
         "anchoring": await _anchoring(session),
         "question_impact": await _question_impact(session),
         "workflow": await _workflow(session),
         "attribution": await _attribution(session),
-        "window": {"months": months, "team": team or None, "domain": domain or None},
+        "window": {
+            "months": months,
+            "team": team or None,
+            "domain": domain or None,
+            "discipline": discipline or None,
+        },
     }

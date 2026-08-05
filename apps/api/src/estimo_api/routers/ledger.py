@@ -90,6 +90,7 @@ def _row(row: LedgerEntryRow, similarity: float | None = None) -> dict[str, Any]
         "module_tags": list(row.module_tags or ()),
         "domain_tags": list(row.domain_tags or ()),
         "team": row.team,
+        "discipline": row.discipline,
         "estimate": (
             {
                 "optimistic": float(row.est_optimistic) if row.est_optimistic is not None else None,
@@ -141,11 +142,22 @@ async def _facets(session: AsyncSession) -> dict[str, Any]:
             .limit(MAX_FACET_VALUES + 1)
         )
     ).scalars()
+    discipline_rows = (
+        await session.execute(
+            select(LedgerEntryRow.discipline)
+            .where(LedgerEntryRow.discipline.is_not(None))
+            .distinct()
+            .order_by(LedgerEntryRow.discipline)
+        )
+    ).scalars()
     team_list = [team for team in teams if team]
     domain_list = sorted({domain for domain in domain_rows if domain})
     return {
         "teams": team_list[:MAX_FACET_VALUES],
         "domains": domain_list[:MAX_FACET_VALUES],
+        # At most two values by construction (the import boundary rejects anything
+        # else), so no cap is needed.
+        "disciplines": [d for d in discipline_rows if d],
         "truncated": len(team_list) > MAX_FACET_VALUES or len(domain_list) > MAX_FACET_VALUES,
     }
 
@@ -174,6 +186,7 @@ async def list_ledger(
     q: Annotated[str, Query(max_length=200)] = "",
     team: Annotated[str, Query(max_length=80)] = "",
     domain: Annotated[str, Query(max_length=60)] = "",
+    discipline: Annotated[str, Query(max_length=20)] = "",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
     """Browse the ledger, or search it through the analog retrieval path.
@@ -183,7 +196,7 @@ async def list_ledger(
     The team/domain slice is pushed INTO retrieval (not applied to its output), so a
     sliced search still returns the best matches within the slice.
     """
-    slice_conditions = ledger_slice_conditions(team or None, domain or None)
+    slice_conditions = ledger_slice_conditions(team or None, domain or None, discipline or None)
     summary = (
         await session.execute(
             select(
@@ -200,7 +213,13 @@ async def list_ledger(
         client = gateway_client(await effective_gateway(request, session))
         try:
             cards = await find_analogs(
-                session, q, client=client, limit=limit, team=team or None, domain=domain or None
+                session,
+                q,
+                client=client,
+                limit=limit,
+                team=team or None,
+                domain=domain or None,
+                discipline=discipline or None,
             )
             retrieval = "hybrid" if client is not None else "lexical"
         except Exception:
@@ -219,7 +238,12 @@ async def list_ledger(
             # logged with its traceback rather than swallowed.
             logger.warning("ledger search fell back to the lexical leg", exc_info=True)
             cards = await find_analogs(
-                session, q, limit=limit, team=team or None, domain=domain or None
+                session,
+                q,
+                limit=limit,
+                team=team or None,
+                domain=domain or None,
+                discipline=discipline or None,
             )
         similarity = {card.entry_id: card.similarity for card in cards}
         ids = [card.entry_id for card in cards]

@@ -545,13 +545,6 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-3 Discipline (FE/BE) dimension end to end (medium).** Schema: composition
-  on `WorkItem`, per-discipline sub-ranges on `EstimateLine`, per-discipline totals on
-  the BoE ("X pd FE, Y pd BE"), discipline column on `ledger_entries` (+ actuals form
-  field) so per-slice calibration data starts accruing NOW. The impact worker proposes
-  the split with citations; until a discipline slice clears MIN_SAMPLES the split
-  renders with a "model-proposed, uncalibrated" badge (the S12-7 honest-silence
-  pattern). Naive baseline: the tenant's historical FE/BE ratio per module.
 - [ ] **S13-4 Number policy refinement (medium).** Where analogs exist: keep the
   analog-median anchor; add LLM **analog vetting** (flag non-comparable analogs out of
   the median — auditable, citable) and give the within-band nudge the top-k analog

@@ -144,6 +144,20 @@ class TestEstimatorFlow:
         with pytest.raises(ValueError, match="ready_for_estimation"):
             await estimate_state(seeded, state)
 
+    async def test_seeded_history_yields_a_discipline_split(self, seeded: AsyncSession) -> None:
+        """S13-3 naive baseline: the seed carries FE+BE actuals, so lines split on
+        the tenant's historical ratio — and the sub-ranges track the line band."""
+        state = await run_brd(FIXTURES / "BRD-AUR-26-02-konsolide-fatura.docx")
+        boe = await estimate_state(seeded, state)
+        split_lines = [line for line in boe.lines if line.disciplines]
+        assert split_lines
+        for line in split_lines:
+            assert {part.discipline for part in line.disciplines} <= {"frontend", "backend"}
+            assert all(part.basis == "historical-ratio" for part in line.disciplines)
+            total_likely = sum(part.range.likely for part in line.disciplines)
+            assert abs(total_likely - line.range.likely) <= 0.05
+        assert boe.discipline_totals
+
     async def test_persisted_graphs_feed_impact_evidence(self, seeded: AsyncSession) -> None:
         """S13-2: with graphs and no client, the deterministic analysis still lands
         repo:// evidence on the lines AND on the document's impact appendix."""

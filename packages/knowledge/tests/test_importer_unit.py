@@ -6,6 +6,8 @@ import pytest
 from estimo_knowledge import propose_mapping, rrf_merge, to_ledger_entry
 from estimo_knowledge.importer import _canonicalize
 
+from estimo_core import LedgerEntry
+
 
 def row(**overrides: str) -> dict[str, str]:
     base = {"brd_ref": "AUR-1", "item_title": "Test kalemi"}
@@ -93,3 +95,26 @@ class TestConfirmedMapping:
     def test_no_mapping_still_uses_aliases(self) -> None:
         canonical = _canonicalize({"takım": "billing"})
         assert canonical == {"team": "billing"}
+
+
+class TestDiscipline:
+    """S13-3: the discipline slice key folds aliases and refuses to mint a third."""
+
+    def test_aliases_fold_to_canonical(self) -> None:
+        def entry(**overrides: str) -> LedgerEntry:
+            return to_ledger_entry(row(est_likely="5", **overrides))
+
+        assert entry(discipline="FE").discipline == "frontend"
+        assert entry(discipline="Ön Yüz").discipline == "frontend"
+        assert entry(discipline="Backend").discipline == "backend"
+        assert entry(discipline="arka uç").discipline == "backend"
+        assert entry(discipline="").discipline is None
+        assert entry().discipline is None
+
+    def test_unrecognized_discipline_rejected(self) -> None:
+        with pytest.raises(ValueError, match="discipline"):
+            to_ledger_entry(row(est_likely="5", discipline="fullstack"))
+
+    def test_turkish_header_maps_to_discipline(self) -> None:
+        mapping = propose_mapping(["Kalem", "Disiplin"])
+        assert mapping["Disiplin"] == "discipline"
