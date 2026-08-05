@@ -37,10 +37,13 @@ from estimo_knowledge.db import KnowledgeChunk, LedgerEntryRow
 
 logger = logging.getLogger("estimo.knowledge.embedding")
 
-# Roughly 8k tokens at ~4 chars/token, the smallest context among embedders anyone
-# would plausibly deploy. Truncation is logged, never silent: a page long enough to be
-# cut is a page whose tail is unsearchable, which the operator should know about.
-MAX_EMBED_CHARS = 32_000
+# The cap must hold for the WORST token density, not the average: prose runs ~4
+# chars/token but symbol-dense code/wiki text runs ~3, and OpenAI's embedders reject
+# anything past 8192 tokens with a hard 400 (measured against text-embedding-3-small
+# on LLM-generated module wikis, 2026-08-05). 20k chars / ~3 chars/token leaves a
+# real margin under that limit. Truncation is logged, never silent: a page long
+# enough to be cut is a page whose tail is unsearchable.
+MAX_EMBED_CHARS = 20_000
 
 # Small enough that one failure loses little work, large enough to amortize round trips.
 DEFAULT_BATCH_SIZE = 64
