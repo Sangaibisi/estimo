@@ -50,6 +50,9 @@ export default function AdminPage() {
   const [secretValue, setSecretValue] = useState("");
   const [secretEnv, setSecretEnv] = useState("");
   const [aclKeys, setAclKeys] = useState("");
+  const [cadenceEdit, setCadenceEdit] = useState<Record<string, string>>({});
+  const [pinRef, setPinRef] = useState<Record<string, string>>({});
+  const [pinNote, setPinNote] = useState<Record<string, string>>({});
 
   // Model gateway form (ADR-0008): initialized from /v1/system, saved via PUT.
   const [gwBaseUrl, setGwBaseUrl] = useState("");
@@ -494,6 +497,102 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      marginTop: 11,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{ fontSize: 11.5, color: "var(--mut)" }}>
+                      {t(locale, "cadenceLabel")}
+                    </span>
+                    <input
+                      style={{ width: 64 }}
+                      placeholder={t(locale, "cadenceOff")}
+                      value={
+                        cadenceEdit[connection.id] ??
+                        (connection.sync_cadence_minutes === null
+                          ? ""
+                          : String(connection.sync_cadence_minutes))
+                      }
+                      onChange={(event) =>
+                        setCadenceEdit({
+                          ...cadenceEdit,
+                          [connection.id]: event.target.value,
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={busy}
+                      onClick={() => {
+                        const raw = (cadenceEdit[connection.id] ?? "").trim();
+                        const minutes = raw === "" ? null : Number(raw);
+                        if (minutes !== null && !Number.isFinite(minutes)) return;
+                        run(() => api.setCadence(connection.id, minutes));
+                      }}
+                    >
+                      {t(locale, "save")}
+                    </button>
+                  </div>
+                  {(connection.kind === "confluence" ||
+                    connection.kind === "jira") && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        marginTop: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <input
+                        style={{ width: 150 }}
+                        placeholder={t(locale, "pinPlaceholder")}
+                        value={pinRef[connection.id] ?? ""}
+                        onChange={(event) =>
+                          setPinRef({
+                            ...pinRef,
+                            [connection.id]: event.target.value,
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busy || !(pinRef[connection.id] ?? "").trim()}
+                        onClick={() =>
+                          run(async () => {
+                            const pin = await api.createPin(
+                              connection.id,
+                              (pinRef[connection.id] ?? "").trim(),
+                            );
+                            setPinNote({
+                              ...pinNote,
+                              [connection.id]: pin.last_error
+                                ? `${pin.ref}: ${pin.last_error}`
+                                : `${pin.ref} ✓`,
+                            });
+                            setPinRef({ ...pinRef, [connection.id]: "" });
+                          })
+                        }
+                      >
+                        {t(locale, "pinNow")}
+                      </button>
+                      {pinNote[connection.id] && (
+                        <span
+                          style={{ fontSize: 11.5, color: "var(--ink2)" }}
+                          className="mn"
+                        >
+                          {pinNote[connection.id]}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
                     <button
                       type="button"

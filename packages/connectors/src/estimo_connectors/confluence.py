@@ -222,6 +222,14 @@ class ConfluenceConnector:
             current = parent.get("parentId")
         return self.default_acl
 
+    async def page_document(
+        self, page_id: str, *, space_key: str | None = None
+    ) -> SourceDocument | None:
+        """Public single-page fetch — the S13-5 pin primitive rides exactly the
+        crawl's own path: same ACL walk, same version-pinned ref, same text
+        extraction. A pin must never be a second, laxer ingestion route."""
+        return await self._page_document(page_id, space_key=space_key)
+
     async def _page_document(
         self, page_id: str, *, space_key: str | None = None
     ) -> SourceDocument | None:

@@ -3,6 +3,8 @@ use); the lifespan builds the OIDC verifier, runs the startup janitor, and dispo
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -117,12 +119,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "interrupted-run sweep skipped (db not ready at startup)", exc_info=True
             )
 
+        # Per-connection sync scheduler (S13-5). In-process on purpose (module
+        # docstring in scheduler.py); connections without a cadence are untouched.
+        from estimo_api.scheduler import scheduler_loop
+
+        scheduler_task = asyncio.create_task(scheduler_loop(app), name="estimo-sync-scheduler")
+
         async with AsyncExitStack() as stack:
             # Run the MCP sub-app's own lifespan (session manager) inside ours.
             await stack.enter_async_context(mcp_app.router.lifespan_context(mcp_app))
             try:
                 yield
             finally:
+                scheduler_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await scheduler_task
                 await engine.dispose()
                 if system_engine is not None:
                     await system_engine.dispose()

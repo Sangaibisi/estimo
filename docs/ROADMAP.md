@@ -545,11 +545,6 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-5 Freshness + pin primitive (medium).** Per-connection sync scheduler with
-  cadence config (Confluence has no external webhooks; git uses the existing HMAC
-  webhook), and a "pin this source now" path: page ID / issue key → existing
-  single-page REST fetch (ACL-walked, version-pinned) → upsert + embed, independent of
-  a full crawl. Pinned refs must join a re-sync set or they never refresh.
 - [ ] **S13-6 Frontier-LLM eval arm (medium).** Add a free-form LLM arm (BRD + repo +
   wiki context, no band constraint) beside the calibrated arm and the naive baseline in
   the eval harness; measured MAE/coverage — not 2023-24 citations — decides future

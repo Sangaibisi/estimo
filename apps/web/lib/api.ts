@@ -307,6 +307,7 @@ export const api = {
     secret_env: string | null;
     secret: string | null;
     acl_keys: string[] | null;
+    sync_cadence_minutes?: number | null;
   }) =>
     request<ConnectionEntry>("/v1/connections", {
       method: "POST",
@@ -318,6 +319,19 @@ export const api = {
     request<{ status: string }>(`/v1/connections/${id}/sync`, {
       method: "POST",
     }),
+  setCadence: (id: string, minutes: number | null) =>
+    request<ConnectionEntry>(`/v1/connections/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sync_cadence_minutes: minutes }),
+    }),
+  listPins: (id: string) => request<PinEntry[]>(`/v1/connections/${id}/pins`),
+  createPin: (id: string, ref: string) =>
+    request<PinEntry>(`/v1/connections/${id}/pins`, {
+      method: "POST",
+      body: JSON.stringify({ ref }),
+    }),
+  deletePin: (id: string, pinId: string) =>
+    request<void>(`/v1/connections/${id}/pins/${pinId}`, { method: "DELETE" }),
   listCanonical: () => request<CanonicalEntry[]>("/v1/canonical"),
   createCanonical: (topic: string) =>
     request<{ id: string; status: string }>("/v1/canonical", {
@@ -393,6 +407,16 @@ export interface GatewayCheckResult {
   error?: string;
 }
 
+export interface PinEntry {
+  id: string;
+  kind: string;
+  ref: string;
+  created_by: string | null;
+  created_at: string | null;
+  last_synced_at: string | null;
+  last_error: string | null;
+}
+
 export interface ConnectionEntry {
   id: string;
   kind: string;
@@ -403,6 +427,7 @@ export interface ConnectionEntry {
   secret_present: boolean;
   secret_stored: boolean;
   acl_keys: string[] | null;
+  sync_cadence_minutes: number | null;
   last_run: {
     status: string;
     started_at: string;

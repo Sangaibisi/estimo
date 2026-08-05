@@ -11,12 +11,17 @@ Confluence.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from estimo_connectors.base import RatePlan, paced_get
+
+# Issue keys are PROJECT-123. Validated before interpolation into JQL — the ref
+# comes from a user-facing pin form, and a free string would be a JQL injection.
+ISSUE_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}-\d{1,10}$")
 
 STORY_POINT_FIELD_NAMES = {"story points", "story point estimate"}
 
@@ -60,6 +65,15 @@ class JiraConnector:
             if (field.get("name") or "").lower() in STORY_POINT_FIELD_NAMES
             and (field.get("schema") or {}).get("type") == "number"
         ]
+
+    async def pull_issue(self, key: str) -> JiraIssue | None:
+        """Single-issue fetch for the S13-5 pin path; None when the key resolves
+        to nothing the credential can see."""
+        if not ISSUE_KEY_RE.match(key):
+            msg = f"not a Jira issue key: {key!r}"
+            raise ValueError(msg)
+        issues = await self.pull_issues(jql=f'key = "{key}"', limit=1)
+        return issues[0] if issues else None
 
     async def pull_issues(self, *, jql: str, limit: int = 500) -> list[JiraIssue]:
         point_fields = await self.story_point_field_ids()

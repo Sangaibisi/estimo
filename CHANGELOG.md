@@ -9,6 +9,26 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-5 — freshness: a per-connection sync scheduler and a "pin this source
+  now" primitive.** Connections gain a panel-managed `sync_cadence_minutes`
+  (migration 0019; NULL = the old manual/webhook-only behaviour — the column IS
+  the off switch, no separate flag to drift from it). The scheduler is an
+  in-process asyncio loop (ADR-0006 keeps the deployment at db/migrate/api/web):
+  it enumerates cadenced connections cross-tenant the way the webhook path does,
+  runs each sync pinned to its tenant, relies on the existing one-running-sync
+  index against replica duplication, and counts a FAILED run as an attempt so a
+  broken connection retries once per cadence, not once per tick. **Pinning**: a
+  Confluence page ID or Jira issue key (validated as an injection boundary —
+  digits only / PROJECT-123, nothing else reaches a REST path or JQL) is fetched
+  through the connector's OWN single-item path — same ACL walk, same
+  version-pinned ref — upserted synchronously so the caller learns in the
+  response whether the source landed, and then **joins the re-sync set**: every
+  successful sync of the connection re-fetches its pins, because the incremental
+  crawl's watermark would otherwise skip an unmodified pinned page forever. Pin
+  failures land on the pin row (`last_error`), never on the sync run. Admin tiles
+  grow the cadence field and a pin box; unpinning stops the refresh but
+  deliberately does not delete the ingested chunk — removing knowledge is a
+  curation decision, not a side effect.
 - **S13-4 — number policy: the analog median stays the anchor, the LLM's role
   around the number is bounded and auditable.** Three legs. (1) **Analog vetting**:
   before the band is computed the model may flag non-comparable analogs out of the

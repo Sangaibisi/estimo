@@ -52,6 +52,9 @@ class Connection(TenantScoped, Base):
     # ACL keys stamped onto every chunk this connection ingests (retrieval
     # pre-filter input, SECURITY.md).
     acl_keys: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
+    # S13-5: minutes between scheduled syncs; NULL = manual/webhook only. This is
+    # the on/off switch — there is no separate enabled flag to drift from it.
+    sync_cadence_minutes: Mapped[int | None] = mapped_column(Integer, default=None)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -89,6 +92,39 @@ class SyncRun(TenantScoped, Base):
         DateTime(timezone=True), server_default=func.now()
     )
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class PinnedSource(TenantScoped, Base):
+    """One "pin this source now" reference (S13-5): a page ID or issue key fetched
+    through the existing single-item REST path (ACL-walked, version-pinned),
+    independent of a full crawl.
+
+    Pinned refs JOIN THE RE-SYNC SET: every successful sync of the connection
+    re-fetches its pins, because the incremental crawl's watermark would otherwise
+    skip a pinned page forever once its first fetch landed."""
+
+    __tablename__ = "pinned_sources"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "connection_id", "ref", name="uq_pinned_sources_tenant_connection_ref"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("connections.id", ondelete="CASCADE")
+    )
+    # "page" (Confluence page id) or "issue" (Jira issue key).
+    kind: Mapped[str] = mapped_column(String(20))
+    ref: Mapped[str] = mapped_column(String(200))
+    created_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_synced_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 class CodeGraphRow(TenantScoped, Base):

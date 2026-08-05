@@ -117,6 +117,23 @@ async def run_sync(
     run.finished_at = dt.datetime.now(dt.UTC)
     await session.commit()
 
+    # Pinned refs join the re-sync set (S13-5): every successful sync re-fetches
+    # this connection's pins, because the incremental crawl's watermark would skip
+    # an unmodified pinned page forever. After the terminal state is durable and
+    # BEFORE embedding, so freshly pinned text gets its vector in the same pass; a
+    # pin failure lands on the pin row, never on the run.
+    if run.status == "succeeded":
+        try:
+            from estimo_connectors.pins import refresh_pins
+
+            pin_stats = await refresh_pins(session, connection)
+            if pin_stats["refreshed"] or pin_stats["failed"]:
+                run.stats = {**(run.stats or {}), "pins": pin_stats}
+                await session.commit()
+        except Exception:
+            logger.exception("pin refresh failed for %s", connection.name)
+            await session.rollback()
+
     # Embedding is a best-effort enrichment and runs only once the run's terminal
     # state is DURABLE. A gateway outage must not cost the expensive, rate-limited
     # part — the crawl — and must not be able to disturb the run row: while the
@@ -298,31 +315,41 @@ async def _sync_jira(session: AsyncSession, connection: Connection, run: SyncRun
     finally:
         await connector.aclose()
 
-    from estimo_knowledge import LedgerEntryRow
-
     imported = 0
     for issue in issues:
-        if issue.story_points is None:
-            continue
-        ref = f"jira://{issue.key}"
-        row = await session.scalar(select(LedgerEntryRow).where(LedgerEntryRow.origin_ref == ref))
-        if row is None:
-            row = LedgerEntryRow(origin_ref=ref)
-            session.add(row)
-        row.brd_ref = issue.parent_key or issue.key
-        # A retitled or re-described issue must lose its vector, or the dense leg keeps
-        # retrieving it under text it no longer contains — confidently, because a
-        # vector carries no visible staleness. Same rule the chunk upsert applies; the
-        # embedding writer picks these rows up on its next pass.
-        if (row.item_title, row.item_description) != (issue.summary, issue.description):
-            row.embedding = None
-            row.embedding_model = None
-            row.embedding_dim = None
-        row.item_title = issue.summary
-        row.item_description = issue.description
-        row.estimate_single = issue.story_points * float(factor)
-        row.method = "jira-story-points"
-        imported += 1
+        if await upsert_issue_row(session, issue, float(factor)):
+            imported += 1
     run.checkpoint = {"jql": jql, "issues_seen": len(issues)}
     await session.commit()
     return {"issues": len(issues), "imported": imported}
+
+
+async def upsert_issue_row(session: AsyncSession, issue: Any, factor: float) -> bool:
+    """One Jira issue → one ledger row; shared by the full sync and the pin path.
+
+    False when the issue carries no story points — a pointless issue is not effort
+    history, and importing it would put an empty observation in the ledger.
+    """
+    from estimo_knowledge import LedgerEntryRow
+
+    if issue.story_points is None:
+        return False
+    ref = f"jira://{issue.key}"
+    row = await session.scalar(select(LedgerEntryRow).where(LedgerEntryRow.origin_ref == ref))
+    if row is None:
+        row = LedgerEntryRow(origin_ref=ref)
+        session.add(row)
+    row.brd_ref = issue.parent_key or issue.key
+    # A retitled or re-described issue must lose its vector, or the dense leg keeps
+    # retrieving it under text it no longer contains — confidently, because a
+    # vector carries no visible staleness. Same rule the chunk upsert applies; the
+    # embedding writer picks these rows up on its next pass.
+    if (row.item_title, row.item_description) != (issue.summary, issue.description):
+        row.embedding = None
+        row.embedding_model = None
+        row.embedding_dim = None
+    row.item_title = issue.summary
+    row.item_description = issue.description
+    row.estimate_single = issue.story_points * factor
+    row.method = "jira-story-points"
+    return True

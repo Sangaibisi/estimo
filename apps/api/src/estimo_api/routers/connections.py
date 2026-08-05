@@ -26,6 +26,13 @@ from estimo_connectors import (
     run_sync,
     verify_webhook,
 )
+from estimo_connectors.db import PinnedSource
+from estimo_connectors.pins import (
+    MAX_PINS_PER_CONNECTION,
+    PINNABLE_KINDS,
+    fetch_pin,
+    validate_pin_ref,
+)
 from estimo_connectors.sync import (
     STALE_RUNNING_AFTER,
     SyncAlreadyRunningError,
@@ -34,7 +41,7 @@ from estimo_connectors.sync import (
 from estimo_knowledge import is_stale
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from estimo_api.auth import (
@@ -77,6 +84,8 @@ class ConnectionIn(BaseModel):
     # storage and never serialized back out. Wins over secret_env at sync time.
     secret: str | None = Field(default=None, min_length=1, max_length=4000)
     acl_keys: list[str] | None = None
+    # S13-5: minutes between scheduled syncs; None = manual/webhook only.
+    sync_cadence_minutes: int | None = Field(default=None, ge=5, le=10080)
 
 
 def _connection_out(connection: Connection) -> dict[str, Any]:
@@ -93,6 +102,7 @@ def _connection_out(connection: Connection) -> dict[str, Any]:
         or bool(connection.secret_env and os.getenv(connection.secret_env) is not None),
         "secret_stored": bool(connection.secret),
         "acl_keys": connection.acl_keys,
+        "sync_cadence_minutes": connection.sync_cadence_minutes,
     }
 
 
@@ -141,6 +151,7 @@ async def create_connection(payload: ConnectionIn, session: SessionDep) -> dict[
         secret_env=payload.secret_env,
         secret=seal(payload.secret) if payload.secret is not None else None,
         acl_keys=payload.acl_keys,
+        sync_cadence_minutes=payload.sync_cadence_minutes,
     )
     session.add(connection)
     await session.commit()
@@ -440,3 +451,123 @@ async def approve_candidate(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await session.commit()
     return {"id": str(page.id), "status": page.status, "version": page.version}
+
+
+class CadenceIn(BaseModel):
+    # None turns scheduling OFF for the connection — deliberate, so it is the
+    # explicit body value, not an omitted field.
+    sync_cadence_minutes: int | None = Field(default=None, ge=5, le=10080)
+
+
+@router.patch("/connections/{connection_id}", dependencies=[Depends(require_admin)])
+async def update_cadence(
+    connection_id: uuid.UUID, payload: CadenceIn, session: SessionDep
+) -> dict[str, Any]:
+    """S13-5: the scheduler cadence is panel-managed per connection."""
+    connection = await session.get(Connection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="connection not found")
+    connection.sync_cadence_minutes = payload.sync_cadence_minutes
+    await session.commit()
+    await session.refresh(connection)
+    return _connection_out(connection)
+
+
+class PinIn(BaseModel):
+    ref: str = Field(min_length=1, max_length=200)
+
+
+def _pin_out(pin: PinnedSource) -> dict[str, Any]:
+    return {
+        "id": str(pin.id),
+        "kind": pin.kind,
+        "ref": pin.ref,
+        "created_by": pin.created_by,
+        "created_at": pin.created_at.isoformat() if pin.created_at else None,
+        "last_synced_at": pin.last_synced_at.isoformat() if pin.last_synced_at else None,
+        "last_error": pin.last_error,
+    }
+
+
+@router.get("/connections/{connection_id}/pins")
+async def list_pins(connection_id: uuid.UUID, session: SessionDep) -> list[dict[str, Any]]:
+    if await session.get(Connection, connection_id) is None:
+        raise HTTPException(status_code=404, detail="connection not found")
+    pins = (
+        (
+            await session.execute(
+                select(PinnedSource)
+                .where(PinnedSource.connection_id == connection_id)
+                .order_by(PinnedSource.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_pin_out(pin) for pin in pins]
+
+
+@router.post(
+    "/connections/{connection_id}/pins",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_reviewer)],
+)
+async def create_pin(
+    connection_id: uuid.UUID,
+    payload: PinIn,
+    session: SessionDep,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict[str, Any]:
+    """S13-5 "pin this source now": page ID / issue key → the connector's own
+    single-item fetch (ACL-walked, version-pinned) → upsert, synchronously — the
+    caller learns in this response whether the source actually landed. The pin
+    then joins the connection's re-sync set (every successful sync re-fetches it).
+    """
+    connection = await session.get(Connection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="connection not found")
+    try:
+        ref = validate_pin_ref(connection.kind, payload.ref)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    count = await session.scalar(
+        select(func.count(PinnedSource.id)).where(PinnedSource.connection_id == connection_id)
+    )
+    if int(count or 0) >= MAX_PINS_PER_CONNECTION:
+        raise HTTPException(
+            status_code=409,
+            detail=f"pin limit reached ({MAX_PINS_PER_CONNECTION}); curation, not mirroring",
+        )
+    existing = await session.scalar(
+        select(PinnedSource).where(
+            PinnedSource.connection_id == connection_id, PinnedSource.ref == ref
+        )
+    )
+    pin = existing or PinnedSource(
+        connection_id=connection_id,
+        kind=PINNABLE_KINDS[connection.kind],
+        ref=ref,
+        created_by=principal.subject,
+    )
+    if existing is None:
+        session.add(pin)
+    await fetch_pin(session, connection, pin)
+    await session.commit()
+    await session.refresh(pin)
+    return _pin_out(pin)
+
+
+@router.delete(
+    "/connections/{connection_id}/pins/{pin_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+async def delete_pin(connection_id: uuid.UUID, pin_id: uuid.UUID, session: SessionDep) -> None:
+    """Unpinning stops the refresh; it deliberately does NOT delete the ingested
+    chunk — removing knowledge from retrieval is a curation decision, not a
+    side effect of tidying a pin list."""
+    pin = await session.get(PinnedSource, pin_id)
+    if pin is None or pin.connection_id != connection_id:
+        raise HTTPException(status_code=404, detail="pin not found")
+    await session.delete(pin)
+    await session.commit()
