@@ -47,6 +47,7 @@ async def _run_git(
     cwd: Path | None = None,
     username: str | None = None,
     token: str | None = None,
+    bearer: bool = False,
 ) -> str:
     env = {
         key: value
@@ -55,7 +56,14 @@ async def _run_git(
     }
     env["GIT_TERMINAL_PROMPT"] = "0"
     askpass_path: str | None = None
-    if token is not None:
+    if token is not None and bearer:
+        # Bitbucket Data Center personal access tokens are Bearer-only (they
+        # are rejected as HTTP Basic passwords). Config travels via GIT_CONFIG_*
+        # env vars so the token still never touches argv, URLs, or .git/config.
+        env["GIT_CONFIG_COUNT"] = "1"
+        env["GIT_CONFIG_KEY_0"] = "http.extraHeader"
+        env["GIT_CONFIG_VALUE_0"] = "Authorization: Bearer " + token
+    elif token is not None:
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as handle:
             handle.write(_ASKPASS)
             askpass_path = handle.name
@@ -89,6 +97,7 @@ async def clone_or_fetch(
     branch: str | None = None,
     username: str | None = None,
     token: str | None = None,
+    bearer: bool = False,
     depth: int = 1,
 ) -> RepoState:
     """Idempotent sync of one repo working tree; returns the synced HEAD state."""
@@ -98,6 +107,7 @@ async def clone_or_fetch(
             cwd=dest,
             username=username,
             token=token,
+            bearer=bearer,
         )
         # Always reset to FETCH_HEAD: after a --single-branch clone the fetch
         # refspec does not track OTHER branches, so origin/<new-branch> never
@@ -109,7 +119,7 @@ async def clone_or_fetch(
         if branch:
             args += ["--branch", branch]
         args += [url, str(dest)]
-        await _run_git(args, username=username, token=token)
+        await _run_git(args, username=username, token=token, bearer=bearer)
 
     head_sha = (await _run_git(["rev-parse", "HEAD"], cwd=dest)).strip()
     committed = (await _run_git(["show", "-s", "--format=%cI", "HEAD"], cwd=dest)).strip()

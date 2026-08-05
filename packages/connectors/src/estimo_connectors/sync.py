@@ -240,6 +240,7 @@ async def _sync_git(
         repos_dir / _workdir_name(connection),
         branch=config.get("branch"),
         username=config.get("username") or clone_username(connection.kind),
+        bearer=config.get("auth") == "bearer",
         token=token,
     )
     # Whole-repo parsing is CPU-bound; keep it off the API event loop or /healthz
