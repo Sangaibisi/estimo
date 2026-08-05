@@ -101,6 +101,16 @@ class Principal(BaseModel):
     # Source-system audiences this caller can be PROVEN to hold. Never taken from a
     # request body — see clamp_acl_keys.
     acl_keys: frozenset[str] = frozenset({PUBLIC_ACL})
+    # S15-1 local accounts. `role` is the product role (platform_admin /
+    # project_owner / user); `roles` above stays the capability set every existing
+    # route guard reads, derived from it. `user_id` is None for OIDC and open-mode
+    # callers, who have no row in `users`.
+    user_id: str | None = None
+    role: str | None = None
+    can_sign: bool = False
+    # True when this caller is a platform admin acting inside a tenant that is not
+    # their own (X-Estimo-Tenant). Surfaced so audit-sensitive routes can say so.
+    impersonating_tenant: bool = False
 
 
 def clamp_acl_keys(principal: Principal, requested: list[str] | None) -> list[str]:
@@ -193,35 +203,174 @@ class OidcVerifier:
 # Roles, most to least privileged. Higher roles imply the checks lower roles pass.
 ROLES = ("admin", "signing_authority", "reviewer", "estimator")
 
+# Product role → the capability set every pre-S15 route guard is written against.
+# A plain user gets `reviewer` as well as `estimator` on purpose: reviewer gates the
+# READ side of the ledger, calibration and connections — surfaces the product is
+# useless without. What separates a project owner from a user is not a capability in
+# this table but the project/map write routes, which check the product role itself.
+_CAPABILITIES: dict[str, frozenset[str]] = {
+    "platform_admin": frozenset(ROLES),
+    "project_owner": frozenset({"estimator", "reviewer"}),
+    "user": frozenset({"estimator", "reviewer"}),
+}
+# The tenant a platform admin wants to act inside. Ignored for everyone else — a
+# header is a request, and only that role's authorization turns it into a fact.
+ACTING_TENANT_HEADER = "X-Estimo-Tenant"
+
 _bearer = HTTPBearer(auto_error=False)
+
+
+def capabilities_for(role: str, *, can_sign: bool) -> frozenset[str]:
+    caps = _CAPABILITIES.get(role, frozenset({"estimator"}))
+    return caps | {"signing_authority"} if can_sign else caps
+
+
+def product_role(roles: frozenset[str]) -> str:
+    """The product role implied by a legacy capability set (OIDC callers)."""
+    if "admin" in roles:
+        return "platform_admin"
+    if "reviewer" in roles:
+        return "project_owner"
+    return "user"
 
 
 def _verifier(request: Request) -> OidcVerifier | None:
     return getattr(request.app.state, "oidc_verifier", None)
 
 
+async def _local_principal(request: Request, token: str) -> Principal | None:
+    """Resolve a session token issued by THIS deployment, or None if it is not one.
+
+    The user row is read on every request rather than trusted from the token: it is
+    what makes deactivation and password changes take effect immediately instead of
+    at the end of a 12-hour session.
+    """
+    from sqlalchemy import select
+
+    from estimo_api.accounts_models import User
+    from estimo_api.passwords import read_session
+
+    key: bytes | None = getattr(request.app.state, "session_key", None)
+    maker = getattr(request.app.state, "system_sessionmaker", None)
+    if key is None or maker is None:
+        return None
+    claims = read_session(key, token)
+    if claims is None:
+        return None
+    try:
+        user_id = uuid.UUID(str(claims["sub"]))
+    except (ValueError, KeyError):
+        return None
+    async with maker() as session:
+        user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None or not user.is_active or user.token_version != claims.get("tv"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="session is no longer valid — sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    tenant = str(user.tenant_id)
+    impersonating = False
+    if user.role == "platform_admin":
+        requested = request.headers.get(ACTING_TENANT_HEADER)
+        if requested:
+            try:
+                tenant = str(uuid.UUID(requested))
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{ACTING_TENANT_HEADER} must be a tenant uuid",
+                ) from None
+            impersonating = tenant != str(user.tenant_id)
+    return Principal(
+        subject=user.email,
+        tenant=tenant,
+        roles=capabilities_for(user.role, can_sign=user.can_sign),
+        acl_keys=frozenset(user.acl_keys or []) | {PUBLIC_ACL},
+        user_id=str(user.id),
+        role=user.role,
+        can_sign=user.can_sign,
+        impersonating_tenant=impersonating,
+    )
+
+
+async def _deployment_is_open(request: Request) -> bool:
+    """True while no account exists yet: the pre-S15 open mode.
+
+    A deployment leaves this state the moment the first platform admin is created
+    and never returns to it, so the answer is memoized once it is False. Any error
+    reading the table is treated as CLOSED — a database we cannot question must not
+    be the reason the API starts trusting anonymous callers.
+    """
+    if getattr(request.app.state, "accounts_exist", False):
+        return False
+    from sqlalchemy import text
+
+    maker = getattr(request.app.state, "system_sessionmaker", None)
+    if maker is None:
+        return False
+    try:
+        async with maker() as session:
+            exists = bool(
+                (await session.execute(text("SELECT EXISTS (SELECT 1 FROM users)"))).scalar()
+            )
+    except Exception:  # noqa: BLE001 — any failure here must fail CLOSED
+        logger.warning("could not read the accounts table; treating the API as closed")
+        return False
+    if exists:
+        request.app.state.accounts_exist = True
+    return not exists
+
+
 async def current_principal(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> Principal:
-    """The authenticated principal. In single-tenant (auth-disabled) mode this is a
-    synthetic admin bound to the default tenant, preserving pre-S10 behavior."""
-    verifier = _verifier(request)
-    if verifier is None:
-        from estimo_api.tenancy import DEFAULT_TENANT
+    """The authenticated principal.
 
-        # Single-tenant open mode: a synthetic admin. The ACL entitlement is NOT
-        # widened along with the roles — ACL keys model the SOURCE system's
-        # permissions (who may read a restricted Confluence space), and Estimo's
-        # users are a superset of that population even when Estimo itself is open.
-        return Principal(subject="local", tenant=DEFAULT_TENANT, roles=frozenset(ROLES))
-    if credentials is None:
+    Three lanes, in order: a session token issued by this deployment (local accounts,
+    S15-1), an OIDC bearer from the customer's IdP (S10-1), and — only while no
+    account exists at all — the historical open mode.
+    """
+    from estimo_api.tenancy import DEFAULT_TENANT
+
+    if credentials is not None:
+        local = await _local_principal(request, credentials.credentials)
+        if local is not None:
+            return local
+        verifier = _verifier(request)
+        if verifier is not None:
+            principal = verifier.verify(credentials.credentials)
+            return principal.model_copy(
+                update={
+                    "role": product_role(principal.roles),
+                    "can_sign": "signing_authority" in principal.roles,
+                }
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="bearer token required",
+            detail="invalid token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return verifier.verify(credentials.credentials)
+
+    if _verifier(request) is None and await _deployment_is_open(request):
+        # Nothing configured, nobody enrolled: a synthetic admin on the default
+        # tenant, preserving pre-S10 behavior. The ACL entitlement is NOT widened
+        # along with the roles — ACL keys model the SOURCE system's permissions (who
+        # may read a restricted Confluence space), and Estimo's users are a superset
+        # of that population even when Estimo itself is open.
+        return Principal(
+            subject="local",
+            tenant=DEFAULT_TENANT,
+            roles=frozenset(ROLES),
+            role="platform_admin",
+            can_sign=True,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="bearer token required",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def require_roles(*needed: str) -> Any:
@@ -246,3 +395,29 @@ require_estimator = require_roles("estimator", "reviewer", "signing_authority", 
 require_reviewer = require_roles("reviewer", "signing_authority", "admin")
 require_signing = require_roles("signing_authority", "admin")
 require_admin = require_roles("admin")
+
+
+def require_product_roles(*needed: str) -> Any:
+    """Dependency factory keyed on the PRODUCT role (S15-1).
+
+    Separate from `require_roles` because the product roles are not a ladder of the
+    same capabilities: a project owner outranks a user only over projects and the
+    repository map, and nowhere else.
+    """
+
+    async def dependency(
+        principal: Annotated[Principal, Depends(current_principal)],
+    ) -> Principal:
+        if principal.role not in needed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"requires one of roles: {', '.join(needed)}",
+            )
+        return principal
+
+    return dependency
+
+
+require_platform_admin = require_product_roles("platform_admin")
+# Who may create a project and draw its map.
+require_project_owner = require_product_roles("platform_admin", "project_owner")

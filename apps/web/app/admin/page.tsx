@@ -20,6 +20,7 @@ import {
 import { DATE_LOCALE, t } from "@/lib/i18n";
 import { BandHeader, Chip, Lbl, Mn, StatusChip } from "@/components/ui";
 import { CONNECTOR_LABELS, ConnectorMark, IconAdmin } from "@/components/icons";
+import { AccountsAdmin, SetupCard } from "@/components/AccountsAdmin";
 
 const KINDS = ["confluence", "bitbucket", "github", "gitlab", "git", "jira"];
 
@@ -232,6 +233,12 @@ export default function AdminPage() {
           {error}
         </div>
       )}
+
+      {/* Shown once in a deployment's life, while anyone can still reach the API. */}
+      <SetupCard />
+
+      {/* ---- Workspaces & people (platform admin only) ---- */}
+      <AccountsAdmin />
 
       {/* ---- Connections ---- */}
       <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>

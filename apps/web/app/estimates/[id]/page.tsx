@@ -659,7 +659,6 @@ export default function EstimateWorkspace({
             boeDoc={boeDoc}
             workItems={state.work_items}
             actuals={actuals}
-            downloadUrl={api.boeDocxUrl(id)}
             busy={busy}
             onRecordActual={(payload) =>
               run(async () => {
@@ -2503,7 +2502,6 @@ function BoePreview({
   boeDoc,
   workItems,
   actuals,
-  downloadUrl,
   busy,
   onRecordActual,
   onSigned,
@@ -2515,7 +2513,6 @@ function BoePreview({
   boeDoc: BoeDocShape | null;
   workItems: WorkItemShape[];
   actuals: ActualEntry[];
-  downloadUrl: string;
   busy: boolean;
   onRecordActual: (payload: {
     work_item_id: string;
@@ -3208,9 +3205,13 @@ function BoePreview({
           <Lbl>{t("exportSection")}</Lbl>
           <div style={{ marginTop: 10 }}>
             {fullySigned ? (
-              <a className="btn p" href={downloadUrl}>
+              <button
+                type="button"
+                className="btn p"
+                onClick={() => void api.downloadBoe(id, `${summary.brd_ref}-boe.docx`)}
+              >
                 {t("downloadDocx")}
-              </a>
+              </button>
             ) : (
               <StatusChip status="warn">{t("notSignedYet")}</StatusChip>
             )}

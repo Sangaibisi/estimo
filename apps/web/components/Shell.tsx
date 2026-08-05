@@ -3,14 +3,21 @@
 /** App chrome — the design's left sidebar (docs/design/repository-map.dc.html).
  *
  * One dark theme, English-only UI, no top bar: the sidebar is the whole chrome.
- * Two nav groups: WORKSPACE (the estimation surfaces) and, pinned to the bottom
- * as its own category, ADMIN (deployment settings only). Behind everything sits
- * the ambient layer — the design's violet radial plus two very slow drifting
- * orbs (`om-drift-*`, disabled under prefers-reduced-motion). */
+ * Two nav groups: WORKSPACE (the estimation surfaces) and, pinned to the bottom as
+ * its own category, ADMIN — visible only to a platform admin, because Settings is
+ * where connections and the model gateway live. Below it sits the session card: who
+ * you are, which workspace you are acting in, and the way out.
+ *
+ * Behind everything is the ambient layer — the design's violet radial plus two very
+ * slow drifting orbs (`om-drift-*`, disabled under prefers-reduced-motion). */
 
 import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { api, type TenantEntry } from "@/lib/api";
+import { ROLE_LABELS, setActingTenant, signOut } from "@/lib/auth";
+import { SessionProvider, useSession } from "@/components/Session";
 import {
   IconAdmin,
   IconCalibration,
@@ -57,7 +64,17 @@ function orb(color: string, size: number, pos: CSSProperties, anim: string): CSS
 }
 
 export function Shell({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <Chrome>{children}</Chrome>
+    </SessionProvider>
+  );
+}
+
+function Chrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const session = useSession();
+  const isPlatformAdmin = session.role === "platform_admin";
 
   const active = (href: string) =>
     href === "/" ? pathname === "/" || pathname.startsWith("/estimates") : pathname.startsWith(href);
@@ -156,12 +173,16 @@ export function Shell({ children }: { children: ReactNode }) {
         <div style={{ flex: 1, minHeight: 24 }} />
 
         {/* Admin lives at the bottom, as its own category — deployment settings
-            only (connections + model gateway), away from the daily surfaces. */}
-        <div style={{ padding: "10px 8px 14px", display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 6px 10px" }} />
-          <div style={groupLabel}>ADMIN</div>
-          {item({ href: "/admin", label: "Settings", icon: IconAdmin })}
-        </div>
+            only (connections, model gateway, accounts). */}
+        {(isPlatformAdmin || !session.accountsExist) && (
+          <div style={{ padding: "10px 8px 0", display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ height: 1, background: "var(--line)", margin: "0 6px 10px" }} />
+            <div style={groupLabel}>ADMIN</div>
+            {item({ href: "/admin", label: "Settings", icon: IconAdmin })}
+          </div>
+        )}
+
+        <SessionCard />
       </nav>
 
       <main
@@ -175,6 +196,121 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         {children}
       </main>
+    </div>
+  );
+}
+
+/** Who you are, where you are acting, and the way out. */
+function SessionCard() {
+  const session = useSession();
+  const [tenants, setTenants] = useState<TenantEntry[]>([]);
+
+  // Only a platform admin may act inside another workspace, so only a platform
+  // admin is offered the switch (and only when there is more than one).
+  useEffect(() => {
+    if (session.role !== "platform_admin") return;
+    api
+      .listTenants()
+      .then(setTenants)
+      .catch(() => setTenants([]));
+  }, [session.role, session.tenant]);
+
+  if (!session.user) {
+    return (
+      <div style={{ padding: "12px 14px 16px" }}>
+        <div style={{ height: 1, background: "var(--line)", marginBottom: 12 }} />
+        <div style={{ fontSize: 11.5, color: "var(--mut)", textWrap: "pretty" }}>
+          No accounts yet — this deployment is open. Claim it in Settings.
+        </div>
+      </div>
+    );
+  }
+
+  const initials = session.user.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <div style={{ padding: "12px 14px 16px" }}>
+      <div style={{ height: 1, background: "var(--line)", marginBottom: 12 }} />
+
+      {session.role === "platform_admin" && tenants.length > 1 && (
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+          <span style={{ ...groupLabel, padding: 0, marginBottom: 0 }}>WORKSPACE</span>
+          <select
+            value={session.tenant ?? ""}
+            onChange={(event) => {
+              setActingTenant(
+                event.target.value === session.user?.tenant_id ? null : event.target.value,
+              );
+              // A workspace switch changes what every screen is about, so the whole
+              // app reloads rather than leaving stale rows from the previous one.
+              window.location.reload();
+            }}
+            style={{ fontSize: 11, padding: "5px 7px" }}
+          >
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span
+          aria-hidden
+          style={{
+            width: 28,
+            height: 28,
+            flex: "none",
+            borderRadius: 8,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "oklch(0.26 0.03 300)",
+            color: "oklch(0.84 0.1 300)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            fontWeight: 700,
+          }}
+        >
+          {initials || "?"}
+        </span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {session.user.name}
+          </span>
+          <span style={{ display: "block", fontSize: 10, color: "var(--mut)" }}>
+            {ROLE_LABELS[session.user.role] ?? session.user.role}
+            {session.user.can_sign ? " · signs" : ""}
+          </span>
+        </span>
+      </div>
+      <button
+        type="button"
+        className="btn"
+        style={{ width: "100%", justifyContent: "center", marginTop: 10, padding: "5px 10px" }}
+        onClick={() => {
+          signOut();
+          window.location.href = "/";
+        }}
+      >
+        Sign out
+      </button>
     </div>
   );
 }

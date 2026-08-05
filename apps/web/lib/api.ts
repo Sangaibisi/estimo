@@ -6,6 +6,8 @@
  * then NEXT_PUBLIC_ESTIMO_API (dev convenience), then the local default.
  */
 
+import { actingTenant, authToken, setAuthToken, type SessionUser } from "@/lib/auth";
+
 declare global {
   interface Window {
     __ESTIMO_API__?: string;
@@ -94,22 +96,147 @@ export interface DeskItem {
   delta_likely: number | null;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/** Every request carries the session, and every request may end it.
+ *
+ * A 401 means the token is gone or no longer buys what it used to (deactivated,
+ * demoted, password changed — the API bumps a token version for all three). Clearing
+ * it here is what turns "my authority was revoked" into "you are back at the login
+ * screen" instead of a page full of red error banners.
+ */
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = authToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenant = actingTenant();
+  if (tenant) headers["X-Estimo-Tenant"] = tenant;
+  return headers;
+}
+
+async function rawFetch(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers:
       init?.body instanceof FormData
-        ? init?.headers
-        : { "Content-Type": "application/json", ...init?.headers },
+        ? { ...authHeaders(), ...init?.headers }
+        : { "Content-Type": "application/json", ...authHeaders(), ...init?.headers },
   });
+  if (response.status === 401 && authToken()) setAuthToken(null);
+  return response;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await rawFetch(path, init);
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`${response.status}: ${detail}`);
   }
+  // 204 has no body to parse; the callers that expect nothing get undefined.
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
 export const api = {
+  /* ---- Session & accounts (S15-1) ---- */
+  me: () =>
+    request<{
+      authenticated: boolean;
+      accounts_exist: boolean;
+      user: SessionUser | null;
+      tenant: string | null;
+      role: string | null;
+      can_sign: boolean;
+    }>("/v1/auth/me"),
+  login: (email: string, password: string) =>
+    request<{ token: string; expires_at: string; user: SessionUser }>("/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  bootstrap: (payload: {
+    setup_token: string;
+    email: string;
+    name: string;
+    password: string;
+    workspace: string;
+  }) =>
+    request<{ token: string; expires_at: string; user: SessionUser }>("/v1/auth/bootstrap", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  changePassword: (current_password: string, new_password: string) =>
+    request<void>("/v1/auth/password", {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
+  listUsers: () => request<SessionUser[]>("/v1/users"),
+  createUser: (payload: {
+    email: string;
+    name: string;
+    password: string;
+    role: string;
+    can_sign: boolean;
+    tenant_id?: string | null;
+  }) => request<SessionUser>("/v1/users", { method: "POST", body: JSON.stringify(payload) }),
+  updateUser: (
+    id: string,
+    payload: Partial<{
+      name: string;
+      role: string;
+      can_sign: boolean;
+      is_active: boolean;
+      tenant_id: string;
+      password: string;
+    }>,
+  ) => request<SessionUser>(`/v1/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  listTenants: () => request<TenantEntry[]>("/v1/tenants"),
+  createTenant: (name: string) =>
+    request<TenantEntry>("/v1/tenants", { method: "POST", body: JSON.stringify({ name }) }),
+
+  /* ---- Projects & the repository map (S14-1) ---- */
+  listProjects: () => request<ProjectEntry[]>("/v1/projects"),
+  createProject: (name: string) =>
+    request<ProjectEntry>("/v1/projects", { method: "POST", body: JSON.stringify({ name }) }),
+  deleteProject: (id: string) => request<void>(`/v1/projects/${id}`, { method: "DELETE" }),
+  projectMap: (id: string) => request<ProjectMap>(`/v1/projects/${id}/map`),
+  addRepo: (
+    projectId: string,
+    payload: {
+      name: string;
+      provider?: string;
+      node_type?: string;
+      connection_id?: string | null;
+    },
+  ) =>
+    request<{ id: string }>(`/v1/projects/${projectId}/repos`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateRepo: (
+    projectId: string,
+    repoId: string,
+    payload: Partial<{
+      name: string;
+      node_type: string;
+      connection_id: string;
+      detach_connection: boolean;
+      pos_x: number;
+      pos_y: number;
+      reset_position: boolean;
+    }>,
+  ) =>
+    request<{ id: string }>(`/v1/projects/${projectId}/repos/${repoId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteRepo: (projectId: string, repoId: string) =>
+    request<void>(`/v1/projects/${projectId}/repos/${repoId}`, { method: "DELETE" }),
+  addRelation: (projectId: string, from_repo_id: string, to_repo_id: string, kind: string) =>
+    request<{ id: string; created: boolean }>(`/v1/projects/${projectId}/relations`, {
+      method: "POST",
+      body: JSON.stringify({ from_repo_id, to_repo_id, kind }),
+    }),
+  deleteRelation: (projectId: string, relationId: string) =>
+    request<void>(`/v1/projects/${projectId}/relations/${relationId}`, { method: "DELETE" }),
+
   listEstimates: () => request<EstimateSummary[]>("/v1/estimates"),
   getEstimate: (id: string) =>
     request<{
@@ -224,7 +351,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind, payload }),
     }),
-  boeDocxUrl: (id: string) => `${apiBase()}/v1/estimates/${id}/boe.docx`,
+  /** Fetch the .docx WITH the session header and hand the browser a blob.
+   *
+   * A plain <a href> to the API cannot carry an Authorization header, so once the
+   * deployment has accounts the old link 401'd — the export silently became the one
+   * feature a signed-in user could not use. */
+  downloadBoe: async (id: string, filename: string) => {
+    const response = await rawFetch(`/v1/estimates/${id}/boe.docx`);
+    if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
   recordActual: (
     id: string,
     payload: {
@@ -415,6 +556,57 @@ export interface PinEntry {
   created_at: string | null;
   last_synced_at: string | null;
   last_error: string | null;
+}
+
+export interface TenantEntry {
+  id: string;
+  name: string;
+  slug: string;
+  users: number;
+  projects: number;
+  created_at: string;
+}
+
+export interface ProjectEntry {
+  id: string;
+  key: string;
+  name: string;
+  owner_id: string | null;
+  repos: number;
+  relations: number;
+  created_at: string;
+}
+
+export interface MapRepo {
+  id: string;
+  name: string;
+  provider: string;
+  node_type: string;
+  connection_id: string | null;
+  connection: {
+    id: string;
+    kind: string;
+    name: string;
+    base_url: string;
+    status: string | null;
+    synced_at: string | null;
+    graph: { files?: number; modules?: number; symbols?: number } | null;
+  } | null;
+  pos_x: number | null;
+  pos_y: number | null;
+}
+
+export interface MapRelation {
+  id: string;
+  from_repo_id: string;
+  to_repo_id: string;
+  kind: string;
+}
+
+export interface ProjectMap {
+  project: { id: string; key: string; name: string };
+  repos: MapRepo[];
+  relations: MapRelation[];
 }
 
 export interface ConnectionEntry {

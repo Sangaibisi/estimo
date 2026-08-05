@@ -8,6 +8,45 @@ Until the first code release, entries track documentation and foundation milesto
 
 ## [Unreleased]
 
+### Added
+- **S15-1 — accounts, three product roles, and multi-tenancy people can actually
+  use.** Until now every caller was a synthetic admin on one implicit tenant: S10
+  shipped OIDC and row-level security, but the product had no notion of a *person*.
+  It does now. A **platform admin** creates workspaces and every account — there is
+  no self-registration anywhere — configures connections and the model gateway, and
+  may act inside any workspace (`X-Estimo-Tenant`, honoured for that role alone). A
+  **project owner** creates projects and shapes the repository map. A **user** works
+  the product. Signing authority is deliberately NOT a fourth role but an orthogonal
+  `can_sign` flag, because "may sign a Basis of Estimate" is a delegation that cuts
+  across seniority. Sign-in is local: scrypt password hashing from the standard
+  library (no new dependency), session tokens signed with a key *derived* from
+  `ESTIMO_SECRET_KEY` so the value that encrypts stored credentials and the value
+  that signs sessions are never the same bytes. Sessions are stateless but
+  **revocable**: the user row is read on every request and carries a token version
+  that a role change, workspace move, deactivation or password change bumps — so
+  revoking authority takes effect immediately rather than whenever a 12-hour token
+  happens to expire. The first-run gate is a setup token (set it, or read the one
+  the API prints at boot): a deployment with no accounts stays open the way it
+  always was, and `POST /v1/auth/bootstrap` closes it for good. The web client grew
+  a sign-in screen, a session card with the workspace switcher, and Settings →
+  Workspaces / People; the BoE export became an authenticated fetch, since a plain
+  `<a href>` cannot carry a bearer token and had silently become the one feature a
+  signed-in user could not use.
+- **S14-1 — the repository map is server state.** Projects, repository nodes, the
+  directed API-call/data-flow relations between them, their typing and their
+  placement all moved from browser localStorage into the tenant's database
+  (migration 0020, RLS per the 0009 pattern). A node either IS a synced connection —
+  carrying its live code-graph shape — or is one somebody declared because it exists
+  in the architecture even though Estimo does not index it; both are first-class
+  relation endpoints, because the architecture does not care which repositories we
+  happen to hold credentials for. Deleting a connection therefore takes the
+  credentials and the index, never the architecture drawn around it (`ON DELETE SET
+  NULL`), and deleting a node takes its relations with it, because an edge to
+  nothing is a dangling reference someone will later read as fact. Project and map
+  queries filter by tenant **explicitly** as well as under RLS: the database backstop
+  is not the application's excuse to never scope, and it is absent on the one
+  deployment where a developer connects as the owner role.
+
 ### Changed
 - **The repository-first redesign (S14 wave 1) — a new design language and the
   Repository Map.** The whole UI moved to the OKLCH dark system delivered as

@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
@@ -20,14 +21,19 @@ from sqlalchemy.orm.exc import StaleDataError
 from estimo_api.db import build_engine, build_sessionmaker
 from estimo_api.mcp_server import build_mcp
 from estimo_api.routers import (
+    accounts,
     connections,
     estimates,
     health,
     impact,
     ledger,
     metrics,
+    projects,
     runs,
     system,
+)
+from estimo_api.routers import (
+    auth as auth_routes,
 )
 from estimo_api.settings import Settings
 
@@ -75,6 +81,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.sessionmaker = sessionmaker
         app.state.system_sessionmaker = system_sessionmaker
         app.state.oidc_verifier = None
+        # Local accounts (S15-1): the session-signing key and the first-run gate.
+        from estimo_api.passwords import derive_session_key
+
+        app.state.session_key = derive_session_key()
+        app.state.accounts_exist = False
+        app.state.setup_token = app_settings.setup_token or secrets.token_urlsafe(24)
+        if not app_settings.setup_token:
+            logging.getLogger("estimo.api").warning(
+                "no ESTIMO_SETUP_TOKEN configured — this boot's one-time setup token "
+                "is %s (needed once, to create the first platform admin)",
+                app.state.setup_token,
+            )
         if app_settings.auth.enabled:
             from estimo_api.auth import OidcVerifier
 
@@ -238,6 +256,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # their own stricter role checks per route. In single-tenant (auth-disabled) mode
     # the synthetic principal holds every role, so these are no-ops.
     app.include_router(health.router)
+    # Sign-in is necessarily unauthenticated; its routes carry their own checks.
+    app.include_router(auth_routes.router)
+    # Workspaces and accounts: platform admin only (declared on the router itself).
+    app.include_router(accounts.router)
+    # The repository map: readable by every account in the tenant, writable by
+    # project owners (route-level checks inside).
+    app.include_router(projects.router, dependencies=[Depends(require_estimator)])
     app.include_router(runs.router, dependencies=[Depends(require_admin)])
     app.include_router(estimates.router, dependencies=[Depends(require_estimator)])
     app.include_router(impact.router, dependencies=[Depends(require_estimator)])

@@ -25,7 +25,19 @@ _TENANT_TABLES = (
     # tenant data does: a panel-saved gateway from one test made the next one see a
     # configured deployment it never configured.
     "runtime_settings",
+    # Accounts and the repository map (S14-1 / S15-1). `users` in particular decides
+    # whether the API is in its open first-run state, so a leftover account from one
+    # test would 401 every request in the next.
+    "project_relations",
+    "project_repos",
+    "projects",
+    "users",
+    "tenants",
 )
+
+# TRUNCATE takes the seeded default workspace with it; every account references one,
+# so it is put back rather than left for each test to rediscover.
+_DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
 
 
 @pytest.fixture(scope="session")
@@ -42,6 +54,12 @@ async def clean_tables(database_url: str) -> AsyncIterator[None]:
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as session:
         await session.execute(text(f"TRUNCATE {', '.join(_TENANT_TABLES)} CASCADE"))
+        await session.execute(
+            text(
+                "INSERT INTO tenants (id, name, slug) "
+                f"VALUES ('{_DEFAULT_TENANT}', 'Default workspace', 'default')"
+            )
+        )
         await session.commit()
     yield
     await engine.dispose()

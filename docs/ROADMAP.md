@@ -565,11 +565,6 @@ reduced to what an operator configures (connections + model gateway) pinned to t
 bottom of the nav as its own category. Same tracking rule as S12/S13: a line is
 deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S14-1 Map persistence.** Projects, hand-drawn repository nodes, typed
-  API-call/data-flow relations, positions and type/project assignments move from
-  localStorage to the API (tenant-scoped tables + RLS per the 0009 pattern, CRUD
-  routes, optimistic UI). Include a one-shot import of the browser-local state so
-  early maps are not lost.
 - [ ] **S14-2 The map feeds the estimator.** The human-curated relation graph joins
   the impact worker's inputs: impacted repo → its consumers along api/data edges
   (blast radius), repo `type` → discipline priors (fe/mobile → frontend,
@@ -623,6 +618,42 @@ regression test.
 - [ ] **Retriage the 23 unverified finder findings** (scheduler starvation, stuck
   `running` rows, pin-version pruning, per-request CodeGraph reassembly, worker
   call budget, …) — verify inline and fix the real ones.
+
+---
+
+## S15 — Accounts, roles and real multi-tenancy · `Status: 🟡 In progress (2026-08-06)`
+
+S10 gave the deployment OIDC and RLS but no notion of a PERSON: every caller was a
+synthetic admin on the default tenant. S15 makes the product something an
+organisation can actually be handed — a platform admin creates workspaces and every
+account, project owners shape their workspace's landscape, and everyone else works
+the product. Same tracking rule: a line is deleted when it ships.
+
+The first wave shipped (see CHANGELOG): local accounts with scrypt passwords and
+revocable session tokens, the three product roles + an orthogonal `can_sign` flag,
+the setup-token first-run gate, workspace CRUD with a platform admin able to act
+inside any workspace (`X-Estimo-Tenant`), and the sign-in gate in the web client.
+
+- [ ] **S15-1r Audit trail.** Who created/changed which account, who acted inside
+  another workspace and when. The `impersonating_tenant` flag already exists on the
+  principal and is currently unused — an admin working inside a customer's workspace
+  should leave a record, not a silence.
+- [ ] **S15-2 Password lifecycle.** Force-change on first sign-in (accounts are
+  created WITH a password today, which means it travels to the person by some other
+  channel), plus an expiry/rotation policy decision. No self-service reset without
+  an email path — that is a whole subsystem, and inventing half of it is worse than
+  not having it.
+- [ ] **S15-3 Per-project membership (decide).** Today a project owner can shape
+  every project in their workspace. If real use wants per-project ownership, it is a
+  `project_members` table and a check — but it doubles the permission surface, so it
+  needs a real reason first. Decision note in this file.
+- [ ] **S15-4 OIDC + local accounts together.** Both lanes work today, but an OIDC
+  caller has no row in `users`, so they cannot own a project and never appear in
+  People. Decide: provision a shadow account on first sign-in, or keep the lanes
+  exclusive per deployment.
+- [ ] **S15-5 Rate-limit the sign-in route.** scrypt makes each attempt expensive
+  for the attacker AND for us; a lockout/backoff policy that cannot be turned into a
+  denial of service against a real account needs measuring, not guessing.
 
 ---
 

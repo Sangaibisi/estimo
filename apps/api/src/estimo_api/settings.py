@@ -47,8 +47,13 @@ class Settings(BaseSettings):
             return None
         return value
 
-    # OIDC auth (ESTIMO_AUTH__ISSUER, …). Empty issuer => single-tenant open mode.
+    # OIDC auth (ESTIMO_AUTH__ISSUER, …). Empty issuer => local accounts only.
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    # One-time token that authorizes creating the FIRST platform admin (S15-1).
+    # Unset => the process generates one at boot and logs it, so an operator who
+    # never set it can still finish setup from the container log — and nobody who
+    # merely reaches the URL can.
+    setup_token: str = ""
     log_level: str = "INFO"
     cors_origins: list[str] = [
         "http://localhost:3000",

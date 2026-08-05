@@ -40,8 +40,16 @@ docker compose --profile mock up --build -d
 ```
 
 - API on `http://localhost:8000`, web on `http://localhost:3000`.
-- Runs **open in single-tenant mode** — no OIDC required. Every row belongs to the
-  implicit DEFAULT_TENANT.
+- Runs **open until you claim it** — a deployment with no accounts answers anonymous
+  callers, exactly as it always did, and every row belongs to the implicit
+  DEFAULT_TENANT. Open Settings → *Claim this deployment* to create the first
+  platform admin: it wants the setup token, which is either the `ESTIMO_SETUP_TOKEN`
+  you set or the one-time value the API prints at boot (`docker compose logs api |
+  grep "setup token"`). From that moment the API answers nobody without a session,
+  and accounts are created only by a platform admin (Settings → People).
+- Set **`ESTIMO_SECRET_KEY`** before doing that. It encrypts stored credentials and
+  is the root of the session-signing key; without it every API restart signs
+  everyone out.
 - The gateway is the one thing you must supply, and it is supplied from the **panel**:
   the endpoint, the key (encrypted at rest when `ESTIMO_SECRET_KEY` is set), the
   stage→model profiles and the timeouts, with a one-click round-trip test. No LLM
@@ -114,24 +122,34 @@ upgrades** (a regenerated password would break auth against the persisted volume
 
 ## 3. Multi-tenant (SaaS)
 
-Two things must be set (ADR-0007):
+Sign-in comes in two flavours, and a deployment picks one:
 
-1. **OIDC** — set `ESTIMO_AUTH__ISSUER` / `ESTIMO_AUTH__AUDIENCE` (and the role/tenant
-   claim paths) to the identity provider. Callers present a bearer access token; the
-   `tenant` claim scopes every request.
-2. **The RLS runtime role** — point `ESTIMO_DATABASE_URL` at the NOSUPERUSER
-   `estimo_app` role, **not** the owner (a superuser bypasses RLS entirely):
+- **Local accounts (default).** The platform admin creates every workspace and every
+  account under Settings → Workspaces / People. Roles are `platform_admin` (creates
+  workspaces and accounts, configures connections and the gateway, may act inside any
+  workspace), `project_owner` (creates projects and shapes the repository map) and
+  `user`; signing authority is the separate `can_sign` flag on an account. Session
+  tokens are signed from `ESTIMO_SECRET_KEY` and revoked implicitly whenever an
+  account's role, workspace, active state or password changes.
+- **OIDC** — set `ESTIMO_AUTH__ISSUER` / `ESTIMO_AUTH__AUDIENCE` (and the role/tenant
+  claim paths) to the identity provider. Callers present a bearer access token; the
+  `tenant` claim scopes every request. OIDC callers have no row in `users`, so they
+  cannot own a project and do not appear under People (ROADMAP S15-4).
 
-   ```
-   ESTIMO_DATABASE_URL=postgresql+asyncpg://estimo_app:<pw>@db:5432/estimo
-   ```
+Either way, **the RLS runtime role** must also be set (ADR-0007) — point
+`ESTIMO_DATABASE_URL` at the NOSUPERUSER
+`estimo_app` role, **not** the owner (a superuser bypasses RLS entirely):
 
-   The migration creates `estimo_app`; set its password out-of-band or via
-   `ESTIMO_APP_ROLE_PASSWORD` on the migration environment.
+```
+ESTIMO_DATABASE_URL=postgresql+asyncpg://estimo_app:<pw>@db:5432/estimo
+```
 
-   **Verify the app-role connection over TCP** (`psql -h <host> -U estimo_app`) — the
-   role authenticates with scram, unlike the trust-socket owner; a socket test can
-   falsely pass while isolation is off.
+The migration creates `estimo_app`; set its password out-of-band or via
+`ESTIMO_APP_ROLE_PASSWORD` on the migration environment.
+
+**Verify the app-role connection over TCP** (`psql -h <host> -U estimo_app`) — the
+role authenticates with scram, unlike the trust-socket owner; a socket test can
+falsely pass while isolation is off.
 
 ### Air-gapped
 
