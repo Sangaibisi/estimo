@@ -32,6 +32,7 @@ def _completion(text: str) -> httpx.Response:
         },
     )
 
+
 pytestmark = pytest.mark.db
 
 
