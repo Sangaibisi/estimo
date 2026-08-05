@@ -545,10 +545,6 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-6 Frontier-LLM eval arm (medium).** Add a free-form LLM arm (BRD + repo +
-  wiki context, no band constraint) beside the calibrated arm and the naive baseline in
-  the eval harness; measured MAE/coverage — not 2023-24 citations — decides future
-  number-policy changes (PRINCIPLES #7).
 - [ ] **S13-7 Atlassian MCP discovery leg (deferred, flag-gated).** Teamwork Graph MCP
   may *discover* candidate page IDs / issue keys — refs only, never text — feeding the
   S13-5 pin queue. Gated on Teamwork Graph GA or a measured retrieval-recall gap

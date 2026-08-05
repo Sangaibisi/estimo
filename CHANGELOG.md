@@ -9,6 +9,16 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-6 — the frontier eval arm.** `estimo-effort-eval --frontier` runs a
+  free-form LLM band per held-out ledger row (no analogs, no band constraint,
+  anchor-redacted like every model boundary) beside the calibrated arm and the
+  naive baseline, measured on the same MAE/coverage axes with its own case count —
+  it answers on rows the calibrated arm must skip for lack of analogs, which is
+  much of its point. Opt-in by construction: the default harness stays offline and
+  deterministic (CI unchanged), the gateway resolves panel-first like every CLI,
+  and the report now emits the `evals/README.md`-promised JSON beside the Markdown
+  plus a prompt-id line. It is these measured numbers — not model citations — that
+  decide any future number-policy change (PRINCIPLES #7).
 - **S13-5 — freshness: a per-connection sync scheduler and a "pin this source
   now" primitive.** Connections gain a panel-managed `sync_cadence_minutes`
   (migration 0019; NULL = the old manual/webhook-only behaviour — the column IS
