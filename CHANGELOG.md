@@ -9,6 +9,23 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S13-4 — number policy: the analog median stays the anchor, the LLM's role
+  around the number is bounded and auditable.** Three legs. (1) **Analog vetting**:
+  before the band is computed the model may flag non-comparable analogs out of the
+  median — every exclusion is printed in the assumption register naming the analog
+  and the stated reason (auditable, reversible), verdicts for analogs that were
+  never presented are discarded, and an unusable reply keeps the full set (refusing
+  to vet is not evidence of incomparability). (2) The **within-band nudge** now sees
+  the top-k analog cards (estimate prompt v2) — it judges the item against the
+  delivered history, not a bare number. (3) The constant **1/3/8 pd no-analog prior
+  is replaced**, when a model is available, by an evidence-grounded proposal fed the
+  impact analysis's claims: validated, **widened to the cone-of-uncertainty floor**
+  (a property of the output, not a hope about the model's self-restraint), LOW
+  confidence, `basis_note="model-proposed, uncalibrated"`, a `note://model-proposal`
+  reference and a 50%-of-likely contingency. The tenant's transfer quantiles are
+  NEVER wrapped around a model-proposed likely — they are measured against the
+  analog median (the 7%-coverage note), and the deterministic 1/3/8 prior remains
+  the exact fallback for the no-model and any-failure paths.
 - **S13-3 — the FE/BE discipline dimension, end to end.** The sharpened product goal
   is person-days *with a frontend/backend split*, so the split now exists at every
   layer instead of nowhere: `discipline` on `ledger_entries` (migration 0018, fed by

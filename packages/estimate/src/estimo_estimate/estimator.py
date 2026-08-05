@@ -41,6 +41,12 @@ from estimo_estimate.calibration import (
     transfer_distribution,
 )
 from estimo_estimate.impact_worker import analyze_impact
+from estimo_estimate.number_policy import (
+    MODEL_PROPOSED_BASIS,
+    analog_context,
+    propose_no_analog_band,
+    vet_analogs,
+)
 from estimo_estimate.prompts import load_estimate_prompt
 from estimo_gateway import GatewayClient, GatewayError
 
@@ -79,8 +85,12 @@ async def _llm_adjust_likely(
     prompt: Prompt,
     item_text: str,
     band: BandResult,
+    analogs: list[AnalogyCard] | None = None,
 ) -> tuple[float, str | None]:
-    """LLM may nudge likely WITHIN the band; anything else degrades to the draft."""
+    """LLM may nudge likely WITHIN the band; anything else degrades to the draft.
+
+    S13-4: the top-k analog cards ride along as context — the nudge judges the item
+    against the actual delivered history, not just against a bare number."""
     try:
         result = await client.complete(
             "estimate",
@@ -92,6 +102,7 @@ async def _llm_adjust_likely(
                         f"{prompt.text}\nBand: optimistic={band.range.optimistic} "
                         f"likely={band.range.likely} pessimistic={band.range.pessimistic}\n"
                         f"Work item:\n{fence(redact_anchors(item_text))}"
+                        f"{analog_context(analogs or [])}"
                     ),
                 },
             ],
@@ -217,13 +228,20 @@ async def estimate_state(
             session, query, client=client, limit=analog_limit
         )
         degraded_retrieval = degraded_retrieval or retrieval_degraded
+
+        # S13-4 analog vetting: the model may flag non-comparable analogs out of
+        # the median. Auditable — every exclusion lands in the assumption register
+        # — and fail-open: an unusable reply keeps the full set.
+        vet_notes: list[AssumptionRisk] = []
+        if client is not None and len(analogs) >= 2:
+            analogs, vet_notes = await vet_analogs(client, query, analogs)
         band = band_from_analogs(analogs, distribution)
 
         evidence: list[EvidenceRef] = [
             EvidenceRef.from_uri(f"ledger://{card.entry_id}", label=card.item_title)
             for card in analogs[:3]
         ]
-        assumptions: list[AssumptionRisk] = []
+        assumptions: list[AssumptionRisk] = [*vet_notes]
         risks: list[AssumptionRisk] = []
         analysis: ImpactAnalysis | None = None
 
@@ -277,33 +295,61 @@ async def estimate_state(
         evidence = deduped
 
         if band is None:
-            # No usable analogs: never invent a number silently (PRINCIPLES #7 spirit).
-            prior_band = ThreePoint(optimistic=1.0, likely=3.0, pessimistic=8.0)
+            # No usable analogs: never invent a number SILENTLY (PRINCIPLES #7).
+            # With a model: an evidence-grounded proposal, widened to the cone floor,
+            # labeled as its own reference class. The tenant's transfer quantiles are
+            # NEVER applied to it (number_policy module docstring). Without a model
+            # (or on any failure): the deterministic literature prior, unchanged.
+            proposal = None
+            if client is not None:
+                summary_parts = [
+                    claim.text for claim in (analysis.modules if analysis else ())[:4]
+                ] + [claim.text for claim in (analysis.integration_points if analysis else ())[:2]]
+                proposal = await propose_no_analog_band(
+                    client, query, "\n".join(summary_parts), _cone_stage(state)
+                )
+            if proposal is not None:
+                prior_band, rationale_note, proposal_assumptions = proposal
+                basis_note = MODEL_PROPOSED_BASIS + (
+                    f"; LLM: {rationale_note}" if rationale_note else ""
+                )
+                assumptions.extend(proposal_assumptions)
+                no_analog_risk = AssumptionRisk(
+                    kind="risk",
+                    text=(
+                        "Defterde benzer iş bulunamadı; bant kanıta dayalı MODEL "
+                        "önerisidir, kalibre edilmemiştir — uzman değerlendirmesi "
+                        "şarttır."
+                    ),
+                    contingency_pd=round(prior_band.likely * 0.5, 1),
+                )
+                fallback_ref = EvidenceRef.from_uri(
+                    "note://model-proposal", label="analogsuz model önerisi"
+                )
+            else:
+                prior_band = ThreePoint(optimistic=1.0, likely=3.0, pessimistic=8.0)
+                basis_note = "no-analog prior band"
+                no_analog_risk = AssumptionRisk(
+                    kind="risk",
+                    text=(
+                        "Defterde benzer iş bulunamadı; bant geniş literatür "
+                        "öncülüdür — uzman değerlendirmesi şarttır."
+                    ),
+                    contingency_pd=4.0,
+                )
+                fallback_ref = EvidenceRef.from_uri(
+                    "note://no-analogs", label="analog bulunamadı — literatür öncülü"
+                )
             lines.append(
                 EstimateLine(
                     work_item_id=item.id,
                     range=prior_band,
                     disciplines=_discipline_split(prior_band, analysis, history, item.module_tags),
                     confidence=Confidence.LOW,
-                    evidence=tuple(evidence)
-                    or (
-                        EvidenceRef.from_uri(
-                            "note://no-analogs", label="analog bulunamadı — literatür öncülü"
-                        ),
-                    ),
+                    evidence=(*evidence, fallback_ref) if evidence else (fallback_ref,),
                     assumptions=tuple(assumptions),
-                    risks=(
-                        *risks,
-                        AssumptionRisk(
-                            kind="risk",
-                            text=(
-                                "Defterde benzer iş bulunamadı; bant geniş literatür "
-                                "öncülüdür — uzman değerlendirmesi şarttır."
-                            ),
-                            contingency_pd=4.0,
-                        ),
-                    ),
-                    basis_note="no-analog prior band",
+                    risks=(*risks, no_analog_risk),
+                    basis_note=basis_note,
                 )
             )
             continue
@@ -311,7 +357,7 @@ async def estimate_state(
         likely = band.range.likely
         rationale: str | None = None
         if client is not None:
-            likely, rationale = await _llm_adjust_likely(client, prompt, query, band)
+            likely, rationale = await _llm_adjust_likely(client, prompt, query, band, analogs)
         final_range = ThreePoint(
             optimistic=min(band.range.optimistic, likely),
             likely=likely,

@@ -52,7 +52,8 @@ def card(entry_id: str, actual: float | None, likely: float | None = None) -> An
 
 class TestBands:
     def test_prompt_is_versioned(self) -> None:
-        assert load_estimate_prompt().id == "estimate-v1"
+        # v2: S13-4 added the analog-cards context block to the nudge prompt.
+        assert load_estimate_prompt().id == "estimate-v2"
 
     def test_no_analogs_returns_none(self) -> None:
         assert band_from_analogs([], DIST) is None

@@ -545,14 +545,6 @@ enormously in scope/impact **reasoning**, keep the **number** anchored on the le
 calibration, keep REST connectors as the only writer to the evidence index. Same
 tracking rule as S12: a line is deleted when it ships; the story goes to CHANGELOG.
 
-- [ ] **S13-4 Number policy refinement (medium).** Where analogs exist: keep the
-  analog-median anchor; add LLM **analog vetting** (flag non-comparable analogs out of
-  the median — auditable, citable) and give the within-band nudge the top-k analog
-  cards as context. Where no analogs exist: replace the constant 1/3/8 pd prior with
-  an evidence-grounded structured LLM proposal — cone-stage-wide band, LOW confidence,
-  `basis_note="model-proposed, uncalibrated"`, errors tracked as a separate reference
-  class. NEVER wrap tenant quantiles around an LLM-proposed likely (they are measured
-  against the analog median; see the 7%-coverage note in calibration.py).
 - [ ] **S13-5 Freshness + pin primitive (medium).** Per-connection sync scheduler with
   cadence config (Confluence has no external webhooks; git uses the existing HMAC
   webhook), and a "pin this source now" path: page ID / issue key → existing

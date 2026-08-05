@@ -48,10 +48,19 @@ def _scripted_reply(messages: list[dict[str, Any]]) -> str | None:
     The impact worker (S13-2) speaks a JSON-action protocol; a free-text reply would
     cost it two strikes per work item before it falls back. The mock finalizes
     immediately with an empty-but-valid analysis (claims need real evidence the mock
-    cannot cite; an empty analysis exercises the whole loop + verifier honestly)."""
-    system = str(next((m.get("content", "") for m in messages if m.get("role") == "system"), ""))
-    if "ESTIMO-IMPACT-PROTOCOL" in system:
+    cannot cite; an empty analysis exercises the whole loop + verifier honestly).
+    The vetting and no-analog legs (S13-4) get minimal valid replies the same way:
+    "everything comparable" and a deliberately wide band."""
+    joined = " ".join(str(m.get("content", "")) for m in messages)
+    if "ESTIMO-IMPACT-PROTOCOL" in joined:
         return _IMPACT_FINALIZE
+    if "ESTIMO-VET" in joined:
+        return '{"verdicts": []}'
+    if "ESTIMO-PROPOSE" in joined:
+        return (
+            '{"optimistic": 2, "likely": 5, "pessimistic": 20, '
+            '"rationale": "mock önerisi", "assumptions": ["mock varsayımı"]}'
+        )
     return None
 
 
