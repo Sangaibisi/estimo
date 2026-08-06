@@ -65,6 +65,28 @@ async def clean_tables(database_url: str) -> AsyncIterator[None]:
     await engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+async def _unclaimed_deployment(database_url: str) -> AsyncIterator[None]:
+    """Every api test starts on a deployment nobody has claimed yet.
+
+    `users` is unlike every other table in these tests: it does not just hold data,
+    it decides whether the API answers anonymous callers at all (S15-1). So one test
+    creating an account silently 401s every later test whose fixtures happen to
+    clean a different list — which is exactly how test_metrics_api.py broke the
+    first time accounts existed.
+
+    Autouse, and in the SHARED conftest, because the alternative is every future
+    test file remembering a precondition it does not otherwise care about.
+    """
+    engine = create_async_engine(database_url)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as session:
+        await session.execute(text("TRUNCATE users CASCADE"))
+        await session.commit()
+    await engine.dispose()
+    yield
+
+
 @pytest.fixture
 async def session(database_url: str) -> AsyncIterator[AsyncSession]:
     engine = create_async_engine(database_url)

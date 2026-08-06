@@ -236,6 +236,24 @@ export const api = {
     }),
   deleteRelation: (projectId: string, relationId: string) =>
     request<void>(`/v1/projects/${projectId}/relations/${relationId}`, { method: "DELETE" }),
+  remoteRepos: (connectionId: string) =>
+    request<{
+      connection_id: string;
+      scope: string;
+      repos: { slug: string; name: string; clone_url: string }[];
+    }>(`/v1/connections/${connectionId}/remote-repos`),
+  importRepos: (
+    projectId: string,
+    payload: {
+      connection_id: string;
+      node_type: string;
+      repos: { slug: string; name?: string; clone_url: string }[];
+    },
+  ) =>
+    request<{ added: number; skipped: string[]; connections_created: number; syncing: number }>(
+      `/v1/projects/${projectId}/repos/import`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
 
   listEstimates: () => request<EstimateSummary[]>("/v1/estimates"),
   getEstimate: (id: string) =>

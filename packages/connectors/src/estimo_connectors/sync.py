@@ -14,6 +14,7 @@ import asyncio
 import datetime as dt
 import logging
 import re
+import uuid as uuid_module
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,36 @@ _PATH_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 class SyncAlreadyRunningError(RuntimeError):
     pass
+
+
+async def effective_secret(session: AsyncSession, connection: Connection) -> str | None:
+    """The connection's credential, following a `derived_from` reference (S14).
+
+    A repository imported onto the map through a configured connection carries no
+    credential of its own — `config["derived_from"]` names the connection whose
+    credential it borrows. That keeps ONE source of truth: rotating the PAT on the
+    configured connection rotates it for every imported repo at its next sync,
+    instead of leaving sealed copies scattered across derived rows.
+
+    The parent lookup runs on the caller's tenant-scoped session, so a derived_from
+    pointing across tenants resolves to nothing rather than to someone else's token.
+    """
+    token = connection_secret(connection)
+    if token is not None:
+        return token
+    parent_ref = (connection.config or {}).get("derived_from")
+    if not parent_ref:
+        return None
+    try:
+        parent_id = uuid_module.UUID(str(parent_ref))
+    except ValueError:
+        return None
+    if parent_id == connection.id:
+        return None
+    parent = await session.get(Connection, parent_id)
+    if parent is None:
+        return None
+    return connection_secret(parent)
 
 
 def _workdir_name(connection: Connection) -> str:
@@ -234,7 +265,7 @@ async def _sync_git(
     client: GatewayClient | None,
 ) -> dict[str, Any]:
     config = connection.config or {}
-    token = connection_secret(connection)
+    token = await effective_secret(session, connection)
     state = await clone_or_fetch(
         connection.base_url,
         repos_dir / _workdir_name(connection),

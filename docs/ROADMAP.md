@@ -562,9 +562,22 @@ the backend follows them. The 2026-08-06 UI wave shipped (see CHANGELOG): the OK
 dark design language (docs/design/repository-map.dc.html) across every screen, the
 Repository Map surface at `/map`, English-only UI, light theme removed, and Settings
 reduced to what an operator configures (connections + model gateway) pinned to the
-bottom of the nav as its own category. Same tracking rule as S12/S13: a line is
+bottom of the nav as its own category. The second wave shipped the backend the map
+stands on: server-side projects/nodes/relations (S14-1), and the flow the maintainer
+described — a platform admin configures the hosting connection once, project owners
+pick a project and then browse-and-import that connection's repositories onto the map
+without ever handling the credential. Same tracking rule as S12/S13: a line is
 deleted when it ships; the story goes to CHANGELOG.
 
+- [ ] **S14-5 Import feedback where the importer can see it.** An imported repo
+  schedules its first sync; when that sync FAILS (wrong branch, revoked token) the
+  node just says "not synced yet" and the reason lives in Settings — which a project
+  owner cannot open. Surface the failing run on the node itself, with the remedy
+  named and the credential nowhere in sight.
+- [ ] **S14-6 Discovery beyond one project key.** Bitbucket DC discovery lists ONE
+  project's repositories (the one the connection's URL names). Browsing a whole
+  server, or several projects through one connection, needs a project picker and a
+  paging story the 500-repo cap does not silently truncate.
 - [ ] **S14-2 The map feeds the estimator.** The human-curated relation graph joins
   the impact worker's inputs: impacted repo → its consumers along api/data edges
   (blast radius), repo `type` → discipline priors (fe/mobile → frontend,

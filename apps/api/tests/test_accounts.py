@@ -44,9 +44,7 @@ async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
 
 
 async def _bootstrap(client: httpx.AsyncClient) -> str:
-    response = await client.post(
-        "/v1/auth/bootstrap", json={"setup_token": SETUP_TOKEN, **ADMIN}
-    )
+    response = await client.post("/v1/auth/bootstrap", json={"setup_token": SETUP_TOKEN, **ADMIN})
     assert response.status_code == 201, response.text
     token: str = response.json()["token"]
     return token
@@ -75,9 +73,7 @@ async def test_a_fresh_deployment_is_open_until_someone_claims_it(
     }
 
     # The setup token is what stops a passer-by from becoming the administrator.
-    refused = await client.post(
-        "/v1/auth/bootstrap", json={"setup_token": "guessed", **ADMIN}
-    )
+    refused = await client.post("/v1/auth/bootstrap", json={"setup_token": "guessed", **ADMIN})
     assert refused.status_code == 403
 
     token = await _bootstrap(client)
@@ -216,7 +212,9 @@ async def test_revoking_authority_ends_live_sessions_immediately(
     assert refused.status_code == 403
 
     # Deactivation is the same story, one step harder.
-    await client.patch(f"/v1/users/{user_id}", headers=_auth(admin_token), json={"is_active": False})
+    await client.patch(
+        f"/v1/users/{user_id}", headers=_auth(admin_token), json={"is_active": False}
+    )
     assert (await client.get("/v1/projects", headers=_auth(user_token))).status_code == 401
     denied = await client.post(
         "/v1/auth/login",
@@ -271,7 +269,9 @@ async def test_a_workspace_cannot_see_another_workspaces_map(client: httpx.Async
 
     # Each workspace sees exactly its own project — the acting-tenant header moves
     # the admin between them rather than merging them.
-    home_names = {p["name"] for p in (await client.get("/v1/projects", headers=_auth(admin_token))).json()}
+    home_names = {
+        p["name"] for p in (await client.get("/v1/projects", headers=_auth(admin_token))).json()
+    }
     away_names = {
         p["name"]
         for p in (

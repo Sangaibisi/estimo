@@ -9,6 +9,26 @@ Until the first code release, entries track documentation and foundation milesto
 ## [Unreleased]
 
 ### Added
+- **S14 — the repository map runs on the configured connections.** The flow the map
+  was drawn for now works end to end: a platform admin configures one hosting
+  connection in Settings, and a project owner opens the map, picks a project, and
+  **browses that connection's repositories** — the real list, fetched with the
+  connection's own credential — ticking the ones that belong to the project. What
+  gets imported becomes a live node: a *derived* connection carrying the discovered
+  clone URL and a `derived_from` reference to the connection whose credential it
+  borrows, so the credential is never copied and rotating it in one place rotates it
+  everywhere. Each import schedules the same background first sync the manual
+  button does, which is what fills the node's code graph.
+  Two boundaries make this safe to hand to someone without operator rights. A
+  borrowed credential may only ever travel to **the connection's own host** — a
+  clone URL pointing anywhere else is refused outright, because "import this repo"
+  must not become a way to send a platform admin's token to a server of the
+  importer's choosing. And discovery *and* import are project-owner surfaces: a
+  plain user reads the map and is offered nothing to press. Discovery speaks
+  Bitbucket **Data Center** (the flavour these deployments actually run — start/limit
+  paging, PAT as `Authorization: Bearer`, context paths preserved) alongside the
+  existing Cloud/GitHub/GitLab listing, and derives the server and project key from
+  whichever URL shape the operator happened to paste.
 - **S15-1 — accounts, three product roles, and multi-tenancy people can actually
   use.** Until now every caller was a synthetic admin on one implicit tenant: S10
   shipped OIDC and row-level security, but the product had no notion of a *person*.

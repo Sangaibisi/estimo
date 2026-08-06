@@ -258,9 +258,7 @@ async def update_user(
         if payload.password is not None:
             complaint = password_complaint(payload.password)
             if complaint:
-                raise HTTPException(
-                    status_code=422, detail=complaint
-                )
+                raise HTTPException(status_code=422, detail=complaint)
             user.password_hash = hash_password(payload.password)
         # Any of role, tenant, active-state or password changes what a live session
         # is entitled to, so all of them end the sessions already issued rather than

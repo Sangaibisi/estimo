@@ -14,14 +14,17 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
+import httpx
 from estimo_connectors import (
     CONNECTION_KINDS,
     CanonicalPage,
     Connection,
+    DiscoveryUnsupported,
     SyncRun,
     approve,
     generate_candidate,
     push_event_branches,
+    remote_repos,
     resolve_secret,
     run_sync,
     verify_webhook,
@@ -36,6 +39,7 @@ from estimo_connectors.pins import (
 from estimo_connectors.sync import (
     STALE_RUNNING_AFTER,
     SyncAlreadyRunningError,
+    effective_secret,
     sweep_interrupted_runs,
 )
 from estimo_knowledge import is_stale
@@ -49,6 +53,7 @@ from estimo_api.auth import (
     clamp_acl_keys,
     current_principal,
     require_admin,
+    require_project_owner,
     require_reviewer,
 )
 from estimo_api.db import get_session
@@ -457,6 +462,51 @@ class CadenceIn(BaseModel):
     # None turns scheduling OFF for the connection — deliberate, so it is the
     # explicit body value, not an omitted field.
     sync_cadence_minutes: int | None = Field(default=None, ge=5, le=10080)
+
+
+@router.get(
+    "/connections/{connection_id}/remote-repos",
+    dependencies=[Depends(require_project_owner)],
+)
+async def list_remote_repos(connection_id: uuid.UUID, session: SessionDep) -> dict[str, Any]:
+    """What this connection's credential can see on its hosting server (S14).
+
+    Project owners shape the map, so they — not only platform admins — may browse.
+    The response carries names and clone URLs only; the credential itself never
+    leaves the API, and the call is read-only against the remote.
+    """
+    connection = await session.get(Connection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="connection not found")
+    config = connection.config or {}
+    token = await effective_secret(session, connection)
+    try:
+        scope, repos = await remote_repos(
+            kind=connection.kind,
+            base_url=connection.base_url,
+            config=config,
+            token=token,
+            username=config.get("username"),
+            bearer=config.get("auth") == "bearer",
+        )
+    except DiscoveryUnsupported as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except httpx.HTTPError as exc:
+        # Network-shaped failures are the server's, not the caller's; keep the
+        # message but never the credential (httpx errors carry only the URL).
+        raise HTTPException(
+            status_code=502, detail=f"could not reach the hosting server: {exc}"
+        ) from exc
+    return {
+        "connection_id": str(connection.id),
+        "scope": scope,
+        "repos": [
+            {"slug": repo.slug, "name": repo.full_name, "clone_url": repo.clone_url}
+            for repo in repos
+        ],
+    }
 
 
 @router.patch("/connections/{connection_id}", dependencies=[Depends(require_admin)])

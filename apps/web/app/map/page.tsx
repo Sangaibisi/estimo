@@ -129,6 +129,17 @@ export default function MapPage() {
   const [drafted, setDrafted] = useState<Record<string, { x: number; y: number }>>({});
 
   const [showAdd, setShowAdd] = useState(false);
+  // Browse-and-import (S14): the configured connection being browsed, what its
+  // credential can see, and which repos are ticked for import.
+  const [browsing, setBrowsing] = useState<ConnectionEntry | null>(null);
+  const [remote, setRemote] = useState<{
+    loading: boolean;
+    error: string | null;
+    scope: string;
+    repos: { slug: string; name: string; clone_url: string }[];
+  } | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [importNote, setImportNote] = useState<string | null>(null);
   const [showAddProject, setShowAddProject] = useState(false);
   const [projectDraft, setProjectDraft] = useState("");
   const [draft, setDraft] = useState({
@@ -141,7 +152,13 @@ export default function MapPage() {
   const loadProjects = useCallback(async () => {
     const rows = await api.listProjects();
     setProjects(rows);
-    setProjectId((current) => current ?? rows[0]?.id ?? null);
+    // Project-first flow: come back to the project you were working in, fall back
+    // to the first one. (Selection is per browser, like a cursor, not shared state.)
+    const remembered = window.localStorage.getItem("estimo-map-project");
+    setProjectId(
+      (current) =>
+        current ?? rows.find((row) => row.id === remembered)?.id ?? rows[0]?.id ?? null,
+    );
     return rows;
   }, []);
 
@@ -168,6 +185,7 @@ export default function MapPage() {
   }, [loadProjects]);
 
   useEffect(() => {
+    if (projectId) window.localStorage.setItem("estimo-map-project", projectId);
     if (!projectId) {
       setBoard(null);
       return;
@@ -194,6 +212,16 @@ export default function MapPage() {
     return map;
   }, [repos]);
 
+  /** Configured hosting connections a project owner can browse repositories
+   * through — parents only; derived children are not browse roots. */
+  const browsable = useMemo(
+    () =>
+      connections.filter(
+        (c) => GIT_KINDS.has(c.kind) && !(c.config && (c.config as Record<string, unknown>).derived_from),
+      ),
+    [connections],
+  );
+
   /** Connections not yet on this map — the "add a synced repository" shortlist. */
   const unplaced = useMemo(() => {
     const linked = new Set(repos.map((repo) => repo.connection_id).filter(Boolean));
@@ -213,6 +241,52 @@ export default function MapPage() {
       setBusy(false);
     }
   }
+
+  const openBrowse = useCallback((connection: ConnectionEntry) => {
+    setBrowsing(connection);
+    setPicked(new Set());
+    setImportNote(null);
+    setRemote({ loading: true, error: null, scope: "", repos: [] });
+    api
+      .remoteRepos(connection.id)
+      .then((result) =>
+        setRemote({ loading: false, error: null, scope: result.scope, repos: result.repos }),
+      )
+      .catch((err) => setRemote({ loading: false, error: String(err), scope: "", repos: [] }));
+  }, []);
+
+  const runImport = useCallback(async () => {
+    if (!browsing || !projectId || !remote) return;
+    const chosen = remote.repos.filter((repo) => picked.has(repo.slug));
+    if (chosen.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.importRepos(projectId, {
+        connection_id: browsing.id,
+        node_type: draft.type,
+        repos: chosen.map((repo) => ({
+          slug: repo.slug,
+          name: repo.slug,
+          clone_url: repo.clone_url,
+        })),
+      });
+      setImportNote(
+        `${result.added} added` +
+          (result.syncing ? ` · ${result.syncing} syncing` : "") +
+          (result.skipped.length ? ` · already on map: ${result.skipped.join(", ")}` : ""),
+      );
+      setPicked(new Set());
+      await loadBoard(projectId);
+      await loadProjects();
+    } catch (err) {
+      setImportNote(null);
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browsing, projectId, remote, picked, draft.type]);
 
   /* ---- Layout: layer columns, platform row, dragged points on top. ---- */
   const layout = useMemo(() => {
@@ -978,11 +1052,185 @@ export default function MapPage() {
               }}
             >
               <div style={{ ...mono(10.5, 0.14), color: "var(--mut)" }}>
-                NEW REPOSITORY IN {project.key}
+                ADD REPOSITORIES TO {project.key}
               </div>
+
+              {/* The main lane: browse what a configured connection can actually
+                  see, tick the repositories that belong to this project, import.
+                  The credential stays on the server — this is the whole reason a
+                  project owner never needs one. */}
+              {browsable.length === 0 && (
+                <div style={{ fontSize: 11.5, color: "var(--mut)", textWrap: "pretty" }}>
+                  No repository connection is configured for this workspace yet. A platform
+                  admin adds one in <Link href="/admin">Settings</Link>; after that you can
+                  browse its repositories here without ever handling the credential.
+                </div>
+              )}
+              {browsable.length > 0 && (
+                <>
+                  <div style={sectionLabel}>BROWSE A CONNECTION</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {browsable.map((connection) => (
+                      <button
+                        key={connection.id}
+                        type="button"
+                        className={browsing?.id === connection.id ? "btn glow" : "btn"}
+                        style={{ gap: 8 }}
+                        disabled={busy}
+                        onClick={() => openBrowse(connection)}
+                      >
+                        <ConnectorMark kind={connection.kind} size={18} />
+                        {connection.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {browsing && remote && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {remote.loading && (
+                    <div style={{ ...mono(11), color: "var(--mut)" }}>
+                      Asking {browsing.name} what it can see…
+                    </div>
+                  )}
+                  {remote.error && (
+                    <div
+                      role="alert"
+                      style={{ fontSize: 11.5, color: "var(--crit)", textWrap: "pretty" }}
+                    >
+                      {remote.error}
+                    </div>
+                  )}
+                  {!remote.loading && !remote.error && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          ...mono(10),
+                          color: "var(--mut)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            flex: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={remote.scope}
+                        >
+                          {remote.scope}
+                        </span>
+                        <span>{remote.repos.length} repos</span>
+                      </div>
+                      <div
+                        style={{
+                          maxHeight: 230,
+                          overflowY: "auto",
+                          border: "1px solid var(--line)",
+                          borderRadius: 9,
+                          background: "oklch(0.17 0.014 295)",
+                        }}
+                      >
+                        {remote.repos.map((repo) => {
+                          const onMap = repos.some((node) => node.name === repo.slug);
+                          return (
+                            <label
+                              key={repo.slug}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 9,
+                                padding: "7px 10px",
+                                borderBottom: "1px solid var(--line)",
+                                cursor: onMap ? "default" : "pointer",
+                                opacity: onMap ? 0.45 : 1,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={onMap || busy}
+                                checked={picked.has(repo.slug)}
+                                onChange={(event) =>
+                                  setPicked((current) => {
+                                    const next = new Set(current);
+                                    if (event.target.checked) next.add(repo.slug);
+                                    else next.delete(repo.slug);
+                                    return next;
+                                  })
+                                }
+                                style={{ width: 13, height: 13, padding: 0, flex: "none" }}
+                              />
+                              <span
+                                style={{
+                                  ...mono(11.5),
+                                  flex: 1,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {repo.slug}
+                              </span>
+                              {onMap && (
+                                <span style={{ ...mono(9), color: "var(--mut)" }}>on map</span>
+                              )}
+                            </label>
+                          );
+                        })}
+                        {remote.repos.length === 0 && (
+                          <div style={{ padding: "10px", fontSize: 11.5, color: "var(--mut)" }}>
+                            This credential sees no repositories here.
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ padding: "5px 9px" }}
+                          disabled={busy || remote.repos.length === 0}
+                          onClick={() =>
+                            setPicked((current) =>
+                              current.size
+                                ? new Set()
+                                : new Set(
+                                    remote.repos
+                                      .filter(
+                                        (repo) => !repos.some((node) => node.name === repo.slug),
+                                      )
+                                      .map((repo) => repo.slug),
+                                  ),
+                            )
+                          }
+                        >
+                          {picked.size ? "Clear" : "Select all"}
+                        </button>
+                        <span style={{ flex: 1 }} />
+                        <button
+                          type="button"
+                          className="btn p"
+                          disabled={busy || picked.size === 0}
+                          onClick={() => void runImport()}
+                        >
+                          Import {picked.size || ""} as {TYPES[draft.type].label}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {importNote && (
+                    <div style={{ ...mono(10.5), color: "var(--ok)" }}>{importNote}</div>
+                  )}
+                </div>
+              )}
+
               {unplaced.length > 0 && (
                 <>
-                  <div style={{ ...sectionLabel }}>SYNCED, NOT YET PLACED</div>
+                  <div style={{ height: 1, background: "var(--line)" }} />
+                  <div style={sectionLabel}>SYNCED, NOT YET PLACED</div>
                   {unplaced.map((connection) => (
                     <button
                       key={connection.id}
@@ -1006,9 +1254,11 @@ export default function MapPage() {
                       {connection.name}
                     </button>
                   ))}
-                  <div style={{ height: 1, background: "var(--line)" }} />
                 </>
               )}
+
+              <div style={{ height: 1, background: "var(--line)" }} />
+              <div style={sectionLabel}>OR DECLARE ONE BY NAME</div>
               <input
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -1052,7 +1302,7 @@ export default function MapPage() {
                     })
                   }
                 >
-                  Add
+                  Declare
                 </button>
                 <button type="button" className="btn" onClick={() => setShowAdd(false)}>
                   Cancel

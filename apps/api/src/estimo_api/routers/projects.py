@@ -15,9 +15,10 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
 from estimo_connectors.db import Connection, SyncRun
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +33,8 @@ from estimo_api.projects_models import (
     ProjectRelation,
     ProjectRepo,
 )
+from estimo_api.runtime_config import effective_gateway
+from estimo_api.tenancy import get_current_tenant
 
 router = APIRouter(prefix="/v1/projects", tags=["projects"])
 
@@ -123,6 +126,32 @@ class RepoPatch(BaseModel):
     @classmethod
     def _known_type(cls, value: str | None) -> str | None:
         if value is not None and value not in NODE_TYPES:
+            raise ValueError(f"node_type must be one of {', '.join(NODE_TYPES)}")
+        return value
+
+
+GIT_KINDS = ("git", "github", "gitlab", "bitbucket")
+
+# One import call is one human gesture on the map — a page of checkboxes, not a
+# migration tool. The cap keeps a stray "select all" on a giant server bounded.
+MAX_IMPORT_REPOS = 50
+
+
+class ImportRepoIn(BaseModel):
+    slug: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, max_length=200)
+    clone_url: str = Field(min_length=8, max_length=500)
+
+
+class ImportIn(BaseModel):
+    connection_id: uuid.UUID
+    node_type: str = "be"
+    repos: list[ImportRepoIn] = Field(min_length=1, max_length=MAX_IMPORT_REPOS)
+
+    @field_validator("node_type")
+    @classmethod
+    def _known_type(cls, value: str) -> str:
+        if value not in NODE_TYPES:
             raise ValueError(f"node_type must be one of {', '.join(NODE_TYPES)}")
         return value
 
@@ -529,3 +558,166 @@ async def delete_relation(
     if result.rowcount == 0:  # type: ignore[attr-defined]
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such relation")
     await session.commit()
+
+
+@router.post("/{project_id}/repos/import", status_code=status.HTTP_201_CREATED)
+async def import_repos(
+    session: SessionDep,
+    tenant: TenantDep,
+    project_id: uuid.UUID,
+    payload: ImportIn,
+    principal: OwnerDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> dict[str, Any]:
+    """Place repositories discovered through a configured connection onto the map.
+
+    Each imported repo becomes a DERIVED connection: same kind, the discovered
+    clone URL, and `config["derived_from"]` pointing at the connection whose
+    credential it borrows (resolved at sync time — one credential, one place to
+    rotate it). The node lands on the map immediately; the first sync — clone,
+    code graph, module wikis — runs in the background.
+
+    Host pinning is the security boundary here: a derived clone URL must live on
+    the SAME host as the connection it borrows the credential from, or a project
+    owner could point a "discovered" repo at an attacker's server and have the
+    sync send the platform admin's token there.
+    """
+    await _load_project(session, project_id, tenant)
+    parent = (
+        await session.execute(
+            select(Connection).where(
+                Connection.id == payload.connection_id, Connection.tenant_id == tenant
+            )
+        )
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such connection")
+    if parent.kind not in GIT_KINDS:
+        raise HTTPException(
+            status_code=422, detail=f"{parent.kind} connections do not hold repositories"
+        )
+    parent_host = urlsplit(parent.base_url).netloc
+    parent_config = parent.config or {}
+
+    existing_names = {
+        row[0]
+        for row in (
+            await session.execute(
+                select(ProjectRepo.name).where(
+                    ProjectRepo.project_id == project_id, ProjectRepo.tenant_id == tenant
+                )
+            )
+        ).all()
+    }
+
+    added = 0
+    skipped: list[str] = []
+    new_connection_ids: list[uuid.UUID] = []
+    for item in payload.repos:
+        node_name = (item.name or item.slug).strip() or item.slug
+        if node_name in existing_names:
+            skipped.append(node_name)
+            continue
+        parsed = urlsplit(item.clone_url)
+        if parsed.scheme not in ("http", "https") or parsed.netloc != parent_host:
+            # Not silently skipped: a mismatched host in an "import" payload is
+            # either corruption or an exfiltration attempt, and both deserve a
+            # refusal the caller can see.
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"clone URL for {item.slug!r} is not on {parent_host} — imported "
+                    "repositories must live on the connection's own server"
+                ),
+            )
+
+        connection: Connection | None
+        if parent.base_url == item.clone_url:
+            connection = parent
+        else:
+            connection = (
+                (
+                    await session.execute(
+                        select(Connection).where(
+                            Connection.tenant_id == tenant, Connection.base_url == item.clone_url
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+        if connection is None:
+            connection = Connection(
+                kind=parent.kind,
+                # Unique per tenant; the slug is the natural name, the project key
+                # disambiguates when two Bitbucket projects share a slug.
+                name=await _free_connection_name(session, tenant, item.slug),
+                base_url=item.clone_url,
+                config={
+                    "derived_from": str(parent.id),
+                    **{
+                        key: parent_config[key]
+                        for key in ("auth", "username")
+                        if parent_config.get(key)
+                    },
+                },
+                secret=None,
+                secret_env=None,
+                acl_keys=list(parent.acl_keys) if parent.acl_keys else None,
+            )
+            session.add(connection)
+            await session.flush()
+            new_connection_ids.append(connection.id)
+
+        session.add(
+            ProjectRepo(
+                project_id=project_id,
+                name=node_name,
+                provider=parent.kind,
+                node_type=payload.node_type,
+                connection_id=connection.id,
+            )
+        )
+        existing_names.add(node_name)
+        added += 1
+
+    await session.commit()
+
+    # First syncs run after the response; each one is tenant-pinned and reuses the
+    # exact background path the manual "Sync now" button takes.
+    from estimo_api.routers import connections as connections_router
+
+    gateway = await effective_gateway(request, session)
+    for connection_id in new_connection_ids:
+        background.add_task(
+            connections_router._run_sync_bg,
+            request.app.state.sessionmaker,
+            connection_id,
+            gateway,
+            get_current_tenant(),
+        )
+
+    return {
+        "added": added,
+        "skipped": skipped,
+        "connections_created": len(new_connection_ids),
+        "syncing": len(new_connection_ids),
+    }
+
+
+async def _free_connection_name(session: AsyncSession, tenant: uuid.UUID, slug: str) -> str:
+    """`slug`, or `slug-2`… when a different connection already wears it."""
+    taken = {
+        row[0]
+        for row in (
+            await session.execute(select(Connection.name).where(Connection.tenant_id == tenant))
+        ).all()
+    }
+    if slug not in taken:
+        return slug
+    for suffix in range(2, 100):
+        candidate = f"{slug}-{suffix}"
+        if candidate not in taken:
+            return candidate
+    raise HTTPException(status_code=409, detail=f"too many connections named {slug!r}")
